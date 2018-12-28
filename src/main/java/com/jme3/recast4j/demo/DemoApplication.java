@@ -79,12 +79,10 @@ public class DemoApplication extends SimpleApplication {
         Material matRed = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matRed.setColor("Color", ColorRGBA.Red);
         // navMesh.getTile(0).data == meshData (in this particular case)
-        System.out.println(meshData.detailMeshes.length);
-        // Problem might be related to Batching all 3935 meshes?
         Geometry g = new Geometry("DebugMesh", RecastUtils.getDebugMesh(meshData.detailMeshes, meshData.detailVerts, meshData.detailTris));
         g.setMaterial(matRed);
         g.setLocalScale(0.01f);
-        g.move(0f, 0.5f, 0f);
+        g.move(0f, 0.01f, 0f);
         rootNode.attachChild(g);
 
         System.err.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
