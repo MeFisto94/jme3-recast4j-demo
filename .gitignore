@@ -1,5 +1,10 @@
 .gradle
 /build/
+/.idea/
+*.so
+*.dll
+*.dylib
+test.nm
 
 # Ignore Gradle GUI config
 gradle-app.setting

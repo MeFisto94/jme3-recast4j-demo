@@ -1,0 +1,2 @@
+rootProject.name = "jme3-recast4j-demo"
+include 'assets' // Assets are our Subproject

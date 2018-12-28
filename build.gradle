@@ -1,0 +1,65 @@
+allprojects {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven { url "https://jitpack.io" }        
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'application'
+
+if (!hasProperty('mainClass')) {
+	mainClassName = 'com.jme3.recast4j.demo.DemoApplication'
+}
+
+ext.jmeVersion = "[3.2,)"
+
+project(":assets") {
+    apply plugin: "java"
+
+    buildDir = rootProject.file("build/assets")
+
+    sourceSets {
+        main {
+            resources {
+                srcDir '.'
+            }
+        }
+    }
+}
+
+dependencies {
+    // Engine
+    compile "org.jmonkeyengine:jme3-core:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-desktop:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-lwjgl:$jmeVersion"
+
+    compile "org.jmonkeyengine:jme3-bullet:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-bullet-native:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-terrain:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-jogg:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-effects:$jmeVersion"
+    compile "org.jmonkeyengine:jme3-plugins:$jmeVersion"
+    
+    // @TODO: Not yet transitive from jme3-recast4j
+    implementation 'com.github.ppiastucki.recast4j:parent:master-SNAPSHOT'
+    implementation 'com.github.ppiastucki.recast4j:detour-tile-cache:master-SNAPSHOT'
+    implementation 'com.github.ppiastucki.recast4j:detour-crowd:master-SNAPSHOT'
+    implementation 'com.github.ppiastucki.recast4j:detour-extras:master-SNAPSHOT'
+    implementation 'com.github.ppiastucki.recast4j:recast:master-SNAPSHOT'
+    implementation 'com.github.ppiastucki.recast4j:detour:master-SNAPSHOT'
+    
+    /*
+    compile 'org.slf4j:slf4j-api:1.7.21'
+    compile 'org.slf4j:slf4j-simple:1.7.21'
+    compile 'org.codehaus.groovy:groovy-all:2.4.7'
+    compile 'com.google.guava:guava:19.0'
+    compile 'com.simsilica:lemur:1.8.2'
+    compile 'com.simsilica:lemur-proto:1.7.1'
+    compile 'com.simsilica:lemur-props:1.0.1'
+    */
+
+    compile files("jme3-recast4j.jar")
+    runtime project(':assets')
+}
