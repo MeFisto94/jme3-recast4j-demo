@@ -11,6 +11,7 @@ import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Recast.RecastConfigBuilder;
 import com.jme3.recast4j.Recast.RecastTest;
+import com.jme3.recast4j.Recast.RecastUtils;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -65,6 +66,8 @@ public class DemoApplication extends SimpleApplication {
         viewPort.addProcessor(fpp);
         fpp.addFilter(new SSAOFilter(1f, 1f, 0.1f, 0.1f));
 
+        System.err.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
+        long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
         MeshData meshData = RecastTest.buildBlockingRenderThread(worldMap.getMesh());
         navMesh = new NavMesh(meshData, 0, 0);
         try {
@@ -72,6 +75,19 @@ public class DemoApplication extends SimpleApplication {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+
+        Material matRed = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        matRed.setColor("Color", ColorRGBA.Red);
+        // navMesh.getTile(0).data == meshData (in this particular case)
+        System.out.println(meshData.detailMeshes.length);
+        // Problem might be related to Batching all 3935 meshes?
+        Geometry g = new Geometry("DebugMesh", RecastUtils.getDebugMesh(meshData.detailMeshes, meshData.detailVerts, meshData.detailTris));
+        g.setMaterial(matRed);
+        g.setLocalScale(0.01f);
+        g.move(0f, 0.5f, 0f);
+        rootNode.attachChild(g);
+
+        System.err.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
     }
 
     @Override
