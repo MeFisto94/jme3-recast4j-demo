@@ -15,6 +15,7 @@ import com.jme3.recast4j.Recast.RecastUtils;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
+import com.jme3.scene.shape.Box;
 import org.recast4j.detour.MeshData;
 import org.recast4j.detour.NavMesh;
 
@@ -42,8 +43,9 @@ public class DemoApplication extends SimpleApplication {
         mat.setColor("Diffuse", ColorRGBA.Red);
         mat.setColor("Ambient", ColorRGBA.White);
         mat.setBoolean("UseMaterialColors", true);
-        worldMap = (Geometry)assetManager.loadModel("Models/dune.j3o");
-        worldMap.setLocalScale(0.01f);
+        //worldMap = (Geometry)assetManager.loadModel("Models/dune.j3o");
+        worldMap = new Geometry("", new Box(64f, 1f, 64f));
+        //worldMap.setLocalScale(0.01f);
         worldMap.setMaterial(mat);
         // @TODO: Dune.j3o does not have normals and thus no neat lighting.
         //TangentBinormalGenerator.generate(worldMap.getMesh());
@@ -81,8 +83,9 @@ public class DemoApplication extends SimpleApplication {
         // navMesh.getTile(0).data == meshData (in this particular case)
         Geometry g = new Geometry("DebugMesh", RecastUtils.getDebugMesh(meshData.detailMeshes, meshData.detailVerts, meshData.detailTris));
         g.setMaterial(matRed);
-        g.setLocalScale(0.01f);
-        g.move(0f, 0.01f, 0f);
+        //g.setLocalScale(0.01f);
+        System.out.println(g.getVertexCount());
+        g.move(0f, 0.1f, 0f);
         rootNode.attachChild(g);
 
         System.err.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
