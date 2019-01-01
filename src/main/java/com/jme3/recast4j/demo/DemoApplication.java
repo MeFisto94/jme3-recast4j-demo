@@ -31,6 +31,7 @@ public class DemoApplication extends SimpleApplication {
     Geometry worldMap;
     AnimChannel walkChannel;
     NavMesh navMesh;
+    NavMeshQuery query;
     FilterPostProcessor fpp;
     Node character;
     List<Geometry> boxes;
@@ -56,6 +57,7 @@ public class DemoApplication extends SimpleApplication {
         RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
         MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder(worldMap).build(), bcfg)).build(bcfg));
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
+        query = new NavMeshQuery(navMesh);
 
         try {
             RecastTest.saveToFile(navMesh);
@@ -77,8 +79,18 @@ public class DemoApplication extends SimpleApplication {
                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Green, character.getWorldTranslation().add(0f, 0.5f, 0f)));
                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Yellow, getLocationOnMap().add(0f, 0.5f, 0f)));
 
-                NavMeshQuery
 
+                // @TODO: Is there a better way? And why does it fail?
+                QueryFilter filter = new DefaultQueryFilter();
+                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {1f, 1f, 1f}, filter);
+                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {1f, 1f, 1f}, filter);
+
+                FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
+                if (fpr.getStatus().isSuccess()) {
+                    System.out.println("Success");
+                } else {
+                    System.out.println("Failure");
+                }
             }
         });
     }
