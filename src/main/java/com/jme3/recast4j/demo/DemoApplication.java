@@ -85,8 +85,12 @@ public class DemoApplication extends SimpleApplication {
 
                 // @TODO: Is there a better way? And why does it fail?
                 QueryFilter filter = new DefaultQueryFilter();
-                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {1f, 1f, 1f}, filter);
-                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {1f, 1f, 1f}, filter);
+                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {10f, 10f, 10f}, filter);
+                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {10f, 10f, 10f}, filter);
+
+                System.out.println(startPoly.getNearestRef());
+                System.out.println(endPoly.getNearestRef());
+                System.out.println(query.findRandomPoint(filter, new NavMeshQuery.FRand()).getRandomRef());
 
                 FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
                 if (fpr.getStatus().isSuccess()) {
@@ -148,8 +152,8 @@ public class DemoApplication extends SimpleApplication {
         gDetailed.setMaterial(matGreen);
         System.out.println("VertCount Regular Mesh: " + g.getVertexCount());
         System.out.println("VertCount Detailed Mesh: " + gDetailed.getVertexCount());
-        g.move(0f, 0.5f, 0f);
-        gDetailed.move(0f, 1f, 0f);
+        g.move(0f, 0.125f, 0f);
+        gDetailed.move(0f, 0.25f, 0f);
 
         rootNode.attachChild(g);
         rootNode.attachChild(gDetailed);
