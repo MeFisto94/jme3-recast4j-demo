@@ -13,12 +13,15 @@ import com.jme3.material.Material;
 import com.jme3.math.*;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.ssao.SSAOFilter;
+import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
+import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
+import com.jme3.scene.shape.Line;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
@@ -37,10 +40,10 @@ public class DemoApplication extends SimpleApplication {
     NavMeshQuery query;
     FilterPostProcessor fpp;
     Node character;
-    List<Geometry> boxes;
+    List<Geometry> pathGeometries;
 
     public DemoApplication() {
-        boxes = new ArrayList<>(64);
+        pathGeometries = new ArrayList<>(64);
     }
 
     public static void main(String[] args) {
@@ -68,35 +71,43 @@ public class DemoApplication extends SimpleApplication {
             ex.printStackTrace();
         }
 
-        showDebugMeshes(meshData);
+        //showDebugMeshes(meshData);
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
 
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
             protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
                 super.click(event, target, capture);
-                // First clear existing boxes from the old path finding:
-                boxes.forEach(Geometry::removeFromParent);
+                // First clear existing pathGeometries from the old path finding:
+                pathGeometries.forEach(Geometry::removeFromParent);
 
                 // Clicked on the map, so build a path to:
                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Green, character.getWorldTranslation().add(0f, 0.5f, 0f)));
                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Yellow, getLocationOnMap().add(0f, 0.5f, 0f)));
 
-
-                // @TODO: Is there a better way? And why does it fail?
-                QueryFilter filter = new DefaultQueryFilter();
-                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {10f, 10f, 10f}, filter);
-                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {10f, 10f, 10f}, filter);
-
-                System.out.println(startPoly.getNearestRef());
-                System.out.println(endPoly.getNearestRef());
-                System.out.println(query.findRandomPoint(filter, new NavMeshQuery.FRand()).getRandomRef());
+                QueryFilter filter = new BetterDefaultQueryFilter();
+                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {2f, 2f, 2f}, filter);
+                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {2f, 2f, 2f}, filter);
 
                 FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
                 if (fpr.getStatus().isSuccess()) {
-                    System.out.println("Success");
+                    // Get the proper path from the rough polygon listing
+                    List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
+                    Vector3f oldPos = character.getWorldTranslation();
+                    if (!list.isEmpty()) {
+                        for (StraightPathItem p: list) {
+                            Vector3f nu = DetourUtils.createVector3f(p.getPos());
+                            rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos, nu));
+                            if (p.getRef() != 0) { // if ref is 0, it's the end.
+                                rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu));
+                            }
+                            oldPos = nu;
+                        }
+                    } else {
+                        System.err.println("Unable to find straight paths");
+                    }
                 } else {
-                    System.out.println("Failure");
+                    System.err.println("I'm sorry, unable to find a path.....");
                 }
             }
         });
@@ -197,8 +208,8 @@ public class DemoApplication extends SimpleApplication {
     }
 
     /**
-     * Helper method to place a colored box at a specific location and will the boxes list with it, so that later on we
-     * can remove all existing boxes (from a previous path finding)
+     * Helper method to place a colored box at a specific location and fill the pathGeometries list with it,
+     * so that later on we can remove all existing pathGeometries (from a previous path finding)
      *
      * @param color The color the box should have
      * @param position The position where the box will be placed
@@ -210,7 +221,26 @@ public class DemoApplication extends SimpleApplication {
         mat.setColor("Color", color);
         result.setMaterial(mat);
         result.setLocalTranslation(position);
-        boxes.add(result);
+        pathGeometries.add(result);
+        return result;
+    }
+
+    /**
+     * Helper method to place a colored line between two specific locations and fill the pathGeometries list with it,
+     * so that later on we can remove all existing pathGeometries (from a previous path finding)
+     *
+     * @param color The color the box should have
+     * @param from The position where the line starts
+     * @param to The position where the line is finished.
+     * @return the line
+     */
+    public Geometry placeColoredLineBetween(ColorRGBA color, Vector3f from, Vector3f to) {
+        Geometry result = new Geometry("Line", new Line(from, to));
+        Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        mat.setColor("Color", color);
+        mat.getAdditionalRenderState().setLineWidth(2f);
+        result.setMaterial(mat);
+        pathGeometries.add(result);
         return result;
     }
 }
