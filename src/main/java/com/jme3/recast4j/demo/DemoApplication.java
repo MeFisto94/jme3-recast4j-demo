@@ -94,6 +94,8 @@ public class DemoApplication extends SimpleApplication {
                     // Get the proper path from the rough polygon listing
                     List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
                     Vector3f oldPos = character.getWorldTranslation();
+                    List<Vector3f> vector3fList = new ArrayList<>(list.size());
+
                     if (!list.isEmpty()) {
                         for (StraightPathItem p: list) {
                             Vector3f nu = DetourUtils.createVector3f(p.getPos());
@@ -101,8 +103,12 @@ public class DemoApplication extends SimpleApplication {
                             if (p.getRef() != 0) { // if ref is 0, it's the end.
                                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu));
                             }
+                            vector3fList.add(nu);
                             oldPos = nu;
                         }
+
+                        character.getControl(NavMeshChaserControl.class).stopFollowing();
+                        character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
                     } else {
                         System.err.println("Unable to find straight paths");
                     }
@@ -118,6 +124,7 @@ public class DemoApplication extends SimpleApplication {
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
         character.addControl(new BetterCharacterControl(0.6f, 2f, 20f)); // values taken from recast defaults
+        character.addControl(new NavMeshChaserControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
 
         Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
@@ -135,9 +142,6 @@ public class DemoApplication extends SimpleApplication {
         rootNode.addLight(new AmbientLight(ColorRGBA.White));
         // Doesn't work:
         //rootNode.addLight(new DirectionalLight(new Vector3f(0f, -1f, 0f), ColorRGBA.White));
-
-        walkChannel = character.getControl(AnimControl.class).createChannel();
-        walk(true);
 
         rootNode.attachChild(character);
         rootNode.attachChild(worldMap);
@@ -175,14 +179,6 @@ public class DemoApplication extends SimpleApplication {
 
     @Override
     public void simpleRender(RenderManager rm) {
-    }
-
-    protected void walk(boolean walking) {
-        if (walking) {
-            walkChannel.setAnim("Walk");
-        } else {
-            walkChannel.setAnim("");
-        }
     }
 
     /**
