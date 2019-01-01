@@ -3,6 +3,9 @@ package com.jme3.recast4j.demo;
 import com.jme3.animation.AnimChannel;
 import com.jme3.animation.AnimControl;
 import com.jme3.app.SimpleApplication;
+import com.jme3.bullet.BulletAppState;
+import com.jme3.bullet.control.BetterCharacterControl;
+import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.collision.CollisionResults;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
@@ -96,8 +99,11 @@ public class DemoApplication extends SimpleApplication {
     }
 
     private void setupWorld() {
+        stateManager.attach(new BulletAppState());
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
+        character.addControl(new BetterCharacterControl(0.6f, 2f, 20f)); // values taken from recast defaults
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
 
         Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
         mat.setColor("Diffuse", ColorRGBA.Red);
@@ -105,8 +111,9 @@ public class DemoApplication extends SimpleApplication {
         mat.setBoolean("UseMaterialColors", true);
         //worldMap = (Geometry)assetManager.loadModel("Models/dune.j3o");
         worldMap = new Geometry("", new Box(8f, 1f, 8f));
-        //worldMap.setLocalScale(0.01f);
         worldMap.setMaterial(mat);
+        worldMap.addControl(new RigidBodyControl(0f));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
         // @TODO: Dune.j3o does not have normals and thus no neat lighting.
         //TangentBinormalGenerator.generate(worldMap.getMesh());
 
