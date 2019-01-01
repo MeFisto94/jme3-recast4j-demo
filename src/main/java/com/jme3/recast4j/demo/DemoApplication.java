@@ -3,17 +3,22 @@ package com.jme3.recast4j.demo;
 import com.jme3.animation.AnimChannel;
 import com.jme3.animation.AnimControl;
 import com.jme3.app.SimpleApplication;
+import com.jme3.collision.CollisionResults;
+import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
 import com.jme3.material.Material;
-import com.jme3.math.ColorRGBA;
-import com.jme3.math.Vector3f;
+import com.jme3.math.*;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
+import com.simsilica.lemur.GuiGlobals;
+import com.simsilica.lemur.event.DefaultMouseListener;
+import com.simsilica.lemur.event.MouseEventControl;
 import org.recast4j.detour.MeshData;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshBuilder;
@@ -28,6 +33,7 @@ public class DemoApplication extends SimpleApplication {
     FilterPostProcessor fpp;
     Node character;
 
+
     public static void main(String[] args) {
         DemoApplication app = new DemoApplication();
         app.start();
@@ -35,6 +41,8 @@ public class DemoApplication extends SimpleApplication {
 
     @Override
     public void simpleInitApp() {
+        GuiGlobals.initialize(this);
+
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
 
@@ -48,7 +56,6 @@ public class DemoApplication extends SimpleApplication {
         worldMap.setMaterial(mat);
         // @TODO: Dune.j3o does not have normals and thus no neat lighting.
         //TangentBinormalGenerator.generate(worldMap.getMesh());
-
 
         rootNode.addLight(new AmbientLight(ColorRGBA.White));
         // Doesn't work:
@@ -82,6 +89,15 @@ public class DemoApplication extends SimpleApplication {
 
         showDebugMeshes(meshData);
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
+
+        MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
+            @Override
+            protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
+                super.click(event, target, capture);
+                // Clicked on the map, so build a path to:
+                System.out.println(getLocationOnMap());
+            }
+        });
     }
 
     private void showDebugMeshes(MeshData meshData) {
@@ -119,6 +135,22 @@ public class DemoApplication extends SimpleApplication {
             walkChannel.setAnim("Walk");
         } else {
             walkChannel.setAnim("");
+        }
+    }
+
+    public Vector3f getLocationOnMap() {
+        Vector3f worldCoordsNear = getCamera().getWorldCoordinates(inputManager.getCursorPosition(), 0);
+        Vector3f worldCoordsFar = getCamera().getWorldCoordinates(inputManager.getCursorPosition(), 1);
+
+        // From closest at the camera to most far away
+        Ray mouseRay = new Ray(worldCoordsNear, worldCoordsFar.subtractLocal(worldCoordsNear).normalizeLocal());
+        CollisionResults cr = new CollisionResults();
+        worldMap.collideWith(mouseRay, cr);
+
+        if (cr.size() > 0) {
+            return cr.getClosestCollision().getContactPoint();
+        } else {
+            return null;
         }
     }
 }

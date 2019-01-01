@@ -1,8 +1,9 @@
 allprojects {
     repositories {
         mavenLocal()
+        jcenter()
         mavenCentral()
-        maven { url "https://jitpack.io" }        
+        maven { url "https://jitpack.io" }
     }
 }
 
@@ -50,15 +51,14 @@ dependencies {
     implementation 'com.github.ppiastucki.recast4j:recast:master-SNAPSHOT'
     implementation 'com.github.ppiastucki.recast4j:detour:master-SNAPSHOT'
     
-    /*
+
     compile 'org.slf4j:slf4j-api:1.7.21'
     compile 'org.slf4j:slf4j-simple:1.7.21'
     compile 'org.codehaus.groovy:groovy-all:2.4.7'
     compile 'com.google.guava:guava:19.0'
-    compile 'com.simsilica:lemur:1.8.2'
-    compile 'com.simsilica:lemur-proto:1.7.1'
+    compile "com.simsilica:lemur:1.11.0"
+    compile "com.simsilica:lemur-proto:1.10.0"
     compile 'com.simsilica:lemur-props:1.0.1'
-    */
 
     compile files("jme3-recast4j.jar")
     runtime project(':assets')
