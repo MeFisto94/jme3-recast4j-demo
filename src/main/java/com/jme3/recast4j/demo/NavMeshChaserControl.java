@@ -62,6 +62,7 @@ public class NavMeshChaserControl extends AbstractControl {
 
     private void moveToWaypoint() {
         Vector3f dir = pathList.get(currentIndex).subtract(spatial.getWorldTranslation()).setY(0f).normalizeLocal();
+        System.out.println("Approaching " + pathList.get(currentIndex) + " Direction: " + dir);
         characterControl.setViewDirection(dir);
         characterControl.setWalkDirection(dir.multLocal(walkspeed));
         walk(true);
@@ -76,6 +77,7 @@ public class NavMeshChaserControl extends AbstractControl {
     }
 
     public void stopFollowing() {
+        System.out.println("Stop Walking");
         characterControl.setWalkDirection(Vector3f.ZERO);
         walk(false);
         pathList.clear();

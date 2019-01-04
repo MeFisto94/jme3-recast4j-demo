@@ -72,7 +72,7 @@ public class DemoApplication extends SimpleApplication {
             ex.printStackTrace();
         }
 
-        //showDebugMeshes(meshData);
+        showDebugMeshes(meshData);
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
 
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
