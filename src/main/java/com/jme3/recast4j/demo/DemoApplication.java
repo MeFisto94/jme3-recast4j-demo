@@ -9,6 +9,7 @@ import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.collision.CollisionResults;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
+import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.*;
 import com.jme3.post.FilterPostProcessor;
@@ -34,7 +35,7 @@ import java.util.List;
 
 public class DemoApplication extends SimpleApplication {
 
-    Geometry worldMap;
+    Spatial worldMap;
     AnimChannel walkChannel;
     NavMesh navMesh;
     NavMeshQuery query;
@@ -60,8 +61,8 @@ public class DemoApplication extends SimpleApplication {
 
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
-        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
-        MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder(worldMap).build(), bcfg)).build(bcfg));
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
+        MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg));
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
 
@@ -71,7 +72,7 @@ public class DemoApplication extends SimpleApplication {
             ex.printStackTrace();
         }
 
-        //showDebugMeshes(meshData);
+        showDebugMeshes(meshData);
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
 
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
@@ -131,22 +132,23 @@ public class DemoApplication extends SimpleApplication {
         mat.setColor("Diffuse", ColorRGBA.Red);
         mat.setColor("Ambient", ColorRGBA.White);
         mat.setBoolean("UseMaterialColors", true);
-        //worldMap = (Geometry)assetManager.loadModel("Models/dune.j3o");
-        worldMap = new Geometry("", new Box(8f, 1f, 8f));
-        worldMap.setMaterial(mat);
+        worldMap = assetManager.loadModel("Models/Level/recast_level.j3o");
+        //worldMap = new Geometry("", new Box(8f, 1f, 8f));
+        //worldMap.setMaterial(mat);
         worldMap.addControl(new RigidBodyControl(0f));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
         // @TODO: Dune.j3o does not have normals and thus no neat lighting.
         //TangentBinormalGenerator.generate(worldMap.getMesh());
 
         rootNode.addLight(new AmbientLight(ColorRGBA.White));
+        rootNode.addLight(new DirectionalLight(Vector3f.UNIT_Y.negate()));
         // Doesn't work:
         //rootNode.addLight(new DirectionalLight(new Vector3f(0f, -1f, 0f), ColorRGBA.White));
 
         rootNode.attachChild(character);
         rootNode.attachChild(worldMap);
 
-        getCamera().setLocation(new Vector3f(0f, 20f, 0f));
+        getCamera().setLocation(new Vector3f(0f, 40f, 0f));
         getCamera().lookAtDirection(new Vector3f(0f, -1f, 0f), Vector3f.UNIT_Z);
 
         fpp = new FilterPostProcessor(assetManager);
