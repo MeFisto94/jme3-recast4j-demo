@@ -2,7 +2,6 @@ package com.jme3.recast4j.demo;
 
 import com.jme3.animation.AnimChannel;
 import com.jme3.app.SimpleApplication;
-import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
@@ -20,7 +19,6 @@ import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.states.RecastGUIState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
-import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
@@ -35,7 +33,6 @@ import org.recast4j.recast.RecastBuilderConfig;
 
 import java.util.ArrayList;
 import java.util.List;
-import jme3tools.optimize.GeometryBatchFactory;
 
 public class DemoApplication extends SimpleApplication {
 
