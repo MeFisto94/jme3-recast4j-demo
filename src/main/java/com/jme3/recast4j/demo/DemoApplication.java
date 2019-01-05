@@ -2,6 +2,7 @@ package com.jme3.recast4j.demo;
 
 import com.jme3.animation.AnimChannel;
 import com.jme3.app.SimpleApplication;
+import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
@@ -19,6 +20,7 @@ import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.states.RecastGUIState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
+import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
@@ -33,10 +35,12 @@ import org.recast4j.recast.RecastBuilderConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import jme3tools.optimize.GeometryBatchFactory;
 
 public class DemoApplication extends SimpleApplication {
 
-    Geometry worldMap;
+//    Geometry worldMap;
+    Spatial worldMap;
     AnimChannel walkChannel;
     NavMesh navMesh;
     NavMeshQuery query;
@@ -72,14 +76,15 @@ public class DemoApplication extends SimpleApplication {
         //Load or build mesh objects used for navigation here.
         //Must be called prior to running recast navMesh build procedure.
         //Must set worldMap variable from method call.
-        loadNavMeshBox();
+//        loadNavMeshBox();
 //        loadNavMeshDune();
-//        loadNavMeshLevel();
+        loadNavMeshLevel();
+        loadDoors();
         
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
-        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
-        MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder(worldMap).build(), bcfg)).build(bcfg));
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
+        MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg));
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
 
@@ -89,7 +94,7 @@ public class DemoApplication extends SimpleApplication {
             ex.printStackTrace();
         }
 
-        //showDebugMeshes(meshData);
+        showDebugMeshes(meshData);
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
 
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
@@ -157,7 +162,7 @@ public class DemoApplication extends SimpleApplication {
         ambient.setColor(ColorRGBA.White.mult(.8f));
         rootNode.addLight(ambient); 
 
-        getCamera().setLocation(new Vector3f(0f, 20f, 0f));
+        getCamera().setLocation(new Vector3f(0f, 40f, 0f));
         getCamera().lookAtDirection(new Vector3f(0f, -1f, 0f), Vector3f.UNIT_Z);
 
         fpp = new FilterPostProcessor(assetManager);
@@ -283,13 +288,17 @@ public class DemoApplication extends SimpleApplication {
     }
 
     private void loadNavMeshLevel() {  
-        Spatial loadModel = getAssetManager().loadModel("Models/Level/recast_level.j3o");
-        
-        
+        worldMap = getAssetManager().loadModel("Models/Level/recast_level.j3o");    
         worldMap.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
-        
         getRootNode().attachChild(worldMap);
+    }
+
+    private void loadDoors() {
+        Spatial doors = getAssetManager().loadModel("Models/Level/recast_door.j3o");
+        doors.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(doors);
+        getRootNode().attachChild(doors);
     }
     
 }
