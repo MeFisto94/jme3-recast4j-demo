@@ -1,7 +1,6 @@
 package com.jme3.recast4j.demo;
 
 import com.jme3.animation.AnimChannel;
-import com.jme3.animation.AnimControl;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
@@ -9,6 +8,7 @@ import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.collision.CollisionResults;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
+import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.*;
 import com.jme3.post.FilterPostProcessor;
@@ -16,12 +16,14 @@ import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
+import com.jme3.recast4j.demo.states.RecastGUIState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
+import com.jme3.system.AppSettings;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
@@ -48,6 +50,10 @@ public class DemoApplication extends SimpleApplication {
 
     public static void main(String[] args) {
         DemoApplication app = new DemoApplication();
+        AppSettings settings = new AppSettings(true);
+        settings.setTitle("RecastLevel");
+        settings.setGammaCorrection(true);
+        app.setSettings(settings);
         app.start();
     }
 
@@ -55,9 +61,21 @@ public class DemoApplication extends SimpleApplication {
     public void simpleInitApp() {
         GuiGlobals.initialize(this);
         flyCam.setEnabled(false);
+        getStateManager().attach(new RecastGUIState());
 
+        //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
-
+        
+        //Load various models from here.
+        loadJaime();
+        
+        //Load or build mesh objects used for navigation here.
+        //Must be called prior to running recast navMesh build procedure.
+        //Must set worldMap variable from method call.
+        loadNavMeshBox();
+//        loadNavMeshDune();
+//        loadNavMeshLevel();
+        
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
         RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
@@ -121,30 +139,23 @@ public class DemoApplication extends SimpleApplication {
 
     private void setupWorld() {
         stateManager.attach(new BulletAppState());
-        character = (Node)assetManager.loadModel("Models/Jaime.j3o");
-        character.setLocalTranslation(0f, 5f, 0f);
-        character.addControl(new BetterCharacterControl(0.6f, 2f, 20f)); // values taken from recast defaults
-        character.addControl(new NavMeshChaserControl());
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
 
-        Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
-        mat.setColor("Diffuse", ColorRGBA.Red);
-        mat.setColor("Ambient", ColorRGBA.White);
-        mat.setBoolean("UseMaterialColors", true);
-        //worldMap = (Geometry)assetManager.loadModel("Models/dune.j3o");
-        worldMap = new Geometry("", new Box(8f, 1f, 8f));
-        worldMap.setMaterial(mat);
-        worldMap.addControl(new RigidBodyControl(0f));
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
-        // @TODO: Dune.j3o does not have normals and thus no neat lighting.
-        //TangentBinormalGenerator.generate(worldMap.getMesh());
-
-        rootNode.addLight(new AmbientLight(ColorRGBA.White));
-        // Doesn't work:
-        //rootNode.addLight(new DirectionalLight(new Vector3f(0f, -1f, 0f), ColorRGBA.White));
-
-        rootNode.attachChild(character);
-        rootNode.attachChild(worldMap);
+        /** A white, directional light source */ 
+        DirectionalLight sun = new DirectionalLight();
+        sun.setDirection((new Vector3f(0.5f, -0.5f, -0.5f)).normalizeLocal());
+        sun.setColor(ColorRGBA.White);
+        rootNode.addLight(sun); 
+        
+        /** A white, directional light source */ 
+        DirectionalLight sun2 = new DirectionalLight();
+        sun2.setDirection((new Vector3f(-0.5f, -0.5f, 0.5f)).normalizeLocal());
+        sun2.setColor(ColorRGBA.White);
+        rootNode.addLight(sun2); 
+        
+        /** A white ambient light source. */ 
+        AmbientLight ambient = new AmbientLight();
+        ambient.setColor(ColorRGBA.White.mult(.8f));
+        rootNode.addLight(ambient); 
 
         getCamera().setLocation(new Vector3f(0f, 20f, 0f));
         getCamera().lookAtDirection(new Vector3f(0f, -1f, 0f), Vector3f.UNIT_Z);
@@ -239,4 +250,46 @@ public class DemoApplication extends SimpleApplication {
         pathGeometries.add(result);
         return result;
     }
+
+    private void loadJaime() {
+        character = (Node)assetManager.loadModel("Models/Jaime.j3o");
+        character.setLocalTranslation(0f, 5f, 0f);
+        character.addControl(new BetterCharacterControl(0.6f, 2f, 20f)); // values taken from recast defaults
+        character.addControl(new NavMeshChaserControl());
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
+        rootNode.attachChild(character);
+    }
+
+    private void loadNavMeshBox() {
+        Material mat = new Material(assetManager, "Common/MatDefs/Light/Lighting.j3md");
+        mat.setColor("Diffuse", ColorRGBA.Red);
+        mat.setColor("Ambient", ColorRGBA.White);
+        mat.setBoolean("UseMaterialColors", true);
+        
+        
+        worldMap = new Geometry("", new Box(8f, 1f, 8f));
+        worldMap.setMaterial(mat);
+        worldMap.addControl(new RigidBodyControl(0f));
+        
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
+        
+        rootNode.attachChild(worldMap);
+    }
+
+    private void loadNavMeshDune() {
+//        worldMap = (Geometry)assetManager.loadModel("Models/dune.j3o");
+//        // @TODO: Dune.j3o does not have normals and thus no neat lighting.
+//        TangentBinormalGenerator.generate(worldMap.getMesh());
+    }
+
+    private void loadNavMeshLevel() {  
+        Spatial loadModel = getAssetManager().loadModel("Models/Level/recast_level.j3o");
+        
+        
+        worldMap.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
+        
+        getRootNode().attachChild(worldMap);
+    }
+    
 }
