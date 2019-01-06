@@ -143,6 +143,52 @@ public class DemoApplication extends SimpleApplication {
         }
     }
 
+    private void findPathSliced(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+        query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter, 0);
+        UpdateSlicedPathResult res;
+        do {
+            // typically called from a control or appstate, so simulate it with a loop and sleep.
+            res = query.updateSlicedFindPath(1);
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+        } while (res.getStatus() == Status.IN_PROGRESS);
+
+        FindPathResult fpr = query.finalizeSlicedFindPath();
+
+        // @TODO: Try Partial. How would one make this logic with controls etc so it's easy?
+        //query.finalizeSlicedFindPathPartial();
+
+        if (fpr.getStatus().isSuccess()) {
+            // Get the proper path from the rough polygon listing
+            List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
+            Vector3f oldPos = character.getWorldTranslation();
+            List<Vector3f> vector3fList = new ArrayList<>(list.size());
+
+            if (!list.isEmpty()) {
+                for (StraightPathItem p: list) {
+                    Vector3f nu = DetourUtils.createVector3f(p.getPos());
+                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
+                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
+                    }
+                    vector3fList.add(nu);
+                    oldPos = nu;
+                }
+
+                character.getControl(NavMeshChaserControl.class).stopFollowing();
+                character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
+            } else {
+                System.err.println("Unable to find straight paths");
+            }
+        } else {
+            System.err.println("I'm sorry, unable to find a path.....");
+        }
+
+    }
+
     private void setupWorld() {
         stateManager.attach(new BulletAppState());
 
