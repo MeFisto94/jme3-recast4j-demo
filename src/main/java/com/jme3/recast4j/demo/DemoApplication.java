@@ -16,6 +16,7 @@ import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
+import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
 import com.jme3.recast4j.demo.states.RecastGUIState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
@@ -186,7 +187,6 @@ public class DemoApplication extends SimpleApplication {
         } else {
             System.err.println("I'm sorry, unable to find a path.....");
         }
-
     }
 
     private void setupWorld() {
