@@ -1,4 +1,4 @@
-package com.jme3.recast4j.demo;
+package com.jme3.recast4j.demo.controls;
 
 import com.jme3.animation.AnimChannel;
 import com.jme3.animation.AnimControl;
