@@ -1,6 +1,5 @@
 package com.jme3.recast4j.demo;
 
-import com.jme3.animation.AnimChannel;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
@@ -10,7 +9,9 @@ import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
-import com.jme3.math.*;
+import com.jme3.math.ColorRGBA;
+import com.jme3.math.Ray;
+import com.jme3.math.Vector3f;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
@@ -39,7 +40,6 @@ public class DemoApplication extends SimpleApplication {
 
 //    Geometry worldMap;
     Spatial worldMap;
-    AnimChannel walkChannel;
     NavMesh navMesh;
     NavMeshQuery query;
     FilterPostProcessor fpp;
@@ -159,6 +159,7 @@ public class DemoApplication extends SimpleApplication {
 
         FindPathResult fpr = query.finalizeSlicedFindPath();
 
+        // @TODO: Use NavMeshSliceControl (but then how to do the Debug Graphics?)
         // @TODO: Try Partial. How would one make this logic with controls etc so it's easy?
         //query.finalizeSlicedFindPathPartial();
 
