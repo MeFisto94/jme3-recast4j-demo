@@ -76,4 +76,8 @@ public abstract class AbstractNavMeshControl extends AbstractControl {
         }
     }
 
+    protected boolean isPathListDone() {
+        // e.g. index 2 -> size >= 3
+        return currentIndex + 1 > pathList.size();
+    }
 }

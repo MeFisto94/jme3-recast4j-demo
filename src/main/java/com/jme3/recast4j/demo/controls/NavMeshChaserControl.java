@@ -16,13 +16,12 @@ public class NavMeshChaserControl extends AbstractNavMeshControl {
     protected void controlUpdate(float tpf) {
         super.controlUpdate(tpf);
 
-        // e.g. index 2 -> size >= 3
-        if (pathList.size() >= currentIndex + 1) {
+        if (!isPathListDone()) {
             if (getSpatial().getWorldTranslation().distance(pathList.get(currentIndex)) < epsilon) {
                 // reached a target, increase the index, that's all
                 currentIndex++;
 
-                if (pathList.size() >= currentIndex + 1) { // still in the list?
+                if (!isPathListDone()) { // still in the list?
                     moveToWaypoint();
                 } else { // reached our target
                     stopFollowing();
