@@ -70,6 +70,7 @@ public abstract class AbstractNavMeshControl extends AbstractControl {
         if (walkChannel != null) {
             if (walking) {
                 walkChannel.setAnim("Walk");
+                walkChannel.setSpeed(walkspeed);
             } else {
                 walkChannel.reset(true);
             }
