@@ -35,6 +35,8 @@ import org.recast4j.recast.RecastBuilderConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DemoApplication extends SimpleApplication {
 
@@ -45,7 +47,8 @@ public class DemoApplication extends SimpleApplication {
     FilterPostProcessor fpp;
     Node character;
     List<Geometry> pathGeometries;
-
+    Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
+    
     public DemoApplication() {
         pathGeometries = new ArrayList<>(64);
     }
@@ -75,8 +78,8 @@ public class DemoApplication extends SimpleApplication {
         //Must be called prior to running recast navMesh build procedure.
         //Must set worldMap variable from method call.
 
-        //        loadNavMeshBox();
-        //        loadNavMeshDune();
+//        loadNavMeshBox();
+//        loadNavMeshDune();
         loadNavMeshLevel();
         loadDoors();
 
@@ -84,7 +87,19 @@ public class DemoApplication extends SimpleApplication {
         
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
-        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).build(new RecastConfigBuilder().withVertsPerPoly(3).build());
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).
+                build(new RecastConfigBuilder()
+                        .withAgentRadius(.3f)           // r
+                        .withAgentHeight(1.8f)          // h
+                        .withCellSize(.15f)             // cs=r/2
+                        .withCellHeight(.075f)          // ch=cs/2
+                        .withAgentMaxClimb(.5f)         // > 2*ch
+                        .withAgentMaxSlope(45f)         
+                        .withEdgeMaxLen(2.4f)           // r*8
+                        .withEdgeMaxError(1.5f)         // 1.1 - 1.5
+                        .withDetailSampleDistance(4.0f) // increase if exception
+                        .withDetailSampleMaxError(4.0f) // increase if exception
+                        .withVertsPerPoly(3).build());
         MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg));
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
@@ -95,7 +110,10 @@ public class DemoApplication extends SimpleApplication {
             ex.printStackTrace();
         }
 
-        showDebugMeshes(meshData);
+        showConfig(bcfg);
+        //Show wireframe. Helps with parm tweaks.
+        showDebugMeshes(meshData, true);
+        
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
 
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
@@ -222,12 +240,20 @@ public class DemoApplication extends SimpleApplication {
         fpp.addFilter(new SSAOFilter(1f, 1f, 0.1f, 0.1f));
     }
 
-    private void showDebugMeshes(MeshData meshData) {
+    private void showDebugMeshes(MeshData meshData, boolean wireframe) {
         Material matRed = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matRed.setColor("Color", ColorRGBA.Red);
-        matRed.getAdditionalRenderState().setWireframe(true);
+        
+        if (wireframe) {
+            matRed.getAdditionalRenderState().setWireframe(true);
+        }
+
         Material matGreen = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matGreen.setColor("Color", ColorRGBA.Green);
+        
+        if (wireframe) {
+            matGreen.getAdditionalRenderState().setWireframe(true);
+        }
 
         // navMesh.getTile(0).data == meshData (in this particular case)
         Geometry gDetailed = new Geometry("DebugMeshDetailed", RecastUtils.getDebugMesh(meshData.detailMeshes, meshData.detailVerts, meshData.detailTris));
@@ -355,4 +381,18 @@ public class DemoApplication extends SimpleApplication {
         getRootNode().attachChild(doors);
     }
     
+    private void showConfig(RecastBuilderConfig bcfg) {
+        LOG.info("<===== CONFIG BUILDER =====>");
+        LOG.info("Cell Size             [{} wu]", bcfg.cfg.cs);
+        LOG.info("Cell Height           [{} wu]", bcfg.cfg.ch);
+        LOG.info("walkableRadius        [{} vx]", bcfg.cfg.walkableRadius);
+        LOG.info("walkableHeight        [{} vx]", bcfg.cfg.walkableHeight);
+        LOG.info("walkableClimb         [{} vx]", bcfg.cfg.walkableClimb);
+        LOG.info("agentMaxSlope         [{} deg]", bcfg.cfg.walkableSlopeAngle);
+        LOG.info("maxEdgeLen            [{} vx]", bcfg.cfg.maxEdgeLen);
+        LOG.info("edgeMaxError          [{} vx]", bcfg.cfg.maxSimplificationError);
+        LOG.info("detailSampleDist      [{} wu]", bcfg.cfg.detailSampleDist);
+        LOG.info("detailSampleMaxError  [{} wu]", bcfg.cfg.detailSampleMaxError);
+        LOG.info("<===== CONFIG BUILDER =====>");
+    }
 }

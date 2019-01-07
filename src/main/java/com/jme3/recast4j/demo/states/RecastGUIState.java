@@ -28,17 +28,7 @@
 package com.jme3.recast4j.demo.states;
 
 import com.jme3.app.Application;
-import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.bounding.BoundingBox;
-import com.jme3.bullet.BulletAppState;
-import com.jme3.bullet.control.RigidBodyControl;
-import com.jme3.scene.Geometry;
-import com.jme3.scene.Mesh;
-import com.jme3.scene.Spatial;
-import java.util.ArrayList;
-import java.util.List;
-import jme3tools.optimize.GeometryBatchFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
