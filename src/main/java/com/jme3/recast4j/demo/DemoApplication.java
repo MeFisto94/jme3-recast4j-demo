@@ -1,6 +1,5 @@
 package com.jme3.recast4j.demo;
 
-import com.jme3.animation.AnimChannel;
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
@@ -10,12 +9,15 @@ import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
-import com.jme3.math.*;
+import com.jme3.math.ColorRGBA;
+import com.jme3.math.Ray;
+import com.jme3.math.Vector3f;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
+import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
 import com.jme3.recast4j.demo.states.RecastGUIState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
@@ -38,7 +40,6 @@ public class DemoApplication extends SimpleApplication {
 
 //    Geometry worldMap;
     Spatial worldMap;
-    AnimChannel walkChannel;
     NavMesh navMesh;
     NavMeshQuery query;
     FilterPostProcessor fpp;
@@ -73,10 +74,13 @@ public class DemoApplication extends SimpleApplication {
         //Load or build mesh objects used for navigation here.
         //Must be called prior to running recast navMesh build procedure.
         //Must set worldMap variable from method call.
-//        loadNavMeshBox();
-//        loadNavMeshDune();
+
+        //        loadNavMeshBox();
+        //        loadNavMeshDune();
         loadNavMeshLevel();
         loadDoors();
+
+        //getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
         
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
@@ -106,37 +110,88 @@ public class DemoApplication extends SimpleApplication {
                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Yellow, getLocationOnMap().add(0f, 0.5f, 0f)));
 
                 QueryFilter filter = new BetterDefaultQueryFilter();
-                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {2f, 2f, 2f}, filter);
-                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {2f, 2f, 2f}, filter);
+                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
+                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
 
-                FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
-                if (fpr.getStatus().isSuccess()) {
-                    // Get the proper path from the rough polygon listing
-                    List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
-                    Vector3f oldPos = character.getWorldTranslation();
-                    List<Vector3f> vector3fList = new ArrayList<>(list.size());
-
-                    if (!list.isEmpty()) {
-                        for (StraightPathItem p: list) {
-                            Vector3f nu = DetourUtils.createVector3f(p.getPos());
-                            rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos, nu));
-                            if (p.getRef() != 0) { // if ref is 0, it's the end.
-                                rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu));
-                            }
-                            vector3fList.add(nu);
-                            oldPos = nu;
-                        }
-
-                        character.getControl(NavMeshChaserControl.class).stopFollowing();
-                        character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
-                    } else {
-                        System.err.println("Unable to find straight paths");
-                    }
-                } else {
-                    System.err.println("I'm sorry, unable to find a path.....");
-                }
+                findPathImmediately(filter, startPoly, endPoly);
             }
         });
+    }
+
+    private void findPathImmediately(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+        FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
+        if (fpr.getStatus().isSuccess()) {
+            // Get the proper path from the rough polygon listing
+            List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
+            Vector3f oldPos = character.getWorldTranslation();
+            List<Vector3f> vector3fList = new ArrayList<>(list.size());
+
+            if (!list.isEmpty()) {
+                for (StraightPathItem p: list) {
+                    Vector3f nu = DetourUtils.createVector3f(p.getPos());
+                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
+                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
+                    }
+                    vector3fList.add(nu);
+                    oldPos = nu;
+                }
+
+                character.getControl(NavMeshChaserControl.class).stopFollowing();
+                character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
+            } else {
+                System.err.println("Unable to find straight paths");
+            }
+        } else {
+            System.err.println("I'm sorry, unable to find a path.....");
+        }
+    }
+
+
+    private void findPathSliced(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+        query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter, 0);
+        UpdateSlicedPathResult res;
+        do {
+            // typically called from a control or appstate, so simulate it with a loop and sleep.
+            res = query.updateSlicedFindPath(1);
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+        } while (res.getStatus() == Status.IN_PROGRESS);
+
+        FindPathResult fpr = query.finalizeSlicedFindPath();
+
+        // @TODO: Use NavMeshSliceControl (but then how to do the Debug Graphics?)
+        // @TODO: Try Partial. How would one make this logic with controls etc so it's easy?
+        //query.finalizeSlicedFindPathPartial();
+
+        if (fpr.getStatus().isSuccess()) {
+            // Get the proper path from the rough polygon listing
+            List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
+            Vector3f oldPos = character.getWorldTranslation();
+            List<Vector3f> vector3fList = new ArrayList<>(list.size());
+
+            if (!list.isEmpty()) {
+                for (StraightPathItem p: list) {
+                    Vector3f nu = DetourUtils.createVector3f(p.getPos());
+                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
+                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
+                    }
+                    vector3fList.add(nu);
+                    oldPos = nu;
+                }
+
+                character.getControl(NavMeshChaserControl.class).stopFollowing();
+                character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
+            } else {
+                System.err.println("Unable to find straight paths");
+            }
+        } else {
+            System.err.println("I'm sorry, unable to find a path.....");
+        }
     }
 
     private void setupWorld() {
@@ -170,6 +225,7 @@ public class DemoApplication extends SimpleApplication {
     private void showDebugMeshes(MeshData meshData) {
         Material matRed = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matRed.setColor("Color", ColorRGBA.Red);
+        matRed.getAdditionalRenderState().setWireframe(true);
         Material matGreen = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matGreen.setColor("Color", ColorRGBA.Green);
 
@@ -256,7 +312,8 @@ public class DemoApplication extends SimpleApplication {
     private void loadJaime() {
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
-        character.addControl(new BetterCharacterControl(0.6f, 2f, 20f)); // values taken from recast defaults
+        character.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
+
         character.addControl(new NavMeshChaserControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
         rootNode.attachChild(character);

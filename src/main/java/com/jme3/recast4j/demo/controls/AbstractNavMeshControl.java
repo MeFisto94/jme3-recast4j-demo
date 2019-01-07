@@ -1,4 +1,4 @@
-package com.jme3.recast4j.demo;
+package com.jme3.recast4j.demo.controls;
 
 import com.jme3.animation.AnimChannel;
 import com.jme3.animation.AnimControl;
@@ -11,20 +11,14 @@ import com.jme3.scene.control.AbstractControl;
 import java.util.ArrayList;
 import java.util.List;
 
-public class NavMeshChaserControl extends AbstractControl {
+public abstract class AbstractNavMeshControl extends AbstractControl {
     protected BetterCharacterControl characterControl;
     protected List<Vector3f> pathList;
     protected int currentIndex;
     protected AnimChannel walkChannel;
-    /**
-     * Epsilon is the distance required to accept a waypoint as close enough, see how changing this value changes
-     * walking behavior. Must be >= 0.2, because for some reason the height is always reported as 1.2 but Jaime walks
-     * on the height of 1.0
-     */
-    protected static final float epsilon = 0.3f;
     protected static final float walkspeed = 2f;
 
-    public NavMeshChaserControl() {
+    public AbstractNavMeshControl() {
         this.pathList = new ArrayList<>();
     }
 
@@ -44,23 +38,9 @@ public class NavMeshChaserControl extends AbstractControl {
         if (walkChannel == null && getSpatial().getControl(AnimControl.class) != null) {
             walkChannel = getSpatial().getControl(AnimControl.class).createChannel();
         }
-
-        // e.g. index 2 -> size >= 3
-        if (pathList.size() >= currentIndex + 1) {
-            if (getSpatial().getWorldTranslation().distance(pathList.get(currentIndex)) < epsilon) {
-                // reached a target, increase the index, that's all
-                currentIndex++;
-
-                if (pathList.size() >= currentIndex + 1) { // still in the list?
-                    moveToWaypoint();
-                } else { // reached our target
-                    stopFollowing();
-                }
-            } // else -> AntiStuck Detection?
-        } // else we've reached our goal
     }
 
-    private void moveToWaypoint() {
+    protected void moveToWaypoint() {
         Vector3f dir = pathList.get(currentIndex).subtract(spatial.getWorldTranslation()).setY(0f).normalizeLocal();
         System.out.println("Approaching " + pathList.get(currentIndex) + " Direction: " + dir);
         characterControl.setViewDirection(dir);
@@ -90,10 +70,15 @@ public class NavMeshChaserControl extends AbstractControl {
         if (walkChannel != null) {
             if (walking) {
                 walkChannel.setAnim("Walk");
+                walkChannel.setSpeed(walkspeed);
             } else {
                 walkChannel.reset(true);
             }
         }
     }
 
+    protected boolean isPathListDone() {
+        // e.g. index 2 -> size >= 3
+        return currentIndex + 1 > pathList.size();
+    }
 }
