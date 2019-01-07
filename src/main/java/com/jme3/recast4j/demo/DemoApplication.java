@@ -223,6 +223,7 @@ public class DemoApplication extends SimpleApplication {
     private void showDebugMeshes(MeshData meshData) {
         Material matRed = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matRed.setColor("Color", ColorRGBA.Red);
+        matRed.getAdditionalRenderState().setWireframe(true);
         Material matGreen = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matGreen.setColor("Color", ColorRGBA.Green);
 
