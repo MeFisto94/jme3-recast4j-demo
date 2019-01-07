@@ -109,8 +109,8 @@ public class DemoApplication extends SimpleApplication {
                 rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Yellow, getLocationOnMap().add(0f, 0.5f, 0f)));
 
                 QueryFilter filter = new BetterDefaultQueryFilter();
-                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {2f, 2f, 2f}, filter);
-                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {2f, 2f, 2f}, filter);
+                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
+                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
 
                 findPathImmediately(filter, startPoly, endPoly);
             }
