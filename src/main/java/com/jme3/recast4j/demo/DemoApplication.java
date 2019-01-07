@@ -74,6 +74,7 @@ public class DemoApplication extends SimpleApplication {
         //Load or build mesh objects used for navigation here.
         //Must be called prior to running recast navMesh build procedure.
         //Must set worldMap variable from method call.
+
         //        loadNavMeshBox();
         //        loadNavMeshDune();
         loadNavMeshLevel();
@@ -145,6 +146,7 @@ public class DemoApplication extends SimpleApplication {
             System.err.println("I'm sorry, unable to find a path.....");
         }
     }
+
 
     private void findPathSliced(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter, 0);
@@ -311,6 +313,7 @@ public class DemoApplication extends SimpleApplication {
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
         character.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
+
         character.addControl(new NavMeshChaserControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
         rootNode.attachChild(character);
