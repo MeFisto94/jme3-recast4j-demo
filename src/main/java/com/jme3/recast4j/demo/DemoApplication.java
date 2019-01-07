@@ -78,6 +78,8 @@ public class DemoApplication extends SimpleApplication {
         //        loadNavMeshDune();
         loadNavMeshLevel();
         loadDoors();
+
+        //getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
         
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
@@ -307,7 +309,7 @@ public class DemoApplication extends SimpleApplication {
     private void loadJaime() {
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
-        character.addControl(new BetterCharacterControl(0.6f, 2f, 20f)); // values taken from recast defaults
+        character.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
         character.addControl(new NavMeshChaserControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
         rootNode.attachChild(character);
