@@ -15,6 +15,9 @@ import com.jme3.math.Vector3f;
 import com.jme3.post.FilterPostProcessor;
 import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
+import com.jme3.recast4j.Detour.Crowd.Crowd;
+import com.jme3.recast4j.Detour.Crowd.CrowdManager;
+import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
@@ -30,6 +33,7 @@ import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
 import org.recast4j.detour.*;
+import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilderConfig;
 
@@ -40,17 +44,19 @@ import org.slf4j.LoggerFactory;
 
 public class DemoApplication extends SimpleApplication {
 
-//    Geometry worldMap;
+    Crowd crowd;
     Spatial worldMap;
     NavMesh navMesh;
     NavMeshQuery query;
     FilterPostProcessor fpp;
-    Node character;
+    List<Node> characters;
     List<Geometry> pathGeometries;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
+    CrowdManagerAppstate crowdManagerAppstate;
     
     public DemoApplication() {
         pathGeometries = new ArrayList<>(64);
+        characters = new ArrayList<>(64);
     }
 
     public static void main(String[] args) {
@@ -67,19 +73,24 @@ public class DemoApplication extends SimpleApplication {
         GuiGlobals.initialize(this);
         flyCam.setEnabled(false);
         getStateManager().attach(new RecastGUIState());
+        crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
+        getStateManager().attach(crowdManagerAppstate);
 
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
-        
-        //Load various models from here.
-        loadJaime();
+
+        // This should be a click action in a GUI somewhere.
+        for (int i = 0; i < 5; i++) {
+            //Load various models from here.
+            addAJaime(i);
+        }
         
         //Load or build mesh objects used for navigation here.
         //Must be called prior to running recast navMesh build procedure.
         //Must set worldMap variable from method call.
 
-//        loadNavMeshBox();
-//        loadNavMeshDune();
+        //loadNavMeshBox();
+        //loadNavMeshDune();
         loadNavMeshLevel();
         loadDoors();
 
@@ -122,21 +133,48 @@ public class DemoApplication extends SimpleApplication {
                 super.click(event, target, capture);
                 // First clear existing pathGeometries from the old path finding:
                 pathGeometries.forEach(Geometry::removeFromParent);
-
                 // Clicked on the map, so build a path to:
-                rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Green, character.getWorldTranslation().add(0f, 0.5f, 0f)));
-                rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Yellow, getLocationOnMap().add(0f, 0.5f, 0f)));
+                Vector3f locOnMap = getLocationOnMap(); // Don't calculate three times
+                LOG.info("Will walk from {} to {}", characters.get(0).getWorldTranslation(), locOnMap);
+                rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Green, characters.get(0).getWorldTranslation().add(0f, 0.5f, 0f)));
+                rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Yellow, locOnMap.add(0f, 0.5f, 0f)));
 
-                QueryFilter filter = new BetterDefaultQueryFilter();
-                FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
-                FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
+                if (characters.size() == 1) {
+                    QueryFilter filter = new BetterDefaultQueryFilter();
+                    FindNearestPolyResult startPoly = query.findNearestPoly(characters.get(0).getWorldTranslation().toArray(null), new float[]{0.5f, 0.5f, 0.5f}, filter);
+                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{0.5f, 0.5f, 0.5f}, filter);
 
-                findPathImmediately(filter, startPoly, endPoly);
+                    findPathImmediately(characters.get(0), filter, startPoly, endPoly);
+                } else {
+                    if (crowd == null) {
+                        crowd = new Crowd(5, 0.4f, navMesh);
+                        CrowdAgentParams params = new CrowdAgentParams();
+                        params.height = 1.8f;
+                        params.radius = 0.3f;
+                        params.maxSpeed = 2f;
+                        params.maxAcceleration = 8f;
+                        params.collisionQueryRange = params.radius * 12f;
+                        params.pathOptimizationRange = params.radius * 30f;
+                        params.updateFlags = CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS | CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE; //|
+                        //CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO | CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS | CrowdAgentParams.DT_CROWD_SEPARATION;
+                        params.obstacleAvoidanceType = 0;
+
+                        for (int i = 0; i < 5; i++) {
+                            crowd.createAgent(characters.get(i).getWorldTranslation(), params);
+                        }
+
+                        crowdManagerAppstate.getCrowdManager().addCrowd(crowd);
+                    }
+
+                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{0.5f, 0.5f, 0.5f}, new BetterDefaultQueryFilter());
+                    // @TODO: RequestMoveToTarget shall automatically query the nearest polygon or accept a FindNearestPolyResult
+                    System.out.println(crowd.requestMoveToTarget(locOnMap, endPoly.getNearestRef()));
+                }
             }
         });
     }
 
-    private void findPathImmediately(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+    private void findPathImmediately(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
         if (fpr.getStatus().isSuccess()) {
             // Get the proper path from the rough polygon listing
@@ -166,7 +204,7 @@ public class DemoApplication extends SimpleApplication {
     }
 
 
-    private void findPathSliced(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+    private void findPathSliced(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter, 0);
         UpdateSlicedPathResult res;
         do {
@@ -335,14 +373,15 @@ public class DemoApplication extends SimpleApplication {
         return result;
     }
 
-    private void loadJaime() {
-        character = (Node)assetManager.loadModel("Models/Jaime.j3o");
-        character.setLocalTranslation(0f, 5f, 0f);
-        character.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
+    private void addAJaime(int idx) {
+        Node tmp = (Node)assetManager.loadModel("Models/Jaime.j3o");
+        tmp.setLocalTranslation(idx * 0.5f, 5f, (idx % 2 != 0 ? 1f : 0f));
+        tmp.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
 
-        character.addControl(new NavMeshChaserControl());
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
-        rootNode.attachChild(character);
+        tmp.addControl(new NavMeshChaserControl());
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(tmp);
+        rootNode.attachChild(tmp);
+        characters.add(tmp);
     }
 
     private void loadNavMeshBox() {
