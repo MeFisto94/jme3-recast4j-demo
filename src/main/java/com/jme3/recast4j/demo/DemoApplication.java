@@ -190,9 +190,9 @@ public class DemoApplication extends SimpleApplication {
             if (!list.isEmpty()) {
                 for (StraightPathItem p: list) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
-                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.0f, 0f), nu.add(0f, 0.0f, 0f)));
+                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
                     if (p.getRef() != 0) { // if ref is 0, it's the end.
-                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.0f, 0f)));
+                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
                     }
                     vector3fList.add(nu);
                     oldPos = nu;
@@ -345,7 +345,7 @@ public class DemoApplication extends SimpleApplication {
      * @return the box
      */
     public Geometry placeColoredBoxAt(ColorRGBA color, Vector3f position) {
-        Geometry result = new Geometry("Box", new Box(0.05f, 0.05f, 0.05f));
+        Geometry result = new Geometry("Box", new Box(0.25f, 0.25f, 0.25f));
         Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         mat.setColor("Color", color);
         result.setMaterial(mat);
@@ -376,7 +376,7 @@ public class DemoApplication extends SimpleApplication {
     private void addAJaime(int idx) {
         Node tmp = (Node)assetManager.loadModel("Models/Jaime.j3o");
         tmp.setLocalTranslation(idx * 0.5f, 5f, (idx % 2 != 0 ? 1f : 0f));
-        tmp.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
+        tmp.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
 
         tmp.addControl(new NavMeshChaserControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(tmp);
