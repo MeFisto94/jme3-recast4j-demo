@@ -18,6 +18,7 @@ import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
+import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
@@ -33,6 +34,7 @@ import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
 import org.recast4j.detour.*;
+import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilderConfig;
@@ -152,7 +154,7 @@ public class DemoApplication extends SimpleApplication {
                     findPathImmediately(characters.get(0), filter, startPoly, endPoly);
                 } else {
                     if (crowd == null) {
-                        crowd = new Crowd(5, 0.4f, navMesh);
+                        crowd = new Crowd(MovementApplicationType.BETTER_CHARACTER_CONTROL, 5, 0.4f, navMesh);
                         CrowdAgentParams params = new CrowdAgentParams();
                         params.height = 1.8f;
                         params.radius = 0.3f;
@@ -165,7 +167,8 @@ public class DemoApplication extends SimpleApplication {
                         params.obstacleAvoidanceType = 0;
 
                         for (int i = 0; i < 5; i++) {
-                            crowd.createAgent(characters.get(i).getWorldTranslation(), params);
+                            CrowdAgent ca = crowd.createAgent(characters.get(i).getWorldTranslation(), params);
+                            crowd.setSpatialForAgent(ca, characters.get(i));
                         }
 
                         crowdManagerAppstate.getCrowdManager().addCrowd(crowd);
