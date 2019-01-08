@@ -32,7 +32,6 @@ import com.simsilica.lemur.event.MouseEventControl;
 import org.recast4j.detour.*;
 import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilderConfig;
-
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -66,7 +65,6 @@ public class DemoApplication extends SimpleApplication {
     public void simpleInitApp() {
         GuiGlobals.initialize(this);
         flyCam.setEnabled(false);
-        getStateManager().attach(new RecastGUIState());
 
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
@@ -83,34 +81,40 @@ public class DemoApplication extends SimpleApplication {
         loadNavMeshLevel();
         loadDoors();
 
-        //getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
+        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
         
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
         RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).
                 build(new RecastConfigBuilder()
-                        .withAgentRadius(.3f)           // r
+                        .withAgentRadius(.44f)           // r
                         .withAgentHeight(1.8f)          // h
-                        .withCellSize(.15f)             // cs=r/2
-                        .withCellHeight(.075f)          // ch=cs/2
-                        .withAgentMaxClimb(.5f)         // > 2*ch
+                        .withCellSize(.04f)             // cs=r/10
+                        .withCellHeight(.02f)          // ch=cs/2
+                        .withAgentMaxClimb(.3f)         // > 2*ch
                         .withAgentMaxSlope(45f)         
-                        .withEdgeMaxLen(2.4f)           // r*8
-                        .withEdgeMaxError(1.5f)         // 1.1 - 1.5
-                        .withDetailSampleDistance(4.0f) // increase if exception
-                        .withDetailSampleMaxError(4.0f) // increase if exception
+                        .withEdgeMaxLen(8.0f)           // r*8
+                        .withEdgeMaxError(1.1f)         // 1.1 - 1.5
+                        .withDetailSampleDistance(2.0f) // increase if exception
+                        .withDetailSampleMaxError(11.0f) // increase if exception
                         .withVertsPerPoly(3).build());
-        MeshData meshData = NavMeshBuilder.createNavMeshData(new NavMeshDataCreateParamsBuilder(new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg));
+        
+        //Split up for testing.
+        NavMeshDataCreateParams build = new NavMeshDataCreateParamsBuilder(
+                new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg);
+        MeshData meshData = NavMeshBuilder.createNavMeshData(build);
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
 
+        //Uncomment for 3rd person view. Call after character/navmesh is loaded.
+        getStateManager().attach(new RecastGUIState(character, build, bcfg));
+        
         try {
             RecastTest.saveToFile(navMesh);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
 
-        showConfig(bcfg);
         //Show wireframe. Helps with parm tweaks.
         showDebugMeshes(meshData, true);
         
@@ -120,6 +124,7 @@ public class DemoApplication extends SimpleApplication {
             @Override
             protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
                 super.click(event, target, capture);
+                
                 // First clear existing pathGeometries from the old path finding:
                 pathGeometries.forEach(Geometry::removeFromParent);
 
@@ -131,7 +136,12 @@ public class DemoApplication extends SimpleApplication {
                 FindNearestPolyResult startPoly = query.findNearestPoly(character.getWorldTranslation().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
                 FindNearestPolyResult endPoly = query.findNearestPoly(getLocationOnMap().toArray(null), new float[] {0.5f, 0.5f, 0.5f}, filter);
 
-                findPathImmediately(filter, startPoly, endPoly);
+                if (startPoly.getNearestRef() == 0 || endPoly.getNearestRef() == 0) {
+                    LOG.error("Start or End getNearestRef() cannot be zero. first == {} last == {}", startPoly.getNearestRef(), endPoly.getNearestRef());
+                    pathGeometries.forEach(Geometry::removeFromParent);
+                } else {
+                    findPathImmediately(filter, startPoly, endPoly);
+                }
             }
         });
     }
@@ -147,9 +157,9 @@ public class DemoApplication extends SimpleApplication {
             if (!list.isEmpty()) {
                 for (StraightPathItem p: list) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
-                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
+                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.0f, 0f), nu.add(0f, 0.0f, 0f)));
                     if (p.getRef() != 0) { // if ref is 0, it's the end.
-                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
+                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.0f, 0f)));
                     }
                     vector3fList.add(nu);
                     oldPos = nu;
@@ -164,7 +174,6 @@ public class DemoApplication extends SimpleApplication {
             System.err.println("I'm sorry, unable to find a path.....");
         }
     }
-
 
     private void findPathSliced(QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter, 0);
@@ -250,10 +259,6 @@ public class DemoApplication extends SimpleApplication {
 
         Material matGreen = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         matGreen.setColor("Color", ColorRGBA.Green);
-        
-        if (wireframe) {
-            matGreen.getAdditionalRenderState().setWireframe(true);
-        }
 
         // navMesh.getTile(0).data == meshData (in this particular case)
         Geometry gDetailed = new Geometry("DebugMeshDetailed", RecastUtils.getDebugMesh(meshData.detailMeshes, meshData.detailVerts, meshData.detailTris));
@@ -307,7 +312,7 @@ public class DemoApplication extends SimpleApplication {
      * @return the box
      */
     public Geometry placeColoredBoxAt(ColorRGBA color, Vector3f position) {
-        Geometry result = new Geometry("Box", new Box(0.25f, 0.25f, 0.25f));
+        Geometry result = new Geometry("Box", new Box(0.05f, 0.05f, 0.05f));
         Material mat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
         mat.setColor("Color", color);
         result.setMaterial(mat);
@@ -338,7 +343,7 @@ public class DemoApplication extends SimpleApplication {
     private void loadJaime() {
         character = (Node)assetManager.loadModel("Models/Jaime.j3o");
         character.setLocalTranslation(0f, 5f, 0f);
-        character.addControl(new BetterCharacterControl(0.3f, 2f, 20f)); // values taken from recast defaults
+        character.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
 
         character.addControl(new NavMeshChaserControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(character);
@@ -379,20 +384,5 @@ public class DemoApplication extends SimpleApplication {
         doors.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(doors);
         getRootNode().attachChild(doors);
-    }
-    
-    private void showConfig(RecastBuilderConfig bcfg) {
-        LOG.info("<===== CONFIG BUILDER =====>");
-        LOG.info("Cell Size             [{} wu]", bcfg.cfg.cs);
-        LOG.info("Cell Height           [{} wu]", bcfg.cfg.ch);
-        LOG.info("walkableRadius        [{} vx]", bcfg.cfg.walkableRadius);
-        LOG.info("walkableHeight        [{} vx]", bcfg.cfg.walkableHeight);
-        LOG.info("walkableClimb         [{} vx]", bcfg.cfg.walkableClimb);
-        LOG.info("agentMaxSlope         [{} deg]", bcfg.cfg.walkableSlopeAngle);
-        LOG.info("maxEdgeLen            [{} vx]", bcfg.cfg.maxEdgeLen);
-        LOG.info("edgeMaxError          [{} vx]", bcfg.cfg.maxSimplificationError);
-        LOG.info("detailSampleDist      [{} wu]", bcfg.cfg.detailSampleDist);
-        LOG.info("detailSampleMaxError  [{} wu]", bcfg.cfg.detailSampleMaxError);
-        LOG.info("<===== CONFIG BUILDER =====>");
     }
 }
