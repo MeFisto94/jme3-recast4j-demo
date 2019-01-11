@@ -60,6 +60,9 @@ dependencies {
     compile "com.simsilica:lemur-proto:1.10.0"
     compile 'com.simsilica:lemur-props:1.0.1'
 
+    //miglayout for lemur
+    compile 'com.miglayout:miglayout-core:5.2'
+        
     compile files("jme3-recast4j.jar")
     runtime project(':assets')
 }

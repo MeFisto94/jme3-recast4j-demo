@@ -1,6 +1,10 @@
 package com.jme3.recast4j.demo;
 
+import com.jme3.app.DebugKeysAppState;
+import com.jme3.app.FlyCamAppState;
 import com.jme3.app.SimpleApplication;
+import com.jme3.app.StatsAppState;
+import com.jme3.audio.AudioListenerState;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
@@ -23,6 +27,7 @@ import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
 import com.jme3.recast4j.demo.states.RecastGUIState;
+import com.jme3.recast4j.demo.states.TestGenState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -31,8 +36,14 @@ import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.jme3.system.AppSettings;
 import com.simsilica.lemur.GuiGlobals;
+import com.simsilica.lemur.Label;
+import com.simsilica.lemur.Panel;
+import com.simsilica.lemur.component.QuadBackgroundComponent;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
+import com.simsilica.lemur.style.Attributes;
+import com.simsilica.lemur.style.BaseStyles;
+import com.simsilica.lemur.style.Styles;
 import org.recast4j.detour.*;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
@@ -50,12 +61,19 @@ public class DemoApplication extends SimpleApplication {
     NavMesh navMesh;
     NavMeshQuery query;
     FilterPostProcessor fpp;
-    List<Node> characters;
+    private List<Node> characters;
     List<Geometry> pathGeometries;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     CrowdManagerAppstate crowdManagerAppstate;
+    Node player;
     
     public DemoApplication() {
+        super( 
+                new StatsAppState(),
+                new AudioListenerState(),
+                new DebugKeysAppState(), 
+                new TestGenState() 
+        );
         pathGeometries = new ArrayList<>(64);
         characters = new ArrayList<>(64);
     }
@@ -63,7 +81,7 @@ public class DemoApplication extends SimpleApplication {
     public static void main(String[] args) {
         DemoApplication app = new DemoApplication();
         AppSettings settings = new AppSettings(true);
-        settings.setTitle("RecastLevel");
+        settings.setTitle("Recast Level Demo");
         settings.setGammaCorrection(true);
         app.setSettings(settings);
         app.start();
@@ -72,19 +90,18 @@ public class DemoApplication extends SimpleApplication {
     @Override
     public void simpleInitApp() {
         GuiGlobals.initialize(this);
-        flyCam.setEnabled(false);
         crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
         getStateManager().attach(crowdManagerAppstate);
 
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
 
-        // This should be a click action in a GUI somewhere.
-        for (int i = 0; i < 5; i++) {
-            //Load various models from here.
-            addAJaime(i);
-        }
-        
+//        // This should be a click action in a GUI somewhere.
+//        for (int i = 0; i < 5; i++) {
+//            //Load various models from here.
+//            addAJaime(i);
+//        }
+        loadJaime();
         //Load or build mesh objects used for navigation here.
         //Must be called prior to running recast navMesh build procedure.
         //Must set worldMap variable from method call.
@@ -119,8 +136,8 @@ public class DemoApplication extends SimpleApplication {
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
 
-        //Uncomment for 3rd person view. Call after character/navmesh is loaded.
-//        getStateManager().attach(new RecastGUIState(character, build, bcfg));
+        //Uncomment for 3rd person view. Call after player/navmesh is loaded.
+        getStateManager().attach(new RecastGUIState(player));
         
         try {
             RecastTest.saveToFile(navMesh);
@@ -150,8 +167,12 @@ public class DemoApplication extends SimpleApplication {
                     QueryFilter filter = new BetterDefaultQueryFilter();
                     FindNearestPolyResult startPoly = query.findNearestPoly(characters.get(0).getWorldTranslation().toArray(null), new float[]{0.5f, 0.5f, 0.5f}, filter);
                     FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{0.5f, 0.5f, 0.5f}, filter);
-
-                    findPathImmediately(characters.get(0), filter, startPoly, endPoly);
+                    if (startPoly.getNearestRef() == 0 || endPoly.getNearestRef() == 0) {
+                        LOG.info("Neither Start or End reference can be 0. startPoly [{}] endPoly [{}]", startPoly, endPoly);
+                        pathGeometries.forEach(Geometry::removeFromParent);
+                    } else {
+                        findPathImmediately(characters.get(0), filter, startPoly, endPoly);
+                    }
                 } else {
                     if (crowd == null) {
                         crowd = new Crowd(MovementApplicationType.BETTER_CHARACTER_CONTROL, 5, 0.4f, navMesh);
@@ -377,7 +398,7 @@ public class DemoApplication extends SimpleApplication {
     }
 
     private void addAJaime(int idx) {
-        Node tmp = (Node)assetManager.loadModel("Models/Jaime.j3o");
+        Node tmp = (Node)assetManager.loadModel("Models/Jaime/Jaime.j3o");
         tmp.setLocalTranslation(idx * 0.5f, 5f, (idx % 2 != 0 ? 1f : 0f));
         tmp.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
 
@@ -421,5 +442,14 @@ public class DemoApplication extends SimpleApplication {
         doors.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(doors);
         getRootNode().attachChild(doors);
+    }    
+   
+    private void loadJaime() {
+        player = (Node) getAssetManager().loadModel("Models/Jaime/Jaime.j3o");
+        player.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
+        player.addControl(new NavMeshChaserControl());
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(player);
+        getRootNode().attachChild(player);
+        characters.add(player);
     }
 }
