@@ -61,7 +61,7 @@ public class DemoApplication extends SimpleApplication {
     NavMesh navMesh;
     NavMeshQuery query;
     FilterPostProcessor fpp;
-    private List<Node> characters;
+    List<Node> characters;
     List<Geometry> pathGeometries;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     CrowdManagerAppstate crowdManagerAppstate;

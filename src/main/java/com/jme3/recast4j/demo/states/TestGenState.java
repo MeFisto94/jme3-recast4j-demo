@@ -264,7 +264,6 @@ public class TestGenState extends BaseAppState {
                 //shouldn't need to check for null.
                 int size = listBoxSize.getSelectionModel().getSelection() + 1;
                 
-               
                 //Set the CrowdAgentParams. Ugly but, lemurs ListBox doesn't 
                 //have a muli selection model for so.
                 if (!checkTurns.isChecked() 
@@ -345,20 +344,17 @@ public class TestGenState extends BaseAppState {
         //e.g. remove all spatials from rootNode
     }
 
-    //onEnable()/onDisable() can be used for managing things that should 
-    //only exist while the state is enabled. Prime examples would be scene 
-    //graph attachment or input listener attachment.
     @Override
     protected void onEnable() {
-        ((SimpleApplication) getApplication()).setDisplayFps(false);
-        ((SimpleApplication) getApplication()).setDisplayStatView(false);
+//        ((SimpleApplication) getApplication()).setDisplayFps(false);
+//        ((SimpleApplication) getApplication()).setDisplayStatView(false);
         ((SimpleApplication) getApplication()).getGuiNode().attachChild(contCrowd);
     }
 
     @Override
     protected void onDisable() {
-        ((SimpleApplication) getApplication()).setDisplayFps(true);
-        ((SimpleApplication) getApplication()).setDisplayStatView(true);
+//        ((SimpleApplication) getApplication()).setDisplayFps(true);
+//        ((SimpleApplication) getApplication()).setDisplayStatView(true);
         contCrowd.removeFromParent();
     }
     
@@ -390,26 +386,7 @@ public class TestGenState extends BaseAppState {
             for (int j = 0; j < size; j++) {
                 Node agent = (Node) getApplication().getAssetManager().loadModel(character);
                 
-                //Set the collision mesh based off bounds
                 agent.setName(testName + "_r" + i + "_c"+ j);
-                
-                //The auto generation is based off model bounds and assumes a 
-                //bipedal character in a T-Pose position. The general assumption 
-                //being we want to set the collision shape of BCC to be around 
-                //shoulder width and as near to the actual head height as 
-                //possible. This would typically mean the largest number in the 
-                //x or z direction would be the arm spread.
-                //If this doesn't work we may have to add another parameter to 
-                //the method to get the detail desired.
-                BoundingBox bounds = (BoundingBox) agent.getWorldBound();
-                float x = bounds.getXExtent();
-                float y = bounds.getYExtent();
-                float z = bounds.getZExtent();
-                float xz = x > z ? x:z;
-                
-                LOG.info("X [{}] Z [{}] XZ [{}] /2 [{}]", xz, xz/2);
-                agent.addControl(new BetterCharacterControl(xz/2, y*2, 20f));
-                agent.addControl(new NavMeshChaserControl());
                 
                 //Set Crowd parameters for the agent
                 CrowdAgentControl cac = new CrowdAgentControl();
@@ -423,7 +400,28 @@ public class TestGenState extends BaseAppState {
                 Vector3f start = new Vector3f(startX, startY, startZ);
                 agent.setLocalTranslation(start);
                 Vector3f localTranslation = agent.getLocalTranslation();
+                
                 LOG.info("agent [{}] loc {}", agent.getName(), localTranslation);
+                
+                //The auto generation is based off model bounds and assumes a 
+                //bipedal character in a T-Pose position. The general assumption 
+                //being we want to set the collision shape of BCC to be around 
+                //shoulder width and as near to the actual head height as 
+                //possible. This would typically mean the largest number in the 
+                //x or z direction would be the arm spread.
+                //If this doesn't work we may have to add another parameter to 
+                //the method to get the detail desired.
+                BoundingBox bounds = (BoundingBox) agent.getWorldBound();
+                float x = bounds.getXExtent();
+                float y = bounds.getYExtent();
+                float z = bounds.getZExtent();
+                float xz = x < z ? x:z;
+                
+                LOG.info("X [{}] Z [{}] XZ [{}] /2 [{}]", x, z, xz, xz/2);
+                
+                agent.addControl(new BetterCharacterControl(xz/2, y*2, 20f));
+                agent.addControl(new NavMeshChaserControl());
+                
                 //Add to agents list.
                 listAgents.add(agent);
             }
@@ -471,12 +469,12 @@ public class TestGenState extends BaseAppState {
                 + "The actual starting point of the agent is determined by its "
                 + "final position on the navMesh.";
         
-        Container legendCont = new Container(new MigLayout("wrap"));
-        Label label = legendCont.addChild(new Label(msg));
+        Container contLegend = new Container(new MigLayout("wrap"));
+        Label label = contLegend.addChild(new Label(msg));
         label.setMaxWidth(400);
-        legendCont.addChild(new ActionButton(new CallMethodAction("Close", legendCont, "removeFromParent")));
-        centerComp(legendCont);
-        GuiGlobals.getInstance().getPopupState().showPopup(legendCont);
+        contLegend.addChild(new ActionButton(new CallMethodAction("Close", contLegend, "removeFromParent")));
+        centerComp(contLegend);
+        GuiGlobals.getInstance().getPopupState().showPopup(contLegend);
     }
     
     private Panel showPopup( String msg ) {
