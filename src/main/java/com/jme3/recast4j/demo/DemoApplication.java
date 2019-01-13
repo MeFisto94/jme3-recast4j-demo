@@ -1,7 +1,6 @@
 package com.jme3.recast4j.demo;
 
 import com.jme3.app.DebugKeysAppState;
-import com.jme3.app.FlyCamAppState;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.StatsAppState;
 import com.jme3.audio.AudioListenerState;
@@ -9,6 +8,9 @@ import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.collision.CollisionResults;
+import com.jme3.input.KeyInput;
+import com.jme3.input.controls.ActionListener;
+import com.jme3.input.controls.KeyTrigger;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
@@ -36,14 +38,8 @@ import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.jme3.system.AppSettings;
 import com.simsilica.lemur.GuiGlobals;
-import com.simsilica.lemur.Label;
-import com.simsilica.lemur.Panel;
-import com.simsilica.lemur.component.QuadBackgroundComponent;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
-import com.simsilica.lemur.style.Attributes;
-import com.simsilica.lemur.style.BaseStyles;
-import com.simsilica.lemur.style.Styles;
 import org.recast4j.detour.*;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
@@ -66,16 +62,16 @@ public class DemoApplication extends SimpleApplication {
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     CrowdManagerAppstate crowdManagerAppstate;
     Node player;
+    private TestGenState testGenState;
     
     public DemoApplication() {
         super( 
                 new StatsAppState(),
                 new AudioListenerState(),
-                new DebugKeysAppState(), 
-                new TestGenState() 
+                new DebugKeysAppState()
         );
         pathGeometries = new ArrayList<>(64);
-        characters = new ArrayList<>(64);
+        characters = new ArrayList<>(64);        
     }
 
     public static void main(String[] args) {
@@ -89,10 +85,12 @@ public class DemoApplication extends SimpleApplication {
 
     @Override
     public void simpleInitApp() {
+        initKeys();
         GuiGlobals.initialize(this);
         crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
         getStateManager().attach(crowdManagerAppstate);
-
+        testGenState = new TestGenState();
+        getStateManager().attach(testGenState);
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
 
@@ -451,5 +449,24 @@ public class DemoApplication extends SimpleApplication {
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(player);
         getRootNode().attachChild(player);
         characters.add(player);
+    }
+    
+    private ActionListener actionListener = new ActionListener() {
+        @Override
+        public void onAction(String name, boolean keyPressed, float tpf) {
+            if (name.equals("activate tests") && !keyPressed) {
+                if (getStateManager().hasState(testGenState)) {
+                    getStateManager().getState(TestGenState.class).setEnabled(false);
+                } else {
+                    testGenState = new TestGenState();
+                    getStateManager().attach(testGenState);
+                }
+            }
+        }
+    };
+
+    private void initKeys() {
+        getInputManager().addMapping("activate tests", new KeyTrigger(KeyInput.KEY_F1));
+        getInputManager().addListener(actionListener, "activate tests");
     }
 }

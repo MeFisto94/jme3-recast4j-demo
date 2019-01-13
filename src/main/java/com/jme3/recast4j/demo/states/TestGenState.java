@@ -39,6 +39,7 @@ import com.jme3.math.Vector3f;
 import com.jme3.recast4j.demo.controls.CrowdAgentControl;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
@@ -47,9 +48,12 @@ import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
+import com.simsilica.lemur.Insets3f;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.Panel;
+import com.simsilica.lemur.RollupPanel;
+import com.simsilica.lemur.TabbedPanel;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
 import com.simsilica.lemur.event.ConsumingMouseListener;
@@ -64,7 +68,11 @@ import com.simsilica.lemur.text.DocumentModelFilter;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,24 +90,25 @@ public class TestGenState extends BaseAppState {
     private ListBox listBoxAvoidance;
     private ListBox listBoxAgent;
     private ListBox listBoxSize;
+    private ListBox listBoxTests;
     private TextField fieldPosX;
     private TextField fieldPosY;
     private TextField fieldPosZ;
     private TextField fieldTestName;
-    private Container contCrowd;
     private Checkbox checkTurns;
     private Checkbox checkAvoid;
     private Checkbox checkTopo;
     private Checkbox checkVis;
     private Checkbox checkSep;
-    private List<Node> listAgents;
-    private boolean loadAgents;
+    private Map<String, Test> mapTests;
+    private boolean newTest;
+    private boolean checkTests;
+    private Container contTabs;
     
     @Override
     protected void initialize(Application app) {
-        //Initialize the character list for the test. 
-        listAgents = new ArrayList<>();
-        loadAgents = false;
+        // Holds all active tests.
+        mapTests = new HashMap<>();
         
         GuiGlobals.initialize(app);
         BaseStyles.loadGlassStyle();
@@ -109,24 +118,36 @@ public class TestGenState extends BaseAppState {
         TbtQuadBackgroundComponent bg = attrs.get("background");
         bg.setColor(new ColorRGBA(0.25f, 0.5f, 0.5f, 1.0f));
         
-        //Container for crowd configuration.
-        contCrowd = new Container(new MigLayout("wrap 3"));
-        contCrowd.setName("TestGenState crowdCont");
-        contCrowd.addChild(new Label("Crowd Agent Generator"), "span, align 50%");
-        //Make dragable.
-        DragHandler dragHandler = new DragHandler();
-        CursorEventControl.addListenersToSpatial(contCrowd, dragHandler);
-       
+        //Container for crowd agent configuration.
+        //Set the column minimum to grow so all children can grow to the edge.
+        //Set to fill so the components in that column will default to a "growx"
+        //constraint. Note that this property does not affect the size for the row,
+        //but rather the sizes of the components in the row.
+        Container contAgentGen = new Container(new MigLayout(
+                "wrap 3", // Layout Constraints
+                "[grow, fill][][]")); // Column constraints [min][pref][max]
+        contAgentGen.setName("TestGenState crowdCont");
+        contAgentGen.setAlpha(0, false);
+        
         // First row.
-        Container contRow1 = new Container(new MigLayout("wrap 5"));
+        //Set column min to grow or minimum will prevent fieldTestName from 
+        //growing fully to edge.
+        Container contRow1 = new Container(new MigLayout(
+                "wrap 3", // Layout Constraints
+                "[grow][][]")); // Column constraints [min][pref][max]
         contRow1.setName("TestGenState rowOneCont");
-        contRow1.addChild(new Label("Test Name"));
+        //contRow1 wraps at 3 componets based on the Crowd Separation row.
+        //Span all 3 cells for the Test Name row so can place fieldTestName in 
+        //same cell and growx and stretch to the edge of contRow1.
+        contRow1.addChild(new Label("Test Name"), "span 3");
         
         doc = new DocumentModelFilter();
         //placeholder for filtering
-        fieldTestName = contRow1.addChild(new TextField(doc));
+        //Placed in Label("Test Name") cell so will align nicely to the end of
+        //of the label. growx direction to stretch the TextField to the edge of
+        //contRow1.
+        fieldTestName = contRow1.addChild(new TextField(doc), "cell 0 0, growx");
         fieldTestName.setSingleLine(true);
-        fieldTestName.setPreferredWidth(100);
         
         contRow1.addChild(new Label("Crowd Separation"));
         doc = new DocumentModelFilter();
@@ -135,19 +156,20 @@ public class TestGenState extends BaseAppState {
         fieldDistance.setSingleLine(true);
         fieldDistance.setPreferredWidth(50);
         fieldDistance.setText("1.0");
-        contRow1.addChild(new Label(".f"));
-        contCrowd.addChild(contRow1, "span, align 50%");
+        contRow1.addChild(new Label(".float"));
+        //contRow1 uses 1 of 3 cells, span to fill row.
+        contAgentGen.addChild(contRow1, "span");
            
         //Second row
         //Add model name here. Add the asset path butSetup #Model Section
         Container cont1Row2 = new Container(new MigLayout("wrap"));
         cont1Row2.setName("TestGenState rowTwoCont1");
-        cont1Row2.addChild(new Label("Agent Type"));
+        cont1Row2.addChild(new Label("Agent"));
         listBoxAgent = cont1Row2.addChild(new ListBox(), "align 50%");
         MouseEventControl.addListenersToSpatial(cont1Row2, ConsumingMouseListener.INSTANCE);
         listBoxAgent.getModel().add("Jamie");
         listBoxAgent.getSelectionModel().setSelection(0);
-        contCrowd.addChild(cont1Row2);
+        contAgentGen.addChild(cont1Row2);
         
         Container cont2Row2 = new Container(new MigLayout("wrap"));
         cont2Row2.setName("TestGenState rowTwoCont2");
@@ -160,11 +182,11 @@ public class TestGenState extends BaseAppState {
             size++;
         }
         listBoxSize.getSelectionModel().setSelection(0);
-        contCrowd.addChild(cont2Row2);
+        contAgentGen.addChild(cont2Row2);
         
         Container cont3Row2 = new Container(new MigLayout("wrap"));
         cont3Row2.setName("TestGenState rowTwoCont3");
-        cont3Row2.addChild(new Label("Obstacle Avoidance Type"));
+        cont3Row2.addChild(new Label("Avoidance"));
         listBoxAvoidance = cont3Row2.addChild(new ListBox(), "align 50%");
         MouseEventControl.addListenersToSpatial(cont3Row2, ConsumingMouseListener.INSTANCE);
         
@@ -174,12 +196,12 @@ public class TestGenState extends BaseAppState {
             listBoxAvoidance.getModel().add(i);
         }
         listBoxAvoidance.getSelectionModel().setSelection(0);
-        contCrowd.addChild(cont3Row2);
+        contAgentGen.addChild(cont3Row2);
         
         //Third row  
         //TODO add a multi selection mode and move this to a ListBox. Change the
         //butSetup mega if/else check when done.
-        Container contRow3 = new Container(new MigLayout("wrap 2"));
+        Container contRow3 = new Container(new MigLayout("wrap"));
         contRow3.setName("TestGenState rowThreeCont");
         contRow3.addChild(new Label("Update Flags"), "span");
         checkTurns = contRow3.addChild(new Checkbox("ANTICIPATE_TURNS"));
@@ -187,12 +209,12 @@ public class TestGenState extends BaseAppState {
         checkTopo = contRow3.addChild(new Checkbox("OPTIMIZE_TOPO"));
         checkVis = contRow3.addChild(new Checkbox("OPTIMIZE_VIS"));
         checkSep = contRow3.addChild(new Checkbox("SEPARATION"));
-        contCrowd.addChild(contRow3, "span, align 50%");
+        contAgentGen.addChild(contRow3, "span");
         
         //Fourth row
-        Container contRow4 = new Container(new MigLayout("wrap 7"));
+        Container contRow4 = new Container(new MigLayout("wrap 6"));
         contRow4.setName("TestGenState rowFourCont");
-        contRow4.addChild(new Label("Start Position")); 
+        contRow4.addChild(new Label("Start Position"), "span"); 
         //X
         contRow4.addChild(new Label("X:"));
         doc = new DocumentModelFilter();
@@ -219,18 +241,38 @@ public class TestGenState extends BaseAppState {
         fieldPosZ.setSingleLine(true);
         fieldPosZ.setPreferredWidth(50);
         fieldPosZ.setText("0.0");
-        contCrowd.addChild(contRow4, "span, align 50%");
+        contAgentGen.addChild(contRow4, "span");
         
-        //Fifth row
-        Container contRow5 = new Container(new MigLayout("wrap 2"));
+        //Fifth row. Holds the Active test window and Remove test button.
+        Container contRow5 = new Container(new MigLayout("wrap", "[grow]"));
         contRow5.setName("TestGenState rowFiveCont");
-        Button butSetup = contRow5.addChild(new Button("Generate Agents"));
+        contRow5.addChild(new Label("Active Tests"));
+        listBoxTests = contRow5.addChild(new ListBox(), "growx");
+        MouseEventControl.addListenersToSpatial(contRow5, ConsumingMouseListener.INSTANCE);
+        //We use the method call to removeTest to set a boolean of
+        contRow5.addChild(new ActionButton(new CallMethodAction("Remove Test", this, "removeTest")));
+        contAgentGen.addChild(contRow5, "span");
+        
+        //Sixth row. Holds the Genrate Agents and Legend buttons.
+        //When using the contAgentGen with grow, fill column constraints you have to 
+        //set the column constrains for the children containers in the layout if 
+        //you want to align components. I am not sure if setting other Lemur parameters
+        //would remedy this or if it is expected MigLayout behavior. The MigLayout
+        //docs only mention if two components share the same cell that this is
+        //the expected behavior, which in this instance, clearly is not the case.
+        Container contRow6 = new Container(new MigLayout(
+                "wrap 2", // Layout Constraints
+                "[]push[][]")); // Column constraints [min][pref][max]
+        contRow6.setName("TestGenState rowSixCont");
+        //Buttons.
+        contRow6.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
+        Button butSetup = contRow6.addChild(new Button("Generate Agents"));
         MouseEventControl.addListenersToSpatial(butSetup, new DefaultMouseListener() {
             private String testName;
             private float distance = -1;
             private String agent;
             private int flags;
-            Vector3f startPos = new Vector3f(0, 0, 0);
+            private Vector3f startPos = new Vector3f(0, 0, 0);
             
             @Override
             protected void click( MouseButtonEvent event, Spatial target, Spatial capture ) {
@@ -238,13 +280,13 @@ public class TestGenState extends BaseAppState {
                 //Garbage in?, no test.
                 if (!isNumeric(fieldDistance.getText()) 
                 ||  fieldDistance.getText().isEmpty()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(showPopup("Crowd Separation requires a valid float value."));
+                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Crowd Separation requires a valid float value.", 0));
                     return;
                 } else {
                     distance = new Float(fieldDistance.getText());
                     //Stop negative distance input for grid.
                     if (distance < 0.1f) {
-                        GuiGlobals.getInstance().getPopupState().showModalPopup(showPopup("Crowd Separation requires a float value >= 0.1."));
+                        GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Crowd Separation requires a float value >= 0.1.", 0));
                         return;
                     }
                 }
@@ -265,13 +307,13 @@ public class TestGenState extends BaseAppState {
                 int size = listBoxSize.getSelectionModel().getSelection() + 1;
                 
                 //Set the CrowdAgentParams. Ugly but, lemurs ListBox doesn't 
-                //have a muli selection model for so.
+                //have a muli selection model.
                 if (!checkTurns.isChecked() 
                 &&  !checkAvoid.isChecked() 
                 &&  !checkTopo.isChecked() 
                 &&  !checkVis.isChecked() 
                 &&  !checkSep.isChecked()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(showPopup("Select at least one Update Flag."));
+                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Select at least one Update Flag.", 0));
                     return;
                 } else {
                     flags = 0;
@@ -304,7 +346,7 @@ public class TestGenState extends BaseAppState {
                 if (!isNumeric(fieldPosX.getText()) || fieldPosX.getText().isEmpty() 
                 ||  !isNumeric(fieldPosY.getText()) || fieldPosY.getText().isEmpty() 
                 ||  !isNumeric(fieldPosZ.getText()) || fieldPosZ.getText().isEmpty()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(showPopup("Start Position requires a valid float value."));
+                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Start Position requires a valid float value.", 0));
                 } else {
                     Float x = new Float(fieldPosX.getText());
                     Float y = new Float(fieldPosY.getText());
@@ -312,11 +354,15 @@ public class TestGenState extends BaseAppState {
                     startPos = new Vector3f(x, y, z);
                 }
                 
-                //The name of this test.
+                //The name of this test.                
                 if (fieldTestName.getText().isEmpty()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(showPopup("You must enter a test name."));
+                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("You must enter a test name.", 0));
                     return;
-                } else{
+                } else if (mapTests.containsKey(fieldTestName.getText())) {
+                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("[" + fieldTestName.getText() + "] has already been activated. "
+                            + "Change the test name or remove the existing test before proceeding.", 400));
+                    return;
+                } else {
                     testName = fieldTestName.getText();
                 }
                  
@@ -332,40 +378,103 @@ public class TestGenState extends BaseAppState {
             }
         });
         
-        contRow5.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
-        contCrowd.addChild(contRow5, "span, align 50%");
+        contAgentGen.addChild(contRow6, "span");
         
-        centerComp(contCrowd);
+        Container contRollup = new Container();
+        contRollup.setAlpha(0, false);
+        RollupPanel rollAgentGen = contRollup.addChild(new RollupPanel("Expand / Collapse", contAgentGen, "glass"));
+        rollAgentGen.setOpen(false);
+        
+        //Container for Crowd configuration.
+        Container contCrowd = new Container(new MigLayout("wrap"));
+        contCrowd.addChild(new Label("Crowd Panel Holder"));
+        
+        //Create the tab container that will hold both contCrowd and contAgentGen
+        contTabs = new Container();
+        contTabs.setName("TestGenState tabsCont");
+        //Make it dragable.
+        DragHandler dragHandler = new DragHandler();
+        CursorEventControl.addListenersToSpatial(contTabs, dragHandler);
+        MouseEventControl.addListenersToSpatial(contTabs, ConsumingMouseListener.INSTANCE);
+        contTabs.addChild(new Label("Detour Crowd"));
+        
+        TabbedPanel tabPanel = contTabs.addChild(new TabbedPanel());
+        tabPanel.setInsets(new Insets3f(5, 5, 5, 5));
+        
+        tabPanel.addTab("Agent Generator", contRollup);
+        tabPanel.addTab("Crowd Settings", contCrowd);
+        
+        centerComp(contTabs);
     }
 
     @Override
     protected void cleanup(Application app) {
-        //TODO: clean up what you initialized in the initialize method,
-        //e.g. remove all spatials from rootNode
+        //Removing the test tab will clear all agents and remove this Appstate
+        //from the StateManager.
+        Iterator<Map.Entry<String, Test>> iterator = mapTests.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Test> entry = iterator.next();
+            List<Node> agents = entry.getValue().getListAgents();
+            for (Node agent: agents) {
+                getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(agent);
+                ((SimpleApplication) getApplication()).getRootNode().detachChild(agent);
+            }
+            iterator.remove();
+        }
     }
 
     @Override
     protected void onEnable() {
-//        ((SimpleApplication) getApplication()).setDisplayFps(false);
-//        ((SimpleApplication) getApplication()).setDisplayStatView(false);
-        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contCrowd);
+//        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contAgentGen);
+        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contTabs);
     }
 
     @Override
     protected void onDisable() {
-//        ((SimpleApplication) getApplication()).setDisplayFps(true);
-//        ((SimpleApplication) getApplication()).setDisplayStatView(true);
-        contCrowd.removeFromParent();
+        ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
+        getStateManager().detach(this);
     }
     
     @Override
     public void update(float tpf) {
-        if (loadAgents) {
-            for (Node agent: listAgents) {
-                getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(agent);
-                ((SimpleApplication) getApplication()).getRootNode().attachChild(agent);
+                    
+        //Look for incactive test to activate. Loads the agents into the physics
+        //space and attaches them to the rootNode.
+        if (newTest) {
+            mapTests.forEach((key, value)-> {
+                if (!value.isActiveTest()) {
+                    List<Node> agents = value.getListAgents();
+                    for (Node agent: agents) {
+                        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(agent);
+                        ((SimpleApplication) getApplication()).getRootNode().attachChild(agent);
+                    }
+                    value.setActiveTest(true);
+                    listBoxTests.getModel().add(key);
+                }
+            });
+            newTest = false;
+        }
+        
+        //Look for tests to remove. Removes the agents from the root node and 
+        //physics space. Use iterator to avoid ConcurrentModificationException.
+        if (checkTests) {
+            Iterator<Map.Entry<String, Test>> iterator = mapTests.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, Test> entry = iterator.next();
+                if (entry.getValue().isRemoveTest()) {
+                    List<Node> agents = entry.getValue().getListAgents();
+                    for (Node agent: agents) {
+                        getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(agent);
+                        ((SimpleApplication) getApplication()).getRootNode().detachChild(agent);
+                    }
+                    iterator.remove();
+                    Integer selection = listBoxTests.getSelectionModel().getSelection();
+                    if (selection != null) {
+                        listBoxTests.getModel().remove((int) selection);
+                    }
+                }
             }
-            loadAgents = false;
+            checkTests = false;
         }
     }
     
@@ -379,9 +488,13 @@ public class TestGenState extends BaseAppState {
     //Set the test parameters for this test.
     private void setupTest(String character, int size, float distance, int updateFlags, 
             int obstacleAvoidanceType, Vector3f startPos, String testName) {
+        
         LOG.info("setupTest(agent [{}], size [{}], distance [{}], updateFlags[{}], "
-        + "obstacleAvoidanceType [{}], startPos {}, testName [{}])", 
-        character, size, distance, updateFlags, obstacleAvoidanceType, startPos, testName);
+                + "obstacleAvoidanceType [{}], startPos {}, testName [{}])", 
+                character, size, distance, updateFlags, obstacleAvoidanceType, startPos, testName);
+        
+        List<Node> listAgents = new ArrayList<>();
+        
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 Node agent = (Node) getApplication().getAssetManager().loadModel(character);
@@ -399,26 +512,23 @@ public class TestGenState extends BaseAppState {
                 float startZ = startPos.getZ() + j * distance;
                 Vector3f start = new Vector3f(startX, startY, startZ);
                 agent.setLocalTranslation(start);
-                Vector3f localTranslation = agent.getLocalTranslation();
-                
-                LOG.info("agent [{}] loc {}", agent.getName(), localTranslation);
                 
                 //The auto generation is based off model bounds and assumes a 
-                //bipedal character in a T-Pose position. The general assumption 
-                //being we want to set the collision shape of BCC to be around 
-                //shoulder width and as near to the actual head height as 
-                //possible. This would typically mean the largest number in the 
-                //x or z direction would be the arm spread.
-                //If this doesn't work we may have to add another parameter to 
-                //the method to get the detail desired.
+                //bipedal character with a T-Pose as one of the available poses 
+                //for the armature. The general assumption being the bounding 
+                //box is based on arm length. We want to set the collision shape 
+                //of BCC to be around shoulder width and as near to the actual 
+                //head height as possible. This would typically mean the largest 
+                //number in the x or z direction would be the arm spread. If this 
+                //doesn't work we may have to add another parameter to the method 
+                //to get the detail desired.
                 BoundingBox bounds = (BoundingBox) agent.getWorldBound();
                 float x = bounds.getXExtent();
                 float y = bounds.getYExtent();
                 float z = bounds.getZExtent();
                 float xz = x < z ? x:z;
                 
-                LOG.info("X [{}] Z [{}] XZ [{}] /2 [{}]", x, z, xz, xz/2);
-                
+                //Give the agent movement controls.
                 agent.addControl(new BetterCharacterControl(xz/2, y*2, 20f));
                 agent.addControl(new NavMeshChaserControl());
                 
@@ -426,9 +536,14 @@ public class TestGenState extends BaseAppState {
                 listAgents.add(agent);
             }
         }
-        loadAgents = true;
+        //Create test and add to the mapTest. Tell the update loop to check for 
+        //new tests to activate.
+        Test test = new Test(testName, listAgents);
+        addMapTest(testName, test);
+        newTest = true;
     }
     
+    //Explains the settings for the Test Generator.
     private void showLegend() {
         String msg = 
                   "Test Name = name used for the test. The agents used in "
@@ -437,6 +552,7 @@ public class TestGenState extends BaseAppState {
                 
                 + "Example: In a size 3 grid (3x3 = 9 agents), the naming is as "
                 + "follows where r = row, c = column, \n\n"
+                
                 + "First Row  = testName_r0_c0, testName_r0_c1, testName_r0_c2\n"
                 + "Second Row = testname_r1_c0, testName_r1_c1, testName_r1_c2\n"
                 + "Third Row  = testname_r2_c0, testName_r2_c1, testName_r2_c2\n\n" 
@@ -444,44 +560,191 @@ public class TestGenState extends BaseAppState {
                 + "Crowd Separation = spacing between agents in the grid. Must "
                 + "be a setting of 0.1f or larger.\n\n"
                 
-                + "Agent Type = model to use for the test.\n\n"
+                + "Agent = model to use for the test.\n\n"
                 
                 + "Crowd Size = number of agents to place into the test in rows "
                 + "and columns. Limit = 15 which is 225 agents.\n\n"
                 
                 + "Example: 2 = 2 rows, 2 columns = a grid of 4 agents\n\n"
                 
-                + "Obstacle Avoidance Type = This is the ObstacleAvoidanceParams "
+                + "Avoidance = This is the ObstacleAvoidanceParams "
                 + "number you setup when instantiating the crowd. "
-                + "Currently, the max number of avoidance parameters that can be "
+                + "Currently, the max number of avoidance types that can be "
                 + "set for the Crowd is eight.\n\n"
                 
                 + "Update Flags = Crowd agent update flags. This is a required "
                 + "setting.\n\n"
-                + "DT_CROWD_ANTICIPATE_TURNS, DT_CROWD_OBSTACLE_AVOIDANCE, "
-                + "DT_CROWD_SEPARATION, DT_CROWD_OPTIMIZE_VIS, "
-                + "DT_CROWD_OPTIMIZE_TOPO\n\n"
                 
                 + "Start Position = starting position the agents will spread out "
                 + "evenly from to form the grid. "
                 + "This is only used to generate the agents for the test so you "
-                + "can drop your agents from above the navMesh id you wish. "
+                + "can drop your agents from above the navMesh if you wish. "
                 + "The actual starting point of the agent is determined by its "
-                + "final position on the navMesh.";
+                + "final position on the navMesh.\n\n"
+                
+                + "Active Tests = a list of all the currently active tests. To "
+                + "remove a test just select it in the list press the "
+                + "\"Remove Test\" button. Each test must have a unique name. "
+                + "Spaces count in the naming so if there is added space after a "
+                + "test name, that test will be considered unique.";
         
-        Container contLegend = new Container(new MigLayout("wrap"));
-        Label label = contLegend.addChild(new Label(msg));
-        label.setMaxWidth(400);
-        contLegend.addChild(new ActionButton(new CallMethodAction("Close", contLegend, "removeFromParent")));
-        centerComp(contLegend);
-        GuiGlobals.getInstance().getPopupState().showPopup(contLegend);
+        GuiGlobals.getInstance().getPopupState().showPopup(buildPopup(msg, 400));
     }
     
-    private Panel showPopup( String msg ) {
+    //Builds a popup for display of messages.
+    private Panel buildPopup( String msg, float maxWidth ) {
         Container window = new Container(new MigLayout("wrap"));
-        window.addChild(new Label(msg));
+        Label label = window.addChild(new Label(msg));
+        if (maxWidth > 0) {
+            label.setMaxWidth(maxWidth);
+        }
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
         centerComp(window);
         return window;                                                              
     }
+
+    /**
+     * Add a new test to the mapTest.
+     * 
+     * @param key the key for the test which is the name of the test.
+     * @param value The test to be added to the mapTest.
+     */
+    private void addMapTest(String key, Test value) {
+        mapTests.put(key, value);
+    }
+    
+    private void removeTest() {
+        
+        //Get the selection from listBoxTests.
+        Integer selection = listBoxTests.getSelectionModel().getSelection();
+        
+        //Check to make sure a test has been selected.
+        if (selection == null) {
+            GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("You must select a test before it can be removed.", 0));
+            return;
+        }
+        
+        //Get the tests name from the listBoxTests selection.
+        String testName = listBoxTests.getModel().get(selection).toString();
+        
+        //We check mapTests to see if the key exists. If not, go no further.
+        if (!mapTests.containsKey(testName)) {
+            GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("No test found by that name.", 0));
+            return;
+        }
+        
+        //We have a valid test so set the test to be removed and tell the update
+        //loop to look for tests to be removed.
+        mapTests.get(testName).setRemoveTest(true);
+        checkTests = true;
+    }
+    
+    //The test object for storing the tests. The test name and listAgents are 
+    //used to guarentee this is a unique test for the value used for the hashmap.
+    private class Test {
+
+        private final String testName;
+        private final List<Node> listAgents;
+        private boolean activeTest;
+        private boolean removeTest;
+        
+        public Test(String testName, List<Node> listAgents) {
+            this.testName = testName;
+            this.listAgents = listAgents;
+        }
+        
+        /**
+         * If true, this test is scheduled for removal in the next update.
+         * 
+         * @return the checkTests
+         */
+        public boolean isRemoveTest() {
+            return removeTest;
+        }
+
+        /**
+         * A setting of true will trigger the removal of the test. All agents 
+         * associated with the test will be removed from the physics space and
+         * rootNode. Removal takes place in the next pass of the update loop.
+         * 
+         * @param removeTest the checkTests to set
+         */
+        public void setRemoveTest(boolean removeTest) {
+            this.removeTest = removeTest;
+        }
+        
+        /**
+         * If test is inactive it will be activated on the next update and all 
+         * agents loaded into the rootNode and physics space from the update loop.
+         * 
+         * @return the activeTest
+         */
+        public boolean isActiveTest() {
+            return activeTest;
+        }
+
+        /**
+         * A setting of true will keep the test active in the mapTest and prevent
+         * the loading of this tests agents.
+         * 
+         * @param activeTest the activeTest to set
+         */
+        public void setActiveTest(boolean activeTest) {
+            this.activeTest = activeTest;
+        }
+
+        /**
+         * The name of this test.
+         * 
+         * @return the testName
+         */
+        public String getTestName() {
+            return testName;
+        }
+
+        /**
+         * The list of agents to be used for this crowd test.
+         * 
+         * @return the listAgents
+         */
+        public List<Node> getListAgents() {
+            return listAgents;
+        }
+
+        @Override
+        public int hashCode() {
+            int hash = 3;
+            hash = 11 * hash + Objects.hashCode(this.testName);
+            hash = 11 * hash + Objects.hashCode(this.listAgents);
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null) {
+                return false;
+            }
+            if (getClass() != obj.getClass()) {
+                return false;
+            }
+            final Test other = (Test) obj;
+            if (!Objects.equals(this.testName, other.testName)) {
+                return false;
+            }
+            if (!Objects.equals(this.listAgents, other.listAgents)) {
+                return false;
+            }
+            return true;
+        }
+        
+        @Override
+        public String toString() {
+            return "Test [name = "+ testName + "] " + "AGENTS " + getListAgents(); 
+        }
+
+    }
+
 }
