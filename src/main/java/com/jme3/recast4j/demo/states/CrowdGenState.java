@@ -32,9 +32,7 @@ import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.simsilica.lemur.Container;
-import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.Label;
-import com.simsilica.lemur.style.BaseStyles;
 
 /**
  *
@@ -46,9 +44,6 @@ public class CrowdGenState extends BaseAppState {
     
     @Override
     protected void initialize(Application app) {
-        GuiGlobals.initialize(app);
-        BaseStyles.loadGlassStyle();
-        GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
         
         //Stub container for Crowd configuration.
         contCrowd = new Container(new MigLayout("wrap"));

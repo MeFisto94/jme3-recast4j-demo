@@ -38,14 +38,11 @@ import com.simsilica.lemur.Insets3f;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.RollupPanel;
 import com.simsilica.lemur.TabbedPanel;
-import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
 import com.simsilica.lemur.event.ConsumingMouseListener;
 import com.simsilica.lemur.event.CursorEventControl;
 import com.simsilica.lemur.event.DragHandler;
 import com.simsilica.lemur.event.MouseEventControl;
-import com.simsilica.lemur.style.Attributes;
 import com.simsilica.lemur.style.BaseStyles;
-import com.simsilica.lemur.style.Styles;
 
 /**
  *
@@ -57,23 +54,8 @@ public class AgentCrowdState extends BaseAppState {
     
     @Override
     protected void initialize(Application app) {
-//        getStateManager().attach(new AgentGenState());
-//        getStateManager().attach(new CrowdGenState());
         
-        GuiGlobals.initialize(app);
-        BaseStyles.loadGlassStyle();
-        GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
         
-        //Make container panels solid.
-        Styles styles = GuiGlobals.getInstance().getStyles();
-        Attributes attrs = styles.getSelector(Container.ELEMENT_ID, "glass");
-        TbtQuadBackgroundComponent bg = attrs.get("background");
-        bg.setColor(new ColorRGBA(0.25f, 0.5f, 0.5f, 1.0f));
-        
-        //Default is pink with alphs .85.
-        attrs = styles.getSelector("title", "glass");
-        ColorRGBA highlightColor = attrs.get("highlightColor");
-        highlightColor.set(new ColorRGBA(ColorRGBA.Pink));
     }
 
     @Override

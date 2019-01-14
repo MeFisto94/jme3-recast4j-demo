@@ -50,9 +50,12 @@ import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
+import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
+import com.simsilica.lemur.style.Attributes;
 import com.simsilica.lemur.style.BaseStyles;
+import com.simsilica.lemur.style.Styles;
 import com.simsilica.lemur.text.DocumentModelFilter;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -104,6 +107,20 @@ public class AgentGenState extends BaseAppState {
         GuiGlobals.initialize(app);
         BaseStyles.loadGlassStyle();
         GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
+        
+                //Make container panels solid.
+        Styles styles = GuiGlobals.getInstance().getStyles();
+        Attributes attrs = styles.getSelector(Container.ELEMENT_ID, "glass");
+        TbtQuadBackgroundComponent bg = attrs.get("background");
+        bg.setColor(new ColorRGBA(0.25f, 0.5f, 0.5f, 1.0f));
+        
+        //Default is pink with alphs .85.
+        attrs = styles.getSelector("title", "glass");
+        ColorRGBA highlightColor = attrs.get("highlightColor");
+        highlightColor.set(new ColorRGBA(ColorRGBA.Pink));
+        
+        attrs = styles.getSelector("glass");
+        attrs.set("fontSize", 12);
         
         //Container for crowd agent configuration.
         //Set the column minimum to grow so all children can grow to the edge.
