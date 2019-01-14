@@ -276,9 +276,10 @@ public class DemoApplication extends SimpleApplication {
     }
 
     private void setupWorld() {
-        stateManager.attach(new BulletAppState());
+        BulletAppState bullet = new BulletAppState();
         // Performance is better when threading in parallel
-        stateManager.getState(BulletAppState.class).setThreadingType(BulletAppState.ThreadingType.PARALLEL);
+        bullet.setThreadingType(BulletAppState.ThreadingType.PARALLEL);
+        stateManager.attach(bullet);
 
         /** A white, directional light source */ 
         DirectionalLight sun = new DirectionalLight();
