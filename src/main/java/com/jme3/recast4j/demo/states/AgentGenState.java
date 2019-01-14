@@ -380,7 +380,8 @@ public class AgentGenState extends BaseAppState {
 
     @Override
     protected void cleanup(Application app) {
-        //Removing the test tab will clear all agents and remove this AppState
+        //Removing this state from StateManager will clear all agents from the 
+        //physics space and gui node.
         //from the StateManager.
         Iterator<Map.Entry<String, Test>> iterator = mapTests.entrySet().iterator();
         while (iterator.hasNext()) {
