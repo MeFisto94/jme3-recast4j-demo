@@ -28,8 +28,11 @@ import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
+import com.jme3.recast4j.demo.states.AgentCrowdState;
+import com.jme3.recast4j.demo.states.AgentGenState;
+import com.jme3.recast4j.demo.states.CrowdGenState;
 import com.jme3.recast4j.demo.states.RecastGUIState;
-import com.jme3.recast4j.demo.states.TestGenState;
+import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -62,13 +65,14 @@ public class DemoApplication extends SimpleApplication {
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     CrowdManagerAppstate crowdManagerAppstate;
     Node player;
-    private TestGenState testGenState;
+    private AgentGenState agentGenState;
     
     public DemoApplication() {
         super( 
                 new StatsAppState(),
                 new AudioListenerState(),
-                new DebugKeysAppState()
+                new DebugKeysAppState(),
+                new GuiUtilState()
         );
         pathGeometries = new ArrayList<>(64);
         characters = new ArrayList<>(64);        
@@ -89,8 +93,6 @@ public class DemoApplication extends SimpleApplication {
         GuiGlobals.initialize(this);
         crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
         getStateManager().attach(crowdManagerAppstate);
-        testGenState = new TestGenState();
-        getStateManager().attach(testGenState);
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
 
@@ -202,15 +204,14 @@ public class DemoApplication extends SimpleApplication {
     }
 
     private void findPathImmediately(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
-        FindPathResult fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
-        if (fpr.getStatus().isSuccess()) {
+        Result<List<Long>> fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
+        if (fpr.succeeded()) {
             // Get the proper path from the rough polygon listing
-            List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
+            Result<List<StraightPathItem>> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.result, Integer.MAX_VALUE, 0);
             Vector3f oldPos = character.getWorldTranslation();
-            List<Vector3f> vector3fList = new ArrayList<>(list.size());
-
-            if (!list.isEmpty()) {
-                for (StraightPathItem p: list) {
+            List<Vector3f> vector3fList = new ArrayList<>(list.result.size());
+            if (!list.result.isEmpty()) {
+                for (StraightPathItem p: list.result) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
                     rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
                     if (p.getRef() != 0) { // if ref is 0, it's the end.
@@ -232,7 +233,8 @@ public class DemoApplication extends SimpleApplication {
 
     private void findPathSliced(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter, 0);
-        UpdateSlicedPathResult res;
+
+        Result<Integer> res;
         do {
             // typically called from a control or appstate, so simulate it with a loop and sleep.
             res = query.updateSlicedFindPath(1);
@@ -241,22 +243,22 @@ public class DemoApplication extends SimpleApplication {
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             }
-        } while (res.getStatus() == Status.IN_PROGRESS);
+        } while (res.status == Status.IN_PROGRESS);
 
-        FindPathResult fpr = query.finalizeSlicedFindPath();
+        Result<List<Long>> fpr = query.finalizeSlicedFindPath();
 
         // @TODO: Use NavMeshSliceControl (but then how to do the Debug Graphics?)
         // @TODO: Try Partial. How would one make this logic with controls etc so it's easy?
         //query.finalizeSlicedFindPathPartial();
 
-        if (fpr.getStatus().isSuccess()) {
+        if (fpr.succeeded()) {
             // Get the proper path from the rough polygon listing
-            List<StraightPathItem> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.getRefs(), Integer.MAX_VALUE, 0);
+            Result<List<StraightPathItem>> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr.result, Integer.MAX_VALUE, 0);
             Vector3f oldPos = character.getWorldTranslation();
-            List<Vector3f> vector3fList = new ArrayList<>(list.size());
+            List<Vector3f> vector3fList = new ArrayList<>(list.result.size());
 
-            if (!list.isEmpty()) {
-                for (StraightPathItem p: list) {
+            if (!list.result.isEmpty()) {
+                for (StraightPathItem p: list.result) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
                     rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
                     if (p.getRef() != 0) { // if ref is 0, it's the end.
@@ -454,12 +456,22 @@ public class DemoApplication extends SimpleApplication {
     private ActionListener actionListener = new ActionListener() {
         @Override
         public void onAction(String name, boolean keyPressed, float tpf) {
+            //This is a chain method of attaching states and is reflected in the 
+            //naming. AgentCrowdState needs both AgentGenState and CrowdGenState 
+            //to be enabled before it can create its GUI.
+            //All AppStates do their own cleanup.
             if (name.equals("activate tests") && !keyPressed) {
-                if (getStateManager().hasState(testGenState)) {
-                    getStateManager().getState(TestGenState.class).setEnabled(false);
+                //Each state handles its own removal and cleanup.
+                if (getStateManager().hasState(agentGenState)) {
+                    getStateManager().getState(AgentGenState.class).setEnabled(false);
+                    getStateManager().getState(CrowdGenState.class).setEnabled(false);
+                    getStateManager().getState(AgentCrowdState.class).setEnabled(false);
+                //If AgentGenState is not attached it starts the chain from its 
+                //enabled method as shown here.
+                //AgentGenState(enabled)=>CrowdGenState(enabled)=>AgentCrowdState(enabled)    
                 } else {
-                    testGenState = new TestGenState();
-                    getStateManager().attach(testGenState);
+                    agentGenState = new AgentGenState();
+                    getStateManager().attach(agentGenState);
                 }
             }
         }

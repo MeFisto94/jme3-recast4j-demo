@@ -43,15 +43,22 @@ dependencies {
     compile "org.jmonkeyengine:jme3-effects:$jmeVersion"
     compile "org.jmonkeyengine:jme3-plugins:$jmeVersion"
     
-    // @TODO: Not yet transitive from jme3-recast4j
-    implementation 'com.github.ppiastucki.recast4j:parent:master-SNAPSHOT'
-    implementation 'com.github.ppiastucki.recast4j:detour-tile-cache:master-SNAPSHOT'
-    implementation 'com.github.ppiastucki.recast4j:detour-crowd:master-SNAPSHOT'
-    implementation 'com.github.ppiastucki.recast4j:detour-extras:master-SNAPSHOT'
-    implementation 'com.github.ppiastucki.recast4j:recast:master-SNAPSHOT'
-    implementation 'com.github.ppiastucki.recast4j:detour:master-SNAPSHOT'
+//    // @TODO: Not yet transitive from jme3-recast4j
+//    implementation 'com.github.ppiastucki.recast4j:parent:master-SNAPSHOT'
+//    implementation 'com.github.ppiastucki.recast4j:detour-tile-cache:master-SNAPSHOT'
+//    implementation 'com.github.ppiastucki.recast4j:detour-crowd:master-SNAPSHOT'
+//    implementation 'com.github.ppiastucki.recast4j:detour-extras:master-SNAPSHOT'
+//    implementation 'com.github.ppiastucki.recast4j:recast:master-SNAPSHOT'
+//    implementation 'com.github.ppiastucki.recast4j:detour:master-SNAPSHOT'
     
-
+    // @TODO: Not yet transitive from jme3-recast4j
+    implementation 'org.recast4j:parent:1.2.0'
+    implementation 'org.recast4j:detour-tile-cache:1.2.0'
+    implementation 'org.recast4j:detour-crowd:1.2.0'
+    implementation 'org.recast4j:detour-extras:1.2.0'
+    implementation 'org.recast4j:recast:1.2.0'
+    implementation 'org.recast4j:detour:1.2.0'
+    
     compile 'org.slf4j:slf4j-api:1.7.21'
     compile 'org.slf4j:slf4j-simple:1.7.21'
     compile 'org.codehaus.groovy:groovy-all:2.4.7'
@@ -66,3 +73,7 @@ dependencies {
     compile files("jme3-recast4j.jar")
     runtime project(':assets')
 }
+
+//tasks.withType(JavaCompile) {
+//    options.compilerArgs = ["-Xlint:unchecked", "-Xlint:deprecation"]
+//}

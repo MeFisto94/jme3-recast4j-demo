@@ -39,7 +39,6 @@ import com.jme3.math.Vector3f;
 import com.jme3.recast4j.demo.controls.CrowdAgentControl;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
-import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
@@ -48,22 +47,12 @@ import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
-import com.simsilica.lemur.Insets3f;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
-import com.simsilica.lemur.Panel;
-import com.simsilica.lemur.RollupPanel;
-import com.simsilica.lemur.TabbedPanel;
 import com.simsilica.lemur.TextField;
-import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
-import com.simsilica.lemur.event.ConsumingMouseListener;
-import com.simsilica.lemur.event.CursorEventControl;
 import com.simsilica.lemur.event.DefaultMouseListener;
-import com.simsilica.lemur.event.DragHandler;
 import com.simsilica.lemur.event.MouseEventControl;
-import com.simsilica.lemur.style.Attributes;
 import com.simsilica.lemur.style.BaseStyles;
-import com.simsilica.lemur.style.Styles;
 import com.simsilica.lemur.text.DocumentModelFilter;
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -81,9 +70,9 @@ import org.slf4j.LoggerFactory;
  *
  * @author Robert
  */
-public class TestGenState extends BaseAppState {
+public class AgentGenState extends BaseAppState {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TestGenState.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(AgentGenState.class.getName());
 
     private TextField fieldDistance;
     private DocumentModelFilter doc;
@@ -104,7 +93,9 @@ public class TestGenState extends BaseAppState {
     private boolean newTest;
     private boolean checkTests;
     private Container contTabs;
+    private Container contAgentGen;
     
+    @SuppressWarnings("unchecked")
     @Override
     protected void initialize(Application app) {
         // Holds all active tests.
@@ -113,17 +104,13 @@ public class TestGenState extends BaseAppState {
         GuiGlobals.initialize(app);
         BaseStyles.loadGlassStyle();
         GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
-        Styles styles = GuiGlobals.getInstance().getStyles();
-        Attributes attrs = styles.getSelector(Container.ELEMENT_ID, "glass");
-        TbtQuadBackgroundComponent bg = attrs.get("background");
-        bg.setColor(new ColorRGBA(0.25f, 0.5f, 0.5f, 1.0f));
         
         //Container for crowd agent configuration.
         //Set the column minimum to grow so all children can grow to the edge.
         //Set to fill so the components in that column will default to a "growx"
         //constraint. Note that this property does not affect the size for the row,
         //but rather the sizes of the components in the row.
-        Container contAgentGen = new Container(new MigLayout(
+        contAgentGen = new Container(new MigLayout(
                 "wrap 3", // Layout Constraints
                 "[grow, fill][][]")); // Column constraints [min][pref][max]
         contAgentGen.setName("TestGenState crowdCont");
@@ -166,7 +153,6 @@ public class TestGenState extends BaseAppState {
         cont1Row2.setName("TestGenState rowTwoCont1");
         cont1Row2.addChild(new Label("Agent"));
         listBoxAgent = cont1Row2.addChild(new ListBox(), "align 50%");
-        MouseEventControl.addListenersToSpatial(cont1Row2, ConsumingMouseListener.INSTANCE);
         listBoxAgent.getModel().add("Jamie");
         listBoxAgent.getSelectionModel().setSelection(0);
         contAgentGen.addChild(cont1Row2);
@@ -175,10 +161,9 @@ public class TestGenState extends BaseAppState {
         cont2Row2.setName("TestGenState rowTwoCont2");
         cont2Row2.addChild(new Label("Crowd Size"));
         listBoxSize = cont2Row2.addChild(new ListBox(), "align 50%");
-        MouseEventControl.addListenersToSpatial(cont2Row2, ConsumingMouseListener.INSTANCE);
         int size = 1;
         for (int i = 0; i < 15; i++) {
-            listBoxSize.getModel().add("" + size);
+            listBoxSize.getModel().add(size);
             size++;
         }
         listBoxSize.getSelectionModel().setSelection(0);
@@ -188,7 +173,6 @@ public class TestGenState extends BaseAppState {
         cont3Row2.setName("TestGenState rowTwoCont3");
         cont3Row2.addChild(new Label("Avoidance"));
         listBoxAvoidance = cont3Row2.addChild(new ListBox(), "align 50%");
-        MouseEventControl.addListenersToSpatial(cont3Row2, ConsumingMouseListener.INSTANCE);
         
         //Have to set this here since Crowd has package-private access the to 
         //the DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS variable. Currently max is 8.
@@ -248,7 +232,6 @@ public class TestGenState extends BaseAppState {
         contRow5.setName("TestGenState rowFiveCont");
         contRow5.addChild(new Label("Active Tests"));
         listBoxTests = contRow5.addChild(new ListBox(), "growx");
-        MouseEventControl.addListenersToSpatial(contRow5, ConsumingMouseListener.INSTANCE);
         //We use the method call to removeTest to set a boolean of
         contRow5.addChild(new ActionButton(new CallMethodAction("Remove Test", this, "removeTest")));
         contAgentGen.addChild(contRow5, "span");
@@ -280,13 +263,17 @@ public class TestGenState extends BaseAppState {
                 //Garbage in?, no test.
                 if (!isNumeric(fieldDistance.getText()) 
                 ||  fieldDistance.getText().isEmpty()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Crowd Separation requires a valid float value.", 0));
+                    GuiGlobals.getInstance().getPopupState()
+                            .showModalPopup(getState(GuiUtilState.class)
+                                    .buildPopup("Crowd Separation requires a valid float value.", 0));
                     return;
                 } else {
                     distance = new Float(fieldDistance.getText());
                     //Stop negative distance input for grid.
                     if (distance < 0.1f) {
-                        GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Crowd Separation requires a float value >= 0.1.", 0));
+                        GuiGlobals.getInstance().getPopupState()
+                                .showModalPopup(getState(GuiUtilState.class)
+                                        .buildPopup("Crowd Separation requires a float value >= 0.1.", 0));
                         return;
                     }
                 }
@@ -313,7 +300,9 @@ public class TestGenState extends BaseAppState {
                 &&  !checkTopo.isChecked() 
                 &&  !checkVis.isChecked() 
                 &&  !checkSep.isChecked()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Select at least one Update Flag.", 0));
+                    GuiGlobals.getInstance().getPopupState()
+                            .showModalPopup(getState(GuiUtilState.class)
+                                    .buildPopup("Select at least one Update Flag.", 0));
                     return;
                 } else {
                     flags = 0;
@@ -346,7 +335,9 @@ public class TestGenState extends BaseAppState {
                 if (!isNumeric(fieldPosX.getText()) || fieldPosX.getText().isEmpty() 
                 ||  !isNumeric(fieldPosY.getText()) || fieldPosY.getText().isEmpty() 
                 ||  !isNumeric(fieldPosZ.getText()) || fieldPosZ.getText().isEmpty()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("Start Position requires a valid float value.", 0));
+                    GuiGlobals.getInstance().getPopupState()
+                            .showModalPopup(getState(GuiUtilState.class)
+                                    .buildPopup("Start Position requires a valid float value.", 0));
                 } else {
                     Float x = new Float(fieldPosX.getText());
                     Float y = new Float(fieldPosY.getText());
@@ -356,11 +347,17 @@ public class TestGenState extends BaseAppState {
                 
                 //The name of this test.                
                 if (fieldTestName.getText().isEmpty()) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("You must enter a test name.", 0));
+                    GuiGlobals.getInstance().getPopupState()
+                            .showModalPopup(getState(GuiUtilState.class)
+                                    .buildPopup("You must enter a test name.", 0));
                     return;
                 } else if (mapTests.containsKey(fieldTestName.getText())) {
-                    GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("[" + fieldTestName.getText() + "] has already been activated. "
-                            + "Change the test name or remove the existing test before proceeding.", 400));
+                    GuiGlobals.getInstance().getPopupState()
+                            .showModalPopup(getState(GuiUtilState.class)
+                                    .buildPopup("[" 
+                                            + fieldTestName.getText() 
+                                            + "] has already been activated. "
+                                            + "Change the test name or remove the existing test before proceeding.", 400));
                     return;
                 } else {
                     testName = fieldTestName.getText();
@@ -379,37 +376,11 @@ public class TestGenState extends BaseAppState {
         });
         
         contAgentGen.addChild(contRow6, "span");
-        
-        Container contRollup = new Container();
-        contRollup.setAlpha(0, false);
-        RollupPanel rollAgentGen = contRollup.addChild(new RollupPanel("Expand / Collapse", contAgentGen, "glass"));
-        rollAgentGen.setOpen(false);
-        
-        //Container for Crowd configuration.
-        Container contCrowd = new Container(new MigLayout("wrap"));
-        contCrowd.addChild(new Label("Crowd Panel Holder"));
-        
-        //Create the tab container that will hold both contCrowd and contAgentGen
-        contTabs = new Container();
-        contTabs.setName("TestGenState tabsCont");
-        //Make it dragable.
-        DragHandler dragHandler = new DragHandler();
-        CursorEventControl.addListenersToSpatial(contTabs, dragHandler);
-        MouseEventControl.addListenersToSpatial(contTabs, ConsumingMouseListener.INSTANCE);
-        contTabs.addChild(new Label("Detour Crowd"));
-        
-        TabbedPanel tabPanel = contTabs.addChild(new TabbedPanel());
-        tabPanel.setInsets(new Insets3f(5, 5, 5, 5));
-        
-        tabPanel.addTab("Agent Generator", contRollup);
-        tabPanel.addTab("Crowd Settings", contCrowd);
-        
-        centerComp(contTabs);
     }
 
     @Override
     protected void cleanup(Application app) {
-        //Removing the test tab will clear all agents and remove this Appstate
+        //Removing the test tab will clear all agents and remove this AppState
         //from the StateManager.
         Iterator<Map.Entry<String, Test>> iterator = mapTests.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -425,16 +396,15 @@ public class TestGenState extends BaseAppState {
 
     @Override
     protected void onEnable() {
-//        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contAgentGen);
-        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contTabs);
+        getStateManager().attach(new CrowdGenState());
     }
 
     @Override
     protected void onDisable() {
-        ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
         getStateManager().detach(this);
     }
     
+    @SuppressWarnings("unchecked")
     @Override
     public void update(float tpf) {
                     
@@ -476,13 +446,6 @@ public class TestGenState extends BaseAppState {
             }
             checkTests = false;
         }
-    }
-    
-    //Centers any lemur component to the middle of the screen.
-    private void centerComp(Panel cont) {
-        // Position the panel                                                            
-        cont.setLocalTranslation((getApplication().getCamera().getWidth() - cont.getPreferredSize().x)/2, 
-                (getApplication().getCamera().getHeight() + cont.getPreferredSize().y)/2, 0);
     }
     
     //Set the test parameters for this test.
@@ -583,24 +546,18 @@ public class TestGenState extends BaseAppState {
                 + "final position on the navMesh.\n\n"
                 
                 + "Active Tests = a list of all the currently active tests. To "
-                + "remove a test just select it in the list press the "
+                + "remove a test just select it in the list and press the "
                 + "\"Remove Test\" button. Each test must have a unique name. "
                 + "Spaces count in the naming so if there is added space after a "
                 + "test name, that test will be considered unique.";
         
-        GuiGlobals.getInstance().getPopupState().showPopup(buildPopup(msg, 400));
-    }
-    
-    //Builds a popup for display of messages.
-    private Panel buildPopup( String msg, float maxWidth ) {
         Container window = new Container(new MigLayout("wrap"));
         Label label = window.addChild(new Label(msg));
-        if (maxWidth > 0) {
-            label.setMaxWidth(maxWidth);
-        }
+        label.setMaxWidth(400);
+        label.setColor(ColorRGBA.Green);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
-        centerComp(window);
-        return window;                                                              
+        getState(GuiUtilState.class).centerComp(window);
+        GuiGlobals.getInstance().getPopupState().showPopup(window);
     }
 
     /**
@@ -620,7 +577,9 @@ public class TestGenState extends BaseAppState {
         
         //Check to make sure a test has been selected.
         if (selection == null) {
-            GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("You must select a test before it can be removed.", 0));
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("You must select a test before it can be removed.", 0));
             return;
         }
         
@@ -629,7 +588,9 @@ public class TestGenState extends BaseAppState {
         
         //We check mapTests to see if the key exists. If not, go no further.
         if (!mapTests.containsKey(testName)) {
-            GuiGlobals.getInstance().getPopupState().showModalPopup(buildPopup("No test found by that name.", 0));
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("No test found by that name.", 0));
             return;
         }
         
@@ -637,6 +598,13 @@ public class TestGenState extends BaseAppState {
         //loop to look for tests to be removed.
         mapTests.get(testName).setRemoveTest(true);
         checkTests = true;
+    }
+
+    /**
+     * @return the contAgentGen
+     */
+    public Container getContAgentGen() {
+        return contAgentGen;
     }
     
     //The test object for storing the tests. The test name and listAgents are 

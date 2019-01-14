@@ -2,9 +2,9 @@ package com.jme3.recast4j.demo.controls;
 
 import com.jme3.math.Vector3f;
 import org.recast4j.detour.NavMeshQuery;
-import org.recast4j.detour.UpdateSlicedPathResult;
 
 import java.util.List;
+import org.recast4j.detour.Result;
 
 /**
  * This Class shows how Pathfinding can be done in slices and dynamic.
@@ -64,12 +64,12 @@ public class NavMeshSliceControl extends AbstractNavMeshControl {
             return;
         }
 
-        UpdateSlicedPathResult res = query.updateSlicedFindPath(maxIters);
-        if (res.getStatus().isSuccess()) {
+        Result<Integer> res = query.updateSlicedFindPath(maxIters);
+        if (res.succeeded()) {
             isFinished = true;
         }
 
-        iterCount = res.getIterations();
+        iterCount = res.result;
     }
 
     @Override
