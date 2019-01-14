@@ -28,11 +28,7 @@ import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
-import com.jme3.recast4j.demo.states.AgentCrowdState;
-import com.jme3.recast4j.demo.states.AgentGenState;
-import com.jme3.recast4j.demo.states.CrowdGenState;
-import com.jme3.recast4j.demo.states.RecastGUIState;
-import com.jme3.recast4j.demo.states.GuiUtilState;
+import com.jme3.recast4j.demo.states.*;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -48,10 +44,11 @@ import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilderConfig;
-import java.util.ArrayList;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class DemoApplication extends SimpleApplication {
 
@@ -280,6 +277,8 @@ public class DemoApplication extends SimpleApplication {
 
     private void setupWorld() {
         stateManager.attach(new BulletAppState());
+        // Performance is better when threading in parallel
+        stateManager.getState(BulletAppState.class).setThreadingType(BulletAppState.ThreadingType.PARALLEL);
 
         /** A white, directional light source */ 
         DirectionalLight sun = new DirectionalLight();
