@@ -30,80 +30,67 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.math.ColorRGBA;
+import com.jme3.recast4j.demo.layout.MigLayout;
 import com.simsilica.lemur.Container;
-import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.HAlignment;
-import com.simsilica.lemur.Insets3f;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.RollupPanel;
 import com.simsilica.lemur.TabbedPanel;
-import com.simsilica.lemur.event.ConsumingMouseListener;
 import com.simsilica.lemur.event.CursorEventControl;
 import com.simsilica.lemur.event.DragHandler;
-import com.simsilica.lemur.event.MouseEventControl;
-import com.simsilica.lemur.style.BaseStyles;
 
 /**
  *
  * @author Robert
  */
-public class AgentCrowdState extends BaseAppState {
+public class CrowdTabsGuiState extends BaseAppState {
 
-    private Container contTabs;
+    private Container contAgentSettingsGui;
     
     @Override
     protected void initialize(Application app) {
-        
-        
     }
 
     @Override
     protected void cleanup(Application app) {
-        ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
+        //Removing will also cleanup the AgentGui and CrowdGui.
+        ((SimpleApplication) getApplication()).getGuiNode().detachChild(contAgentSettingsGui);
     }
 
     @Override
     protected void onEnable() {
-        //Create the container that will hold the tab panel for AgentGen and 
-        //CrowdGen gui.
-        contTabs = new Container();
-        contTabs.setName("TestGenState tabsCont");
+        //Create the container that will hold the tab panel for AgentGridGui and 
+        //AgentSettings gui.
+        contAgentSettingsGui = new Container(new MigLayout("wrap"));
+        contAgentSettingsGui.setName("AgentSettingsGui contAgentSettingsGui");
         //Make it dragable.
         DragHandler dragHandler = new DragHandler();
-        CursorEventControl.addListenersToSpatial(contTabs, dragHandler);
-        //Consume the mouse events so it doesn't auto-close when clicked
-        // outside of interactive child elements.
-        MouseEventControl.addListenersToSpatial(contTabs, ConsumingMouseListener.INSTANCE);
-        contTabs.addChild(new Label("Detour Crowd"));
+        CursorEventControl.addListenersToSpatial(contAgentSettingsGui, dragHandler);
+        contAgentSettingsGui.addChild(new Label("Detour Crowd"));
         
         //Create the tabbed panel.
-        TabbedPanel tabPanel = contTabs.addChild(new TabbedPanel());
-        tabPanel.setInsets(new Insets3f(5, 5, 5, 5));
+        TabbedPanel tabPanel = contAgentSettingsGui.addChild(new TabbedPanel());
         
-        //Add a rollup panel so can hide test genrator.
-        RollupPanel rollAgentGen = new RollupPanel("Expand / Collapse", getState(AgentGenState.class).getContAgentGen(), "glass");
-        rollAgentGen.setOpen(false);
-        rollAgentGen.getTitleElement().setTextHAlignment(HAlignment.Center);
-        rollAgentGen.getTitleElement().setFocusColor(ColorRGBA.Magenta);
-
+        //Add a rollup panel so can hide agent grid generator.
+        RollupPanel rollAgentGrid = new RollupPanel("Expand / Collapse", getState(AgentGridGuiState.class).getContAgentGridGui(), "glass");
+        rollAgentGrid.getTitleElement().setTextHAlignment(HAlignment.Center);
+        rollAgentGrid.setAlpha(0, false);
+        tabPanel.addTab("Agent Grid Generator", rollAgentGrid);
+        
         //Add a rollup panel so can hide crowd settings.
-        RollupPanel rollCrowd = new RollupPanel("Expand / Collapse", getState(CrowdGenState.class).getContCrowd(), "glass");
-        rollCrowd.setOpen(false);
-        rollCrowd.getTitleElement().setTextHAlignment(HAlignment.Center);
-        rollCrowd.getTitleElement().setFocusColor(ColorRGBA.Magenta);
+        RollupPanel rollAgentSettings = new RollupPanel("Expand / Collapse", getState(AgentSettingsGuiState.class).getContAgentSettingsGui(), "glass");
+        rollAgentSettings.getTitleElement().setTextHAlignment(HAlignment.Center);
+        rollAgentSettings.setAlpha(0, false);        
+        tabPanel.addTab("Agent Settings", rollAgentSettings);
         
-        //The tabs to be added. Set alpha here to hide background tab panel.
-        tabPanel.addTab("Agent Generator", rollAgentGen);
-        tabPanel.addTab("Crowd Settings", rollCrowd);
+        getState(GuiUtilState.class).centerComp(contAgentSettingsGui);
         
-        getState(GuiUtilState.class).centerComp(contTabs);
-        
-        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contTabs);
+        ((SimpleApplication) getApplication()).getGuiNode().attachChild(contAgentSettingsGui);
     }
 
     @Override
     protected void onDisable() {
+        //Called by the DemoApplication F1 button ActionListener.
         getStateManager().detach(this);
     }
     

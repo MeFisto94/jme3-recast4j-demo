@@ -35,6 +35,8 @@ import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.Panel;
+import java.text.NumberFormat;
+import java.text.ParsePosition;
 
 /**
  * Utility class for common use Gui methods.
@@ -108,5 +110,13 @@ public class GuiUtilState extends BaseAppState {
         // Position the panel                                                            
         cont.setLocalTranslation((getApplication().getCamera().getWidth() - cont.getPreferredSize().x)/2, 
                 (getApplication().getCamera().getHeight() + cont.getPreferredSize().y)/2, 0);
+    }
+    
+    //Validate user input for float fields.
+    public boolean isNumeric(String str) {
+        NumberFormat formatter = NumberFormat.getInstance();
+        ParsePosition pos = new ParsePosition(0);
+        formatter.parse(str, pos);
+        return str.length() == pos.getIndex();
     }
 }

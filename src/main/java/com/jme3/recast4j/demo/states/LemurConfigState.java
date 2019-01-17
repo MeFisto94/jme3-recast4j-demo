@@ -28,33 +28,54 @@
 package com.jme3.recast4j.demo.states;
 
 import com.jme3.app.Application;
-import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.math.ColorRGBA;
 import com.simsilica.lemur.Container;
-import com.simsilica.lemur.Label;
+import com.simsilica.lemur.GuiGlobals;
+import com.simsilica.lemur.TextField;
+import com.simsilica.lemur.component.QuadBackgroundComponent;
+import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
+import com.simsilica.lemur.style.Attributes;
+import com.simsilica.lemur.style.BaseStyles;
+import com.simsilica.lemur.style.Styles;
 
 /**
  *
  * @author Robert
  */
-public class CrowdGenState extends BaseAppState {
-
-    private Container contCrowd;
+public class LemurConfigState extends BaseAppState {
     
     @Override
     protected void initialize(Application app) {
+        GuiGlobals.initialize(app);
+        BaseStyles.loadGlassStyle();
+        GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
         
-        //Stub container for Crowd configuration.
-        contCrowd = new Container(new MigLayout("wrap"));
-        contCrowd.setName("TestGenState crowdCont");
-        contCrowd.setAlpha(0, false);
-        contCrowd.addChild(new Label("Crowd Panel Holder"));
+        //Make container panels solid.
+        Styles styles = GuiGlobals.getInstance().getStyles();
+        Attributes attrs = styles.getSelector(Container.ELEMENT_ID, "glass");
+        TbtQuadBackgroundComponent bg = attrs.get("background");
+        bg.setColor(new ColorRGBA(0.25f, 0.5f, 0.5f, 1.0f));
+        
+        //Set the rollup button colors
+        //Default is pink with alphs .85. 
+        attrs = styles.getSelector("title", "glass");
+        attrs.set("highlightColor", new ColorRGBA(ColorRGBA.Pink));
+        attrs.set("focusColor", new ColorRGBA(ColorRGBA.Magenta));
+        
+        //Set the default font size
+        attrs = styles.getSelector("glass");
+        attrs.set("fontSize", 12);
+
+        //Change textfield background from defaults.
+        attrs = styles.getSelector(TextField.ELEMENT_ID, "glass");
+        attrs.set("background", new QuadBackgroundComponent(new ColorRGBA(ColorRGBA.DarkGray)), false);
     }
 
     @Override
     protected void cleanup(Application app) {
-        ((SimpleApplication) getApplication()).getGuiNode().detachChild(contCrowd);
+        //TODO: clean up what you initialized in the initialize method,
+        //e.g. remove all spatials from rootNode
     }
 
     //onEnable()/onDisable() can be used for managing things that should 
@@ -62,24 +83,21 @@ public class CrowdGenState extends BaseAppState {
     //graph attachment or input listener attachment.
     @Override
     protected void onEnable() {
-        getStateManager().attach(new AgentCrowdState());
+        //Called when the state is fully enabled, ie: is attached and 
+        //isEnabled() is true or when the setEnabled() status changes after the 
+        //state is attached.
     }
 
     @Override
     protected void onDisable() {
-        getStateManager().detach(this);
+        //Called when the state was previously enabled but is now disabled 
+        //either because setEnabled(false) was called or the state is being 
+        //cleaned up.
     }
     
     @Override
     public void update(float tpf) {
         //TODO: implement behavior during runtime
-    }
-
-    /**
-     * @return the contCrowd
-     */
-    public Container getContCrowd() {
-        return contCrowd;
     }
     
 }

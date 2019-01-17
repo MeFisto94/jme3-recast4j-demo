@@ -17,7 +17,7 @@ public abstract class AbstractNavMeshControl extends AbstractControl {
     protected int currentIndex;
     protected AnimChannel walkChannel;
     protected static final float walkspeed = 2f;
-
+    protected boolean startWalking;
     public AbstractNavMeshControl() {
         this.pathList = new ArrayList<>();
     }
@@ -38,6 +38,11 @@ public abstract class AbstractNavMeshControl extends AbstractControl {
         if (walkChannel == null && getSpatial().getControl(AnimControl.class) != null) {
             walkChannel = getSpatial().getControl(AnimControl.class).createChannel();
         }
+        
+        if (startWalking) {
+            moveToWaypoint(); // Start walking for the first time
+            startWalking = false;
+        }
     }
 
     protected void moveToWaypoint() {
@@ -52,7 +57,8 @@ public abstract class AbstractNavMeshControl extends AbstractControl {
         this.pathList = pathList;
         currentIndex = 0;
         if (!pathList.isEmpty()) {
-            moveToWaypoint(); // Start walking for the first time
+            startWalking = true; //This assures walking will start.
+//            moveToWaypoint(); // Start walking for the first time
         }
     }
 

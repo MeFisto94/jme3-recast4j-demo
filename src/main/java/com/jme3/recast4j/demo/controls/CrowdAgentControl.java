@@ -37,6 +37,7 @@ import com.jme3.scene.control.Control;
 import com.jme3.util.clone.Cloner;
 import com.jme3.util.clone.JmeCloneable;
 import java.io.IOException;
+import org.recast4j.detour.crowd.CrowdAgentParams;
 
 /**
  *
@@ -44,10 +45,9 @@ import java.io.IOException;
  */
 public class CrowdAgentControl implements Control, JmeCloneable {
 
-    private Spatial spatial;
-    private int flags;
-    private int obstacleAvoidanceType;
-    private Vector3f target;
+    protected Spatial spatial;
+    protected Vector3f target;
+    protected CrowdAgentParams ap = null;
     
     @Override
     public void setSpatial(Spatial spatial) {
@@ -55,8 +55,14 @@ public class CrowdAgentControl implements Control, JmeCloneable {
             throw new IllegalStateException(
                     "This control has already been added to a Spatial");
         }
-        this.spatial = spatial;
 
+        if (this.getAgentParams() == null) {
+            throw new IllegalStateException(
+                    "This control must have a CrowdAgentParams object set prior "
+                            + "to adding the control to a spatial.");
+        }
+        
+        this.spatial = spatial;
     }
 
     @Override
@@ -66,12 +72,12 @@ public class CrowdAgentControl implements Control, JmeCloneable {
 
     @Override
     public void render(RenderManager rm, ViewPort vp) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+
     }
 
     @Override
     public Control cloneForSpatial(Spatial spatial) {
-        throw new UnsupportedOperationException("Do not use cloneForSpatial."); //To change body of generated methods, choose Tools | Templates.
+        throw new UnsupportedOperationException("Do not use cloneForSpatial.");
     }
 
     @Override
@@ -87,42 +93,13 @@ public class CrowdAgentControl implements Control, JmeCloneable {
     @Override
     public Object jmeClone() {
         CrowdAgentControl cac = new CrowdAgentControl();
-        cac.setFlags(this.getFlags());
-        cac.setObstacleAvoidanceType(this.getObstacleAvoidanceType());
+        
         cac.setTarget(this.getTarget());
         return cac;
     }
 
     @Override
     public void cloneFields(Cloner cloner, Object original) {
-    }
-
-    /**
-     * @return the flags
-     */
-    public int getFlags() {
-        return flags;
-    }
-
-    /**
-     * @param flags the flags to set
-     */
-    public void setFlags(int flags) {
-        this.flags = flags;
-    }
-
-    /**
-     * @return the obstacleAvoidanceType
-     */
-    public int getObstacleAvoidanceType() {
-        return obstacleAvoidanceType;
-    }
-
-    /**
-     * @param obstacleAvoidanceType the obstacleAvoidanceType to set
-     */
-    public void setObstacleAvoidanceType(int obstacleAvoidanceType) {
-        this.obstacleAvoidanceType = obstacleAvoidanceType;
     }
 
     /**
@@ -137,6 +114,20 @@ public class CrowdAgentControl implements Control, JmeCloneable {
      */
     public void setTarget(Vector3f target) {
         this.target = target;
+    }
+
+    /**
+     * @return the agent parameters object used for crowd navigation.
+     */
+    public CrowdAgentParams getAgentParams() {
+        return ap;
+    }
+
+    /**
+     * @param ap the agent parameters object to set for crowd navigation.
+     */
+    public void setAgentParams(CrowdAgentParams ap) {
+        this.ap = ap;
     }
 
 

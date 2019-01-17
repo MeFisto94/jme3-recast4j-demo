@@ -36,7 +36,6 @@ import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.jme3.system.AppSettings;
-import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
 import org.recast4j.detour.*;
@@ -62,13 +61,14 @@ public class DemoApplication extends SimpleApplication {
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     CrowdManagerAppstate crowdManagerAppstate;
     Node player;
-    private AgentGenState agentGenState;
+    private AgentGridGuiState agentGridGuiState;
     
     public DemoApplication() {
         super( 
                 new StatsAppState(),
                 new AudioListenerState(),
                 new DebugKeysAppState(),
+                new LemurConfigState(),
                 new GuiUtilState()
         );
         pathGeometries = new ArrayList<>(64);
@@ -80,6 +80,9 @@ public class DemoApplication extends SimpleApplication {
         AppSettings settings = new AppSettings(true);
         settings.setTitle("Recast Level Demo");
         settings.setGammaCorrection(true);
+        //While testing, remove when ready for release.
+        settings.setWidth(1280);
+        settings.setHeight(720);
         app.setSettings(settings);
         app.start();
     }
@@ -87,7 +90,6 @@ public class DemoApplication extends SimpleApplication {
     @Override
     public void simpleInitApp() {
         initKeys();
-        GuiGlobals.initialize(this);
         crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
         getStateManager().attach(crowdManagerAppstate);
         //Set the atmosphere of the world, lights, camera, post processing, physics.
@@ -456,22 +458,21 @@ public class DemoApplication extends SimpleApplication {
     private ActionListener actionListener = new ActionListener() {
         @Override
         public void onAction(String name, boolean keyPressed, float tpf) {
-            //This is a chain method of attaching states and is reflected in the 
-            //naming. AgentCrowdState needs both AgentGenState and CrowdGenState 
-            //to be enabled before it can create its GUI.
-            //All AppStates do their own cleanup.
+            //This is a chain method of attaching states. CrowdTabsGuiState needs 
+            //both AgentGridGuiState and AgentSettingsGuiState to be enabled 
+            //before it can create its GUI. All AppStates do their own cleanup.
             if (name.equals("activate tests") && !keyPressed) {
                 //Each state handles its own removal and cleanup.
-                if (getStateManager().hasState(agentGenState)) {
-                    getStateManager().getState(AgentGenState.class).setEnabled(false);
-                    getStateManager().getState(CrowdGenState.class).setEnabled(false);
-                    getStateManager().getState(AgentCrowdState.class).setEnabled(false);
-                //If AgentGenState is not attached it starts the chain from its 
+                if (getStateManager().hasState(agentGridGuiState)) {
+                    getStateManager().getState(AgentGridGuiState.class).setEnabled(false);
+                    getStateManager().getState(AgentSettingsGuiState.class).setEnabled(false);
+                    getStateManager().getState(CrowdTabsGuiState.class).setEnabled(false);
+                //If AgentGridGuiState is not attached, it starts the chain from its 
                 //enabled method as shown here.
-                //AgentGenState(enabled)=>CrowdGenState(enabled)=>AgentCrowdState(enabled)    
+                //AgentGridGuiState(enabled)=>AgentSettingsGuiState(enabled)=>CrowdTabsGuiState(enabled)    
                 } else {
-                    agentGenState = new AgentGenState();
-                    getStateManager().attach(agentGenState);
+                    agentGridGuiState = new AgentGridGuiState();
+                    getStateManager().attach(agentGridGuiState);
                 }
             }
         }
