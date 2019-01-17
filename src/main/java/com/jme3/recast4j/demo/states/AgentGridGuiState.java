@@ -126,12 +126,12 @@ public class AgentGridGuiState extends BaseAppState {
         contMain.addChild(new Label("Grid Size"), "wrap");
         
         //The agentPath listbox. Add new model name here. Add the asset path to the 
-        //models in butSetup listener under the #Model Section.
+        //models in butAddAgentGrid listener under the #Model Section.
         listBoxAgent = contMain.addChild(new ListBox(), "split 2, growx");
         listBoxAgent.getModel().add("Jamie");
         listBoxAgent.getSelectionModel().setSelection(0);
         
-        //The crowd size listbox. 
+        //The grid size listbox. 
         listBoxSize = contMain.addChild(new ListBox(), "gapright 10, wrap");
         int size = 1;
         for (int i = 0; i < 15; i++) {
@@ -170,7 +170,7 @@ public class AgentGridGuiState extends BaseAppState {
         //The active tests listbox.
         contMain.addChild(new Label("Active Tests"), "wrap");
         listBoxTests = contMain.addChild(new ListBox(), "growx, wrap");
-        //Use the method call to set the removeTest boolean to true.
+        //Use the method call to set the checkTests boolean to true.
         contMain.addChild(new ActionButton(new CallMethodAction("Remove Test", this, "removeTest")), "wrap");
         
         //Holds the Generate Agents and Legend buttons.
@@ -180,9 +180,9 @@ public class AgentGridGuiState extends BaseAppState {
         contMain.addChild(contButton, "growx");
         //Buttons.
         contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
-        Button butSetup = contButton.addChild(new Button("Add Agent Grid"));
-        //The listener for addAgentGrid button.
-        MouseEventControl.addListenersToSpatial(butSetup, new DefaultMouseListener() {
+        Button butAddAgentGrid = contButton.addChild(new Button("Add Agent Grid"));
+        //The listener for butAddAgentGrid button.
+        MouseEventControl.addListenersToSpatial(butAddAgentGrid, new DefaultMouseListener() {
             //Default minimums
             private String testName     = "No Name";
             private float separation    = 1.0f;
@@ -261,7 +261,7 @@ public class AgentGridGuiState extends BaseAppState {
                 addAgentGrid(agentPath, size, separation, startPos, testName);
             }
 
-            //Set the test parameters for this test.
+            //Set the grid parameters for this test.
             private void addAgentGrid(String agentPath, int size, float distance, Vector3f startPos, String testName) {
 
                 //Anything over 2 arguments creates a new object so split this up.
@@ -329,7 +329,7 @@ public class AgentGridGuiState extends BaseAppState {
     protected void cleanup(Application app) {
         //Removing this state from StateManager will clear all agents from the 
         //physics space and gui node. The removal of the gui components is a by
-        //product of the removal of AgentCrowdGuiState where this gui lives.
+        //product of the removal of CrowdTabsGuiState where this gui lives.
         Iterator<Map.Entry<String, Test>> iterator = mapTests.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<String, Test> entry = iterator.next();
@@ -344,8 +344,8 @@ public class AgentGridGuiState extends BaseAppState {
 
     @Override
     protected void onEnable() {
-        //Start the CrowdGuiStatewhich in turn starts the AgenCrowdGuiState.
-        //Call from DemoApplication F1 button ActionListener.
+        //Start the AgentSettingsGuiState which in turn starts the CrowdTabsGuiState.
+        //Called from DemoApplication F1 button ActionListener.
         getStateManager().attach(new AgentSettingsGuiState());
     }
 
@@ -413,7 +413,7 @@ public class AgentGridGuiState extends BaseAppState {
                 + "Row2 = testname_r1_c0, testName_r1_c1, testName_r1_c2\n"
                 + "Row2 = testname_r2_c0, testName_r2_c1, testName_r2_c2\n\n" 
                 
-                + "Agent Separation - spacing between agents in the grid. Must "
+                + "Agent Separation - Spacing between agents in the grid. Must "
                 + "be a setting of 0.1f or larger.\n\n"
                 
                 + "Agent - Model to use for the test.\n\n"

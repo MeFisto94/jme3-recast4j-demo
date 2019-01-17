@@ -72,13 +72,15 @@ public class CrowdTabsGuiState extends BaseAppState {
         TabbedPanel tabPanel = contAgentSettingsGui.addChild(new TabbedPanel());
         
         //Add a rollup panel so can hide agent grid generator.
-        RollupPanel rollAgentGrid = new RollupPanel("Expand / Collapse", getState(AgentGridGuiState.class).getContAgentGridGui(), "glass");
+        RollupPanel rollAgentGrid = new RollupPanel("Expand / Collapse", 
+                getState(AgentGridGuiState.class).getContAgentGridGui(), "glass");
         rollAgentGrid.getTitleElement().setTextHAlignment(HAlignment.Center);
         rollAgentGrid.setAlpha(0, false);
         tabPanel.addTab("Agent Grid Generator", rollAgentGrid);
         
-        //Add a rollup panel so can hide crowd settings.
-        RollupPanel rollAgentSettings = new RollupPanel("Expand / Collapse", getState(AgentSettingsGuiState.class).getContAgentSettingsGui(), "glass");
+        //Add a rollup panel so can hide agent settings.
+        RollupPanel rollAgentSettings = new RollupPanel("Expand / Collapse", 
+                getState(AgentSettingsGuiState.class).getContAgentSettingsGui(), "glass");
         rollAgentSettings.getTitleElement().setTextHAlignment(HAlignment.Center);
         rollAgentSettings.setAlpha(0, false);        
         tabPanel.addTab("Agent Settings", rollAgentSettings);

@@ -39,14 +39,9 @@ import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
-import com.simsilica.lemur.Insets3f;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
-import com.simsilica.lemur.component.IconComponent;
-import com.simsilica.lemur.component.QuadBackgroundComponent;
-import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
-import com.simsilica.lemur.core.GuiComponent;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
 import com.simsilica.lemur.event.PopupState;
@@ -85,12 +80,12 @@ public class AgentSettingsGuiState extends BaseAppState {
         
         //The top container for this gui.
         contAgentSettingsGui = new Container(new MigLayout(null));
-        contAgentSettingsGui.setName("CrowdGenState contAgentGridGui");
+        contAgentSettingsGui.setName("AgentSettingsGuiState contAgentGridGui");
         contAgentSettingsGui.setAlpha(0, false);
         
         //Holds all the underlying components for this gui.
         Container contMain = new Container(new MigLayout(null));
-        contMain.setName("CrowdGenState rowOneCont");
+        contMain.setName("AgentSettingsGuiState contMain");
         contMain.setAlpha(0, false);
         contAgentSettingsGui.addChild(contMain);
 
@@ -181,10 +176,10 @@ public class AgentSettingsGuiState extends BaseAppState {
         }
         listBoxAvoidance.getSelectionModel().setSelection(0);
         
+        //Update flags.
         Container contUpdateFlags = new Container(new MigLayout("wrap"));
         contUpdateFlags.setAlpha(0, false);
         contMain.addChild(contUpdateFlags, "wrap, gapleft 30");
-        //Update flags.
         checkTurns = contUpdateFlags.addChild(new Checkbox("ANTICIPATE_TURNS"));        
         checkAvoid = contUpdateFlags.addChild(new Checkbox("OBSTACLE_AVOIDANCE"));
         checkTopo = contUpdateFlags.addChild(new Checkbox("OPTIMIZE_TOPO"));
@@ -194,11 +189,11 @@ public class AgentSettingsGuiState extends BaseAppState {
         //Holds the Legend and Setup buttons.
         Container contButton = new Container(new MigLayout("wrap 2", // Layout Constraints
                 "[]push[][]")); // Column constraints [min][pref][max]
-        contButton.setName("CrowdGenState rowSixCont");
+        contButton.setName("AgentSettingsGuiState contButton");
         contMain.addChild(contButton, "growx");
         //Buttons.
         contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
-        Button butSetup = contButton.addChild(new Button("Setup Crowd"));
+        Button butSetup = contButton.addChild(new Button("Add Agent Parameters"));
         MouseEventControl.addListenersToSpatial(butSetup, new DefaultMouseListener() {
             //Default minimums.
             private float radius                = 0.0f;
@@ -417,7 +412,7 @@ public class AgentSettingsGuiState extends BaseAppState {
     @Override
     protected void cleanup(Application app) {
         //The removal of the gui components is a by product of the removal of 
-        //AgentCrowdGuiState where this gui lives.
+        //CrowdTabsGuiState where this gui lives.
     }
 
     @Override
@@ -444,7 +439,7 @@ public class AgentSettingsGuiState extends BaseAppState {
         return contAgentSettingsGui;
     }
     
-    //Explains the settings for the Agent Generator.
+    //Explains the agent parameters.
     private void showLegend() {
         String msg = 
                 "Agent Radius - The radius of the agent. When presented with an "
@@ -480,11 +475,9 @@ public class AgentSettingsGuiState extends BaseAppState {
                 + "types that can be configured for the Crowd is nine. "
                 + "[Limits: 0 <= value <= 8]";
                 
-
-
         Container window = new Container(new MigLayout("wrap"));
         Label label = window.addChild(new Label(msg));
-        label.setMaxWidth(600);
+        label.setMaxWidth(400);
         label.setColor(ColorRGBA.Green);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
         getState(GuiUtilState.class).centerComp(window);
