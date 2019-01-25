@@ -104,7 +104,7 @@ public class CrowdState extends BaseAppState {
         //Removing will also cleanup the AgentGridState and AgentParamState
         //lemur objects.
         ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
-        int size = listActiveCrowds.getModel().size();
+        int size = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
         if (size > 0) {
             for (int i = 0; i < size; i++) {
                 Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i);
