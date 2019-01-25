@@ -30,7 +30,6 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.bounding.BoundingBox;
-import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
@@ -48,7 +47,6 @@ import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.event.PopupState;
-import java.util.HashMap;
 import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.NavMeshQuery;
@@ -586,6 +584,7 @@ public class AgentParamState extends BaseAppState {
         ap.updateFlags              = updateFlags;
         ap.obstacleAvoidanceType    = obstacleAvoidanceType;
         
+        //Temp fix for crowd clearing.
         resetCrowd(selectedCrowd);
         
         for (Node agent: listAgents) {
@@ -594,10 +593,8 @@ public class AgentParamState extends BaseAppState {
             CrowdAgent createAgent = getState(CrowdManagerAppstate.class)
                     .getCrowdManager().getCrowd(selectedCrowd).createAgent(agent.getWorldTranslation(), ap);
             //Is physics agent? set spatial.
-            if (agent.getControl(BetterCharacterControl.class) != null) {
-                getState(CrowdManagerAppstate.class).getCrowdManager()
-                        .getCrowd(selectedCrowd).setSpatialForAgent(createAgent, agent);
-            }
+            getState(CrowdManagerAppstate.class).getCrowdManager()
+                    .getCrowd(selectedCrowd).setSpatialForAgent(createAgent, agent);
             
             //anything over 2 arguments creates a new object so split this up.
             LOG.info("<===== Begin AgentParamState addAgentCrowd =====>");

@@ -62,7 +62,6 @@ import java.util.Iterator;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
 import org.recast4j.detour.crowd.CrowdAgent;
-import org.recast4j.detour.crowd.CrowdAgent.CrowdAgentState;
 import org.recast4j.detour.crowd.ObstacleAvoidanceQuery.ObstacleAvoidanceParams;
 import org.recast4j.detour.io.MeshSetReader;
 import org.slf4j.Logger;
@@ -564,7 +563,7 @@ public class CrowdState extends BaseAppState {
                             .buildPopup("[ " 
                                     + fieldCrowdName.getText() 
                                     + " ] has already been activated. "
-                                    + "Change the crowd name or remove the existing crowd before proceeding.", maxPopupSize));
+                                    + "Change the crowd name or remove the existing crowd before proceeding.", 0));
             return;
         } else {
             crowdName = fieldCrowdName.getText();
@@ -633,6 +632,7 @@ public class CrowdState extends BaseAppState {
             NavMeshQuery query = new NavMeshQuery(navMesh);
             
             Crowd crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
+   
             //Add to CrowdManager, mapCrowds, and listActiveCrowds.
             getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);      
             mapCrowds.put(crowdName, query);
