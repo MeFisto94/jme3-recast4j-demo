@@ -1,6 +1,7 @@
 package com.jme3.recast4j.demo;
 
 import com.jme3.app.DebugKeysAppState;
+import com.jme3.app.LostFocusBehavior;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.StatsAppState;
 import com.jme3.audio.AudioListenerState;
@@ -27,7 +28,8 @@ import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
-import com.jme3.recast4j.demo.controls.NavMeshChaserControl;
+import com.jme3.recast4j.demo.controls.CrowdBCC;
+import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.states.*;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
@@ -61,7 +63,6 @@ public class DemoApplication extends SimpleApplication {
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     CrowdManagerAppstate crowdManagerAppstate;
     Node player;
-    private AgentGridGuiState agentGridGuiState;
     
     public DemoApplication() {
         super( 
@@ -85,6 +86,8 @@ public class DemoApplication extends SimpleApplication {
         settings.setHeight(720);
         app.setSettings(settings);
         app.start();
+        app.setLostFocusBehavior(LostFocusBehavior.Disabled);
+        app.setPauseOnLostFocus(false);
     }
 
     @Override
@@ -116,16 +119,17 @@ public class DemoApplication extends SimpleApplication {
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
         RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).
                 build(new RecastConfigBuilder()
-                        .withAgentRadius(.44f)           // r
-                        .withAgentHeight(1.8f)          // h
-                        .withCellSize(.04f)             // cs=r/10
-                        .withCellHeight(.02f)          // ch=cs/2
+                        .withAgentRadius(.3f)           // r
+                        .withAgentHeight(1.7f)          // h
+                        //cs and ch should probably be .1 at min.
+                        .withCellSize(.1f)              // cs=r/3
+                        .withCellHeight(.1f)            // ch=cs 
                         .withAgentMaxClimb(.3f)         // > 2*ch
                         .withAgentMaxSlope(45f)         
-                        .withEdgeMaxLen(8.0f)           // r*8
-                        .withEdgeMaxError(1.1f)         // 1.1 - 1.5
-                        .withDetailSampleDistance(2.0f) // increase if exception
-                        .withDetailSampleMaxError(11.0f) // increase if exception
+                        .withEdgeMaxLen(2.4f)             // r*8
+                        .withEdgeMaxError(1.3f)         // 1.1 - 1.5
+                        .withDetailSampleDistance(6.0f) // increase if exception
+                        .withDetailSampleMaxError(5.0f) // increase if exception
                         .withVertsPerPoly(3).build());
         
         //Split up for testing.
@@ -136,7 +140,7 @@ public class DemoApplication extends SimpleApplication {
         query = new NavMeshQuery(navMesh);
 
         //Uncomment for 3rd person view. Call after player/navmesh is loaded.
-        getStateManager().attach(new RecastGUIState(player));
+        getStateManager().attach(new ThirdPersonCamState(player));
         
         try {
             RecastTest.saveToFile(navMesh);
@@ -172,32 +176,33 @@ public class DemoApplication extends SimpleApplication {
                     } else {
                         findPathImmediately(characters.get(0), filter, startPoly, endPoly);
                     }
-                } else {
-                    if (crowd == null) {
-                        crowd = new Crowd(MovementApplicationType.BETTER_CHARACTER_CONTROL, 5, 0.4f, navMesh);
-                        CrowdAgentParams params = new CrowdAgentParams();
-                        params.height = 1.8f;
-                        params.radius = 0.3f;
-                        params.maxSpeed = 2f;
-                        params.maxAcceleration = 8f;
-                        params.collisionQueryRange = params.radius * 12f;
-                        params.pathOptimizationRange = params.radius * 30f;
-                        params.updateFlags = CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS | CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE; //|
-                        //CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO | CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS | CrowdAgentParams.DT_CROWD_SEPARATION;
-                        params.obstacleAvoidanceType = 0;
-
-                        for (int i = 0; i < 5; i++) {
-                            CrowdAgent ca = crowd.createAgent(characters.get(i).getWorldTranslation(), params);
-                            crowd.setSpatialForAgent(ca, characters.get(i));
-                        }
-
-                        crowdManagerAppstate.getCrowdManager().addCrowd(crowd);
-                    }
-
-                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{0.5f, 0.5f, 0.5f}, new BetterDefaultQueryFilter());
-                    // @TODO: RequestMoveToTarget shall automatically query the nearest polygon or accept a FindNearestPolyResult
-                    System.out.println(crowd.requestMoveToTarget(locOnMap, endPoly.getNearestRef()));
                 }
+//                else {
+//                    if (crowd == null) {
+//                        crowd = new Crowd(MovementApplicationType.BETTER_CHARACTER_CONTROL, 5, 0.4f, navMesh);
+//                        CrowdAgentParams params = new CrowdAgentParams();
+//                        params.height = 1.8f;
+//                        params.radius = 0.3f;
+//                        params.maxSpeed = 2f;
+//                        params.maxAcceleration = 8f;
+//                        params.collisionQueryRange = params.radius * 12f;
+//                        params.pathOptimizationRange = params.radius * 30f;
+//                        params.updateFlags = CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS | CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE; //|
+//                        //CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO | CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS | CrowdAgentParams.DT_CROWD_SEPARATION;
+//                        params.obstacleAvoidanceType = 0;
+//
+//                        for (int i = 0; i < 5; i++) {
+//                            CrowdAgent ca = crowd.createAgent(characters.get(i).getWorldTranslation(), params);
+//                            crowd.setSpatialForAgent(ca, characters.get(i));
+//                        }
+//
+//                        crowdManagerAppstate.getCrowdManager().addCrowd(crowd);
+//                    }
+//
+//                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{0.5f, 0.5f, 0.5f}, new BetterDefaultQueryFilter());
+//                    // @TODO: RequestMoveToTarget shall automatically query the nearest polygon or accept a FindNearestPolyResult
+//                    System.out.println(crowd.requestMoveToTarget(locOnMap, endPoly.getNearestRef()));
+//                }
             }
         });
     }
@@ -220,8 +225,8 @@ public class DemoApplication extends SimpleApplication {
                     oldPos = nu;
                 }
 
-                character.getControl(NavMeshChaserControl.class).stopFollowing();
-                character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
+                character.getControl(PhysicsAgentControl.class).stopFollowing();
+                character.getControl(PhysicsAgentControl.class).followPath(vector3fList);
             } else {
                 System.err.println("Unable to find straight paths");
             }
@@ -267,8 +272,8 @@ public class DemoApplication extends SimpleApplication {
                     oldPos = nu;
                 }
 
-                character.getControl(NavMeshChaserControl.class).stopFollowing();
-                character.getControl(NavMeshChaserControl.class).followPath(vector3fList);
+                character.getControl(PhysicsAgentControl.class).stopFollowing();
+                character.getControl(PhysicsAgentControl.class).followPath(vector3fList);
             } else {
                 System.err.println("Unable to find straight paths");
             }
@@ -282,7 +287,7 @@ public class DemoApplication extends SimpleApplication {
         // Performance is better when threading in parallel
         bullet.setThreadingType(BulletAppState.ThreadingType.PARALLEL);
         stateManager.attach(bullet);
-
+        
         /** A white, directional light source */ 
         DirectionalLight sun = new DirectionalLight();
         sun.setDirection((new Vector3f(0.5f, -0.5f, -0.5f)).normalizeLocal());
@@ -404,7 +409,7 @@ public class DemoApplication extends SimpleApplication {
         tmp.setLocalTranslation(idx * 0.5f, 5f, (idx % 2 != 0 ? 1f : 0f));
         tmp.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
 
-        tmp.addControl(new NavMeshChaserControl());
+        tmp.addControl(new PhysicsAgentControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(tmp);
         rootNode.attachChild(tmp);
         characters.add(tmp);
@@ -449,7 +454,8 @@ public class DemoApplication extends SimpleApplication {
     private void loadJaime() {
         player = (Node) getAssetManager().loadModel("Models/Jaime/Jaime.j3o");
         player.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
-        player.addControl(new NavMeshChaserControl());
+//        player.addControl(new CrowdBCC(0.3f, 1.5f, 20f)); // values taken from recast defaults
+        player.addControl(new PhysicsAgentControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(player);
         getRootNode().attachChild(player);
         characters.add(player);
@@ -458,28 +464,35 @@ public class DemoApplication extends SimpleApplication {
     private ActionListener actionListener = new ActionListener() {
         @Override
         public void onAction(String name, boolean keyPressed, float tpf) {
-            //This is a chain method of attaching states. CrowdTabsGuiState needs 
-            //both AgentGridGuiState and AgentSettingsGuiState to be enabled 
+            //This is a chain method of attaching states. CrowdState needs 
+            //both AgentGridState and AgentParamState to be enabled 
             //before it can create its GUI. All AppStates do their own cleanup.
-            if (name.equals("activate tests") && !keyPressed) {
+            //Lemur cleanup for all states is done from CrowdState.
+            if (name.equals("crowd builder") && !keyPressed) {
                 //Each state handles its own removal and cleanup.
-                if (getStateManager().hasState(agentGridGuiState)) {
-                    getStateManager().getState(AgentGridGuiState.class).setEnabled(false);
-                    getStateManager().getState(AgentSettingsGuiState.class).setEnabled(false);
-                    getStateManager().getState(CrowdTabsGuiState.class).setEnabled(false);
-                //If AgentGridGuiState is not attached, it starts the chain from its 
+                //CrowdState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
+                if (getStateManager().getState(AgentGridState.class) != null) {
+                    getStateManager().getState(CrowdState.class).setEnabled(false);
+                //If AgentGridState is not attached, it starts the chain from its 
                 //enabled method as shown here.
-                //AgentGridGuiState(enabled)=>AgentSettingsGuiState(enabled)=>CrowdTabsGuiState(enabled)    
+                //AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdState(onEnable)    
                 } else {
-                    agentGridGuiState = new AgentGridGuiState();
-                    getStateManager().attach(agentGridGuiState);
+                    getStateManager().attach(new AgentGridState());
+                }
+            }
+            
+            if (name.equals("crowd pick") && !keyPressed) {
+                if (getStateManager().getState(AgentParamState.class) != null) {
+                    Vector3f locOnMap = getLocationOnMap(); // Don't calculate three times
+                    getStateManager().getState(AgentParamState.class).setFieldTargetXYZ(locOnMap);
                 }
             }
         }
     };
 
     private void initKeys() {
-        getInputManager().addMapping("activate tests", new KeyTrigger(KeyInput.KEY_F1));
-        getInputManager().addListener(actionListener, "activate tests");
+        getInputManager().addMapping("crowd builder", new KeyTrigger(KeyInput.KEY_F1));
+        getInputManager().addMapping("crowd pick", new KeyTrigger(KeyInput.KEY_LSHIFT));
+        getInputManager().addListener(actionListener, "crowd builder", "crowd pick");
     }
 }

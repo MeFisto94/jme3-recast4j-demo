@@ -104,12 +104,12 @@ public class GuiUtilState extends BaseAppState {
     /**
      * Centers any lemur component to the middle of the screen.
      * 
-     * @param cont the lemur component to center.
+     * @param panel the lemur component to center.
      */
-    public void centerComp(Panel cont) {
+    public void centerComp(Panel panel) {
         // Position the panel                                                            
-        cont.setLocalTranslation((getApplication().getCamera().getWidth() - cont.getPreferredSize().x)/2, 
-                (getApplication().getCamera().getHeight() + cont.getPreferredSize().y)/2, 0);
+        panel.setLocalTranslation((getApplication().getCamera().getWidth() - panel.getPreferredSize().x)/2, 
+                (getApplication().getCamera().getHeight() + panel.getPreferredSize().y)/2, 0);
     }
     
     //Validate user input for float fields.

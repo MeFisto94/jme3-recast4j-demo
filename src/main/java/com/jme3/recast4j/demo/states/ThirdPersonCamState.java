@@ -44,12 +44,12 @@ import org.slf4j.LoggerFactory;
  *
  * @author Robert
  */
-public class RecastGUIState extends BaseAppState {
+public class ThirdPersonCamState extends BaseAppState {
     
-    private static final Logger LOG = LoggerFactory.getLogger(RecastGUIState.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(ThirdPersonCamState.class.getName());
     private final Node player;
 
-    public RecastGUIState(Node player) {
+    public ThirdPersonCamState(Node player) {
         this.player = player;
     }
     

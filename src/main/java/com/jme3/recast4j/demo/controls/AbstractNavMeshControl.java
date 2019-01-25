@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public abstract class AbstractNavMeshControl extends AbstractControl {
+
     protected BetterCharacterControl characterControl;
     protected List<Vector3f> pathList;
     protected int currentIndex;
