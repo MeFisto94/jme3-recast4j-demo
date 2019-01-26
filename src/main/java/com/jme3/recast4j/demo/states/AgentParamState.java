@@ -30,7 +30,6 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.bounding.BoundingBox;
-import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
@@ -47,6 +46,7 @@ import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.event.PopupState;
+import java.util.Arrays;
 import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.NavMeshQuery;
@@ -273,55 +273,49 @@ public class AgentParamState extends BaseAppState {
      * Explains the agent parameters.
      */
     private void showLegend() {
-        String msg =
-                "Agent Radius - The radius of the agent. When presented with an " + 
-                "opeining they are to large to enter, pathFinding will try to " + 
-                "navigate around it. If checked, the given value will be used for " + 
-                "the radius of Crowd navigation. Left unchecked, and the radius " + 
-                "assigned to the agent during the grid creation process will be " + 
-                "used instead. [Limit: >= 0]\n\n" +
-                
-                "Agent Height - The height of the agent. Obstacles with a height " + 
-                "less than this (value - radius) will cause pathFinding to try " + 
-                "and find a navigable path around the obstacle. If checked, the " + 
-                "given value will be used for the radius of Crowd navigation. " + 
-                "Left unchecked, and the radius assigned to the agent during the " + 
-                "grid creation process will be used instead. [Limit: > 0]\n\n" +
-                
-                "Max Acceleration - When an agent lags behind in the path, this " + 
-                "is the maximum burst of speed the agent will move at when "+ 
-                "trying to catch up to their expected position. [Limit: >= 0]\n\n" +
-                
-                "Max Speed - the maximum speed the agent will travel along the " + 
-                "path when unobstructed. [Limit: >= 0]\n\n" +
-                
-                "Collision Query Range - Defines how close a collision element " + 
-                "must be before it's considered for steering behaviors. " + 
-                "[Limits: > 0]\n\n" +
-                
-                "Path Optimization Range: The path visibility optimization " + 
-                "range. [Limit: > 0]\n\n" +
-                
-                "Separation Weight - How aggresive the agent manager should be " + 
-                "at avoiding collisions with this agent. [Limit: >= 0]\n\n" +
-                
-                "Avoidance Type - This is the Obstacle Avoidance configuration " + 
-                "to be applied to this agent. Currently, the max number of avoidance " + 
-                "types that can be configured for the Crowd is eight. See " + 
-                "[Crowd][Obstacle Avoidance Parameters]. " + 
-                "[Limits: 0 <= value < 8]\n\n" +
-                
-                "Update Flags - Crowd agent update flags. This is a required " + 
-                "setting.\n\n" + 
-                
-                "Target Position - This is the target for the crowd to move to. " + 
-                "You can set it manually or by hovering your mouse pointer over " + 
-                "the desired target and selecting the [Shift] key";
+
+        String[] msg = {
+        "Agent Radius - The radius of the agent. When presented with an opening  they are to", 
+        "large to enter, pathFinding will try to navigate around it. If checked, the given value will", 
+        "be used for the radius of Crowd navigation. Left unchecked, and the radius assigned to", 
+        "the agent during the grid creation process will be used instead. [Limit: >= 0]",
+        " ",
+        "Agent Height - The height of the agent. Obstacles with a height less than this ",
+        "(value - radius) will cause pathFinding to try and find a navigable path around the", 
+        "obstacle. If checked, the given value will be used for the height of Crowd navigation. Left", 
+        "unchecked, and the height assigned to the agent during the grid creation process will be",
+        "used instead. [Limit: > 0]",
+        " ",
+        "Max Acceleration - When an agent lags behind in the path, this is the maximum burst of", 
+        "speed the agent will move at when trying to catch up to their expected position.",
+        "[Limit: >= 0]",
+        " ",
+        "Max Speed - the maximum speed the agent will travel along the path when",
+        "unobstructed. [Limit: >= 0]",
+        " ",
+        "Collision Query Range - Defines how close a collision element must be before it's", 
+        "considered for steering behaviors. [Limits: > 0]",
+        " ",
+        "Path Optimization Range: The path visibility optimization range. [Limit: > 0]",
+        " ",
+        "Separation Weight - How aggressive  the agent manager should be at avoiding collisions", 
+        "with this agent. [Limit: >= 0]",
+        " ",
+        "Avoidance Type - This is the Obstacle Avoidance configuration to be applied to this", 
+        "agent. Currently, the max number of avoidance types that can be configured for the", 
+        "Crowd is eight. See [ Crowd ] [ Obstacle Avoidance Parameters ]. [Limits: 0 <= value < 8]",
+        " ",
+        "Update Flags - Crowd agent update flags. This is a required setting.",
+        " ",
+        "Target Position - This is the target for the crowd to move to. You can set it manually or", 
+        "by hovering your mouse pointer over the desired target and selecting the [ Shift ] key.",
+        };
                 
         Container window = new Container(new MigLayout("wrap"));
-        Label label = window.addChild(new Label(msg));
-        label.setMaxWidth(600);
-        label.setColor(ColorRGBA.Green);
+        ListBox listScroll = window.addChild(new ListBox());
+        listScroll.getModel().addAll(Arrays.asList(msg));
+        listScroll.setPreferredSize(new Vector3f(500, 400, 0));
+        listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
         getState(GuiUtilState.class).centerComp(window);
         //This assures clicking outside of the message should close the window 
@@ -599,6 +593,7 @@ public class AgentParamState extends BaseAppState {
             //anything over 2 arguments creates a new object so split this up.
             LOG.info("<===== Begin AgentParamState addAgentCrowd =====>");
             LOG.info("Crowd                 [{}]", selectedCrowd);
+            LOG.info("Active Agents         [{}]", getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd).getActiveAgents().size());
             LOG.info("Agent Name            [{}]", agent.getName());
             LOG.info("Position World        [{}]", agent.getWorldTranslation());
             LOG.info("Position Local        [{}]", agent.getLocalTranslation());
@@ -698,6 +693,7 @@ public class AgentParamState extends BaseAppState {
         Crowd crowd1 = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(crowd);
         List<CrowdAgent> activeAgents = crowd1.getActiveAgents();
         for (CrowdAgent agent: activeAgents) {
+            crowd1.resetMoveTarget(activeAgents.indexOf(agent));
             crowd1.removeAgent(agent);
         }
     }

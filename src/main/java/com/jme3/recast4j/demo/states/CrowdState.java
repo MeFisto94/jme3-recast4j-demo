@@ -31,7 +31,7 @@ import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.input.event.MouseButtonEvent;
-import com.jme3.math.ColorRGBA;
+import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
@@ -57,6 +57,7 @@ import com.simsilica.lemur.text.DocumentModelFilter;
 import com.simsilica.lemur.text.TextFilters;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import org.recast4j.detour.NavMesh;
@@ -361,7 +362,10 @@ public class CrowdState extends BaseAppState {
         rollAgentParam.setOpen(false);
         tabPanel.addTab("Agent Parameters", rollAgentParam);
         
-        getState(GuiUtilState.class).centerComp(contTabs);
+        int width = getApplication().getCamera().getWidth();
+        int height = getApplication().getCamera().getHeight();
+        contTabs.setLocalTranslation(
+                new Vector3f((width- contTabs.getPreferredSize().x)/2, height, 0));
         
         ((SimpleApplication) getApplication()).getGuiNode().attachChild(contTabs);
     }
@@ -391,105 +395,89 @@ public class CrowdState extends BaseAppState {
     
     //Explains the agent parameters.
     private void showLegend() {
-        String msg = 
-                "NavMesh - The navigation mesh to use for planning.\n\n" + 
                 
-                "Crowd Name - The name for this crowd. Used for adding agents to" + 
-                "a crowd. Each crowd must have a unique name. Spaces count in " + 
-                "the naming so if there is added space after a crowd name, that " + 
-                "crowd  will be considered unique.\n\n" +
-                
-                "Max Agents - The maximum number of agents the crowd can manage. " + 
-                "[Limit: >= 1]\n\n" +
-                
-                "Max Agent Radius - The maximum radius of any agent that will be " + 
-                "added to the crowd. [Limit: > 0]\n\n" + 
-                
-                "Movement Type - Each type determines how movement is applied to " + 
-                "an agent.\n\n" + 
-                
-                "BETTER_CHARACTER_CONTROL - As the name implies, uses physics " +
-                "and the BetterCharacterControl to set move and view direction.\n\n" +
-
-                "DIRECT - Direct setting of the agents translation. No controls " + 
-                "are needed for movement but you must set the view direction yourself.\n\n" +
-                
-                "CUSTOM - With custom, you implement the applyMovement() method " + 
-                "from the ApplyFunction interface. This will give you access to " + 
-                "the agents CrowdAgent object, the new position and the velocity " + 
-                "of the agent.\n\n" + 
-                
-                "NONE - No movement is implemented. You can freely interact with" + 
-                "the crowd and implement your own movement soloutions.\n\n" +
-
-                "Active Crowds - The list of active crowds. A crowd must be " + 
-                "selected before any agents can be added to a crowd or targets " + 
-                "for agents can be set.\n\n" + 
-                
-                "Obstacle Avoidance Parameters - The shared avoidance " + 
-                "configuration for an Agent inside the crowd. When first " + 
-                "instantiating the crowd, you are alloted eight parameter " + 
-                "objects in total. All eight slots are pre-filled with " + 
-                "the defaults listed below.\n\n" + 
-                
-                "[Defaults]\n" +
-                "velBias = 0.4f\n" +
-                "weightDesVel = 2.0f\n" +
-                "weightCurVel = 0.75f\n" +
-                "weightSide = 0.75f\n" +
-                "weightToi = 2.5f\n" +
-                "horizTime = 2.5f\n" +
-		"gridSize = 33\n" +
-                "adaptiveDivs = 7\n" +
-                "adaptiveRings = 2\n" +
-                "adaptiveDepth = 5\n\n" +
-                
-                "You may not remove any default parameter from the Crowd, " + 
-                "however, you can overwrite them. To change any parameter, first " + 
-                "set the parameters you desire in the Obstacle Avoidance " + 
-                "Parameters section, then select any parameter from the list and " + 
-                "click the [Update Parameter] button.\n\n" +
-                
-                "Velocity Bias - The velocity bias describes how the sampling " + 
-                "patterns is offset from the (0,0) based on the desired velocity. " + 
-                "This allows to tighten the sampling area and cull a lot of " + 
-                "samples. [Limit: 0-1]\n\n" +
-                
-                "Weight Desired Velocity - How much deviation from desired " + 
-                "velocity is penalized, the more penalty applied to this, the " + 
-                "more \"goal oriented\" the avoidance is, at the cost of " + 
-                "getting more easily stuck at local minimas.\n\n" +
-                
-                "Weight Current Velocity - How much deviation from current " + 
-                "velocity is penalized, the more penalty applied to this, the " + 
-                "more stubborn the agent is. This basically is a low pass " + 
-                "filter, and very important part of making things work.\n\n" +
-                
-                "Weight Side - In order to avoid reciprocal dance, the agenst " + 
-                "prefer to pass from right, this weight applies penalty to " + 
-                "velocities which try to take over from the wrong side.\n\n" +
-                
-                "Weight To Impact - How much penalty is added based on time to " + 
-                "impact. Too much penalty and the agents are shy, too little " + 
-                "and they avoid too late.\n\n" +
-                
-                "Horrizon Time - Time horizon, this affects how early the agents " + 
-                "start to avoid each other. Too long horizon and the agents are " + 
-                "scared of going through tight spots, and too small and they " + 
-                "avoid too late (closely related to weightToi).\n\n" +
-                
-                "Adaptive Divisions - Number of divisions per ring. [Limit: 1-32]\n\n" +
-                
-                "Adaptive Rings - Number of rings. [Limit: 1-4]\n\n" +
-                
-                "Adaptive Depth - Number of iterations at best velocity.";
-                
+        String[] msg = { 
+        "NavMesh - The navigation mesh to use for planning.",
+        " ",
+        "Crowd Name - The name for this crowd. Each crowd must have a unique name. Spaces",
+        "count in the naming so if there is added space after a crowd name, that crowd will", 
+        "be considered unique.",  
+        " ",
+        "Max Agents - The maximum number of agents the crowd can manage. [Limit: >= 1]",
+        "  ",
+        "Max Agent Radius - The maximum radius of any agent that will be added to the crowd.",
+        " ",
+        "Movement Type - Each type determines how movement is applied to an agent.",
+        " ",
+        "* BETTER_CHARACTER_CONTROL - As the name implies, uses physics and the ",
+        "BetterCharacterControl to set move and view direction. ",
+        " ",
+        "* DIRECT - Direct setting of the agents translation. No controls are needed for,",
+        "movement but you must set the view direction yourself.",
+        " ",
+        "* CUSTOM - With custom, you implement the applyMovement() method from the",
+        "ApplyFunction interface. This will give you access to the agents CrowdAgent object, the",
+        "new position and the velocity of the agent.",
+        " ",
+        "* NONE - No movement is implemented. You can freely interact with the crowd and",
+        "implement your own movement soloutions.",
+        " ",
+        "Active Crowds - The list of active crowds. A crowd must be selected before any agents", 
+        "can be added to a crowd or targets for agents can be set.", 
+        " ",
+        "Obstacle Avoidance Parameters - The shared avoidance configuration for an Agent", 
+        "inside the crowd. When first instantiating the crowd, you are allotted eight parameter", 
+        "objects in total. All eight slots are filled with the defaults listed below.", 
+        " ",
+        "[Defaults]",
+        "velBias             = 0.4f \t   weightDesVel   = 2.0f",
+        "weightCurVel  = 0.75f \t weightSide        = 0.75f",
+        "weightToi         = 2.5f \t   horizTime          = 2.5f",
+        "gridSize            = 33 \t     adaptiveDivs     = 7",
+        "adaptiveRings  = 2 \t       adaptiveDepth  = 5",
+        "                                                               ",
+        "You may not remove any default parameter from the Crowd, however, you can",
+        "overwrite them. To change any parameter, first set the parameters you desire in the",
+        "Obstacle Avoidance Parameters section, then select any parameter from the list and", 
+        "click the [ Update Parameter ] button.",
+        " ",
+        "* Velocity Bias - The velocity bias describes how the sampling patterns is offset from", 
+        "the (0,0) based on the desired velocity. This allows to tighten the sampling area and cull", 
+        "a lot of samples. [Limit: 0-1]",
+        " ",
+        "* Weight Desired Velocity - How much deviation from desired velocity is penalized, the", 
+        "more penalty applied to this, the more \"goal oriented\" the avoidance is, at the cost of", 
+        "getting more easily stuck at local minima.",
+        " ",
+        "* Weight Current Velocity - How much deviation from current velocity is penalized, the", 
+        "more penalty applied to this, the more stubborn the agent is. This basically is a low pass", 
+        "filter, and very important part of making things work.",
+        " ",
+        "* Weight Side - In order to avoid reciprocal dance, the agents prefer to pass from right,", 
+        "this weight applies penalty to velocities which try to take over from the wrong side.",
+        " ",
+        "* Weight To Impact - How much penalty is added based on time to impact. Too much", 
+        "penalty and the agents are shy, too little and they avoid too late.",
+        " ",
+        "* Horrizon Time - Time horizon, this affects how early the agents start to avoid each", 
+        "other. Too long horizon and the agents are scared of going through tight spots, and too", 
+        "small, and they avoid too late (closely related to weightToi).",
+        " ",
+        "* Adaptive Divisions - Number of divisions per ring. [Limit: 1-32]",
+        " ",
+        "* Adaptive Rings - Number of rings. [Limit: 1-4]",
+        " ",
+        "* Adaptive Depth - Number of iterations at best velocity." 
+        };
+        
         Container window = new Container(new MigLayout("wrap"));
-        Label label = window.addChild(new Label(msg));
-        label.setMaxWidth(getApplication().getCamera().getWidth());
-        label.setColor(ColorRGBA.Green);
+        ListBox listScroll = window.addChild(new ListBox());
+        listScroll.getModel().addAll(Arrays.asList(msg));
+        listScroll.setPreferredSize(new Vector3f(500, 400, 0));
+        listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
         getState(GuiUtilState.class).centerComp(window);
+//        window.setLocalTranslation(new Vector3f(0, getApplication().getCamera().getHeight(), 0));
         //This assures clicking outside of the message should close the window 
         //but not activate underlying UI components.
         GuiGlobals.getInstance().getPopupState().showPopup(window, PopupState.ClickMode.ConsumeAndClose, null, null);

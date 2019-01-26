@@ -50,6 +50,7 @@ import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.event.PopupState;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -351,63 +352,56 @@ public class AgentGridState extends BaseAppState {
      * Explains the settings for the Grid Generator.
      */
     private void showLegend() {
-        String msg = 
-                "Grid Name - The name used for the grid. The agents used in " + 
-                "the grid will all be named according to their insertion point " + 
-                "into the grid of agents. This is a required setting.\n\n" + 
-                
-                "Example: In a size 3 grid (3x3 = 9 agents), the naming is as " + 
-                "follows where r = row, c = column, \n\n" + 
-                
-                "Row1 = gridName_r0_c0, gridName_r0_c1, gridName_r0_c2\n" + 
-                "Row2 = gridname_r1_c0, gridName_r1_c1, gridName_r1_c2\n" + 
-                "Row2 = gridname_r2_c0, gridName_r2_c1, gridName_r2_c2\n\n" +  
-                
-                "Use Physics - If [Use Physics] is checked, it's expected that " + 
-                "physics is to be used for navigation movement and a " + 
-                "PhysicsAgentControl and BetterCharacterControl will be added to " + 
-                "the Agent of choice.\n\n" + 
-     
-                "Agent Radius - The radius of the agent. If left unchecked, the " + 
-                "value will be taken from the world bounds of the spatial and is " + 
-                "the smallest value in the x or z direction / 2.\n\n" + 
-                
-                "Agent Height - The height of the agent. If left unchecked, the " + 
-                "value will be taken from the world bounds of the spatial and is " + 
-                "the Y value * 2.\n\n" +
-
-                "Agent Weight - The weight of the agent. If left unchecked, a " + 
-                "default weight of 1.0f will be assigned if [Use Physics] is " + 
-                "checked, otherwise, it is ignored.\n\n" +
-     
-                "Agent Separation - Spacing between agents in the grid. Must " + 
-                "be a setting of 0.1f or larger.\n\n" +
-                
-                "Agent - Model to use for the grid.\n\n" + 
-                
-                "Grid Size - Number of agents to place into the grid in rows " + 
-                "and columns. Limit = 15 which is 225 agents.\n\n" + 
-                
-                "Example: 2 = 2 rows, 2 columns = a grid of 4 agents\n\n" + 
-                
-                "Active Grids - The list of all the currently active grids. " + 
-                "Select any grid from the list and press the [Remove Grid] " + 
-                "button to remove the grid and all active agents related to " + 
-                "that grid. Each grid must have a unique name. Spaces count in " + 
-                "the naming so if there is added space after a grid name, that " + 
-                "grid will be considered unique.\n\n" + 
-                
-                "Start Position - Starting position the agents will spread out " + 
-                "evenly from to form the grid. This is only used to generate " + 
-                "the agents for the grid so you can drop your agents from above " + 
-                "the navMesh if you wish. The actual starting point of the agent " + 
-                "is determined by its final position on the navMesh prior to " + 
-                "being added to the crowd.";
+        String[] msg = {
+        "Grid Name - The name used for the grid. The agents used in the grid will all be named",
+        "according to their insertion point into the grid of agents. This is a required setting.",
+        " ",
+        "Example: In a size 3 grid (3x3 = 9 agents), the naming is as follows.",
+        " ",
+        "r = row, c = column",
+        "Row1 = gridName_r0_c0, gridName_r0_c1, gridName_r0_c2",
+        "Row2 = gridname_r1_c0, gridName_r1_c1, gridName_r1_c2", 
+        "Row2 = gridname_r2_c0, gridName_r2_c1, gridName_r2_c2", 
+        " ",
+        "Use Physics - If [ Use Physics ] is checked, it's expected that physics is to be used for", 
+        "navigation movement and a PhysicsAgentControl and BetterCharacterControl will be", 
+        "added to the Agent of choice.", 
+        " ",
+        "Agent Radius - The radius of the agent. Left unchecked, the value will be taken from the", 
+        "world bounds of the spatial and is the smallest value in the x or z direction / 2.",
+        " ",
+        "Agent Height - The height of the agent. Left unchecked, the value will be taken from the", 
+        "world bounds of the spatial and is the Y value * 2.",
+        " ",
+        "Agent Weight - The weight of the agent. Left unchecked, a default weight of 1.0f will be",
+        "assigned if [ Use Physics ] is checked, otherwise, it is ignored.",
+        " ",
+        "Agent Separation - Spacing between agents in the grid. Must be a setting of 0.1f",
+        "or larger.",
+        " ",
+        "Agent - Model to use for the grid.",
+        " ",
+        "Grid Size - Number of agents to place into the grid in rows and columns. Limit = 15", 
+        "which is 225 agents.",
+        " ",
+        "Example: 2 = 2 rows, 2 columns = a grid of 4 agents.",
+        " ",
+        "Active Grids - The list of all the currently active grids. Select any grid from the list and",
+        "press the [Remove Grid] button to remove the grid and all active agents related to that", 
+        "grid. Each grid must have a unique name. Spaces count in the naming so if there is", 
+        "added space after a grid name, that grid will be considered unique.",
+        " ",
+        "Start Position - Starting position the agents will spread out evenly from to form the grid.", 
+        "This is only used to generate the agents for the grid so you can drop your agents from", 
+        "above the navMesh if you wish. The actual starting point of the agent is determined by", 
+        "its final position on the navMesh prior to being added to the crowd."
+        };
         
         Container window = new Container(new MigLayout("wrap"));
-        Label label = window.addChild(new Label(msg));
-        label.setMaxWidth(maxPopupSize);
-        label.setColor(ColorRGBA.Green);
+        ListBox listScroll = window.addChild(new ListBox());
+        listScroll.getModel().addAll(Arrays.asList(msg));
+        listScroll.setPreferredSize(new Vector3f(500, 400, 0));
+        listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
         getState(GuiUtilState.class).centerComp(window);
         //This assures clicking outside of the message should close the window 
