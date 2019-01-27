@@ -72,9 +72,9 @@ public class AgentGridState extends BaseAppState {
     private Checkbox checkPhysics;
     private Checkbox checkRadius;
     private Checkbox checkWeight;
-    private ListBox listBoxAgent;
-    private ListBox listBoxGrid;
-    private ListBox listBoxSize;
+    private ListBox<String> listBoxAgent;
+    private ListBox<String> listBoxGrid;
+    private ListBox<Integer> listBoxSize;
     private TextField fieldDistance;
     private TextField fieldGridName;
     private TextField fieldHeight;
@@ -156,7 +156,7 @@ public class AgentGridState extends BaseAppState {
         //The agentPath listbox. Add new model name here. Add the asset path to the 
         contAgent.addChild(new Label("Agent"));
         //models in butAddAgentGrid listener under the #Model Section.
-        listBoxAgent = contAgent.addChild(new ListBox());
+        listBoxAgent = contAgent.addChild(new ListBox<>());
         listBoxAgent.getModel().add("Jamie");
         listBoxAgent.setVisibleItems(7);
         listBoxAgent.getSelectionModel().setSelection(0);
@@ -171,7 +171,7 @@ public class AgentGridState extends BaseAppState {
         
         //The grid size listbox. 
         contGridSize.addChild(new Label("Grid Size"));
-        listBoxSize = contGridSize.addChild(new ListBox());
+        listBoxSize = contGridSize.addChild(new ListBox<>());
         listBoxSize.setVisibleItems(7);
         int size = 1;
         for (int i = 0; i < 15; i++) {
@@ -195,7 +195,7 @@ public class AgentGridState extends BaseAppState {
         
         //The active grids listbox.
         contGrid.addChild(new Label("Active Grids"));
-        listBoxGrid = contGrid.addChild(new ListBox(), "growx");
+        listBoxGrid = contGrid.addChild(new ListBox<>(), "growx");
         //Use the method call to set the checkGrids boolean to true.
         contGrid.addChild(new ActionButton(new CallMethodAction("Remove Grid", this, "removeGrid")));
                         

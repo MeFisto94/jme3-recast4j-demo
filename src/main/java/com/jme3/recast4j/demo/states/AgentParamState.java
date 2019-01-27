@@ -71,7 +71,7 @@ public class AgentParamState extends BaseAppState {
     private TextField fieldPathOptimizeRange;
     private TextField fieldRadius;
     private TextField fieldSeparationWeight;
-    private ListBox listBoxAvoidance;
+    private ListBox<Integer> listBoxAvoidance;
     private Checkbox checkAvoid;
     private Checkbox checkSep;
     private Checkbox checkTopo;
@@ -160,7 +160,7 @@ public class AgentParamState extends BaseAppState {
         contAvoidance.addChild(new Label("Avoidance Type"));
         
         //Obstacle avoidance listbox.
-        listBoxAvoidance = contAvoidance.addChild(new ListBox(), "align 50%");
+        listBoxAvoidance = contAvoidance.addChild(new ListBox<>(), "align 50%");
         listBoxAvoidance.setVisibleItems(7);
         //Have to set this here since Crowd has package-private access the to 
         //the DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS variable. Currently this is eight.
@@ -330,18 +330,18 @@ public class AgentParamState extends BaseAppState {
 
         float radius;
         float height;
-        float max_accel;
-        float max_speed;   
+        float maxAccel;
+        float maxSpeed;   
         float colQueryRange;
         float pathOptimizeRange;
         int updateFlags;
         int obstacleAvoidanceType;
         float separationWeight;
         
-        int selectedCrowd = getState(CrowdState.class).getSelectedCrowd();
+        Integer selectedCrowd = getState(CrowdState.class).getSelectedCrowd();
         
         //Must select a crowd before anything else.
-        if (selectedCrowd == -1) {
+        if (selectedCrowd == null) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup("You must select a [ Active Crowd ] "
@@ -405,9 +405,9 @@ public class AgentParamState extends BaseAppState {
                             .buildPopup("[ Max Acceleration ] requires a valid float value.", 0));
             return;
         } else {
-            max_accel = new Float(fieldMaxAccel.getText());
+            maxAccel = new Float(fieldMaxAccel.getText());
             //Stop negative acceleration input.
-            if (max_accel < 0.0f) {
+            if (maxAccel < 0.0f) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
                                 .buildPopup("[ Max Acceleration ] requires a float value >= 0.0f.", 0));
@@ -423,9 +423,9 @@ public class AgentParamState extends BaseAppState {
                             .buildPopup("[ Max Speed ] requires a valid float value.", 0));
             return;
         } else {
-            max_speed = new Float(fieldMaxSpeed.getText());
+            maxSpeed = new Float(fieldMaxSpeed.getText());
             //Stop negative input.
-            if (max_speed < 0.0f) {
+            if (maxSpeed < 0.0f) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
                                 .buildPopup("[ Max Speed ] requires a float value >= 0.0f.", 0));
@@ -570,8 +570,8 @@ public class AgentParamState extends BaseAppState {
         CrowdAgentParams ap = new CrowdAgentParams();
         ap.radius                   = radius;
         ap.height                   = height;
-        ap.maxAcceleration          = max_accel;
-        ap.maxSpeed                 = max_speed;
+        ap.maxAcceleration          = maxAccel;
+        ap.maxSpeed                 = maxSpeed;
         ap.collisionQueryRange      = colQueryRange;
         ap.pathOptimizationRange    = pathOptimizeRange;
         ap.separationWeight         = separationWeight;
@@ -689,12 +689,22 @@ public class AgentParamState extends BaseAppState {
         this.fieldTargetZ.setText(z);
     }
 
+    /**
+     * Resets all crowd agent move targets for the selected crowd. 
+     * targetRef = 0;
+     * targetPos( 0, 0, 0);
+     * dvel( 0, 0, 0);
+     * targetPathqRef = PathQueue.DT_PATHQ_INVALID;
+     * targetReplan = false;
+     * targetState = MoveRequestState.DT_CROWDAGENT_TARGET_NONE;
+     * @param crowd The crowd to reset.
+     */
     private void resetCrowd(int crowd) {
         Crowd crowd1 = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(crowd);
         List<CrowdAgent> activeAgents = crowd1.getActiveAgents();
         for (CrowdAgent agent: activeAgents) {
             crowd1.resetMoveTarget(activeAgents.indexOf(agent));
-            crowd1.removeAgent(agent);
+//            crowd1.removeAgent(agent);
         }
     }
     

@@ -49,11 +49,13 @@ import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.RollupPanel;
 import com.simsilica.lemur.TabbedPanel;
 import com.simsilica.lemur.TextField;
+import com.simsilica.lemur.core.VersionedReference;
 import com.simsilica.lemur.event.CursorEventControl;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.DragHandler;
 import com.simsilica.lemur.event.MouseEventControl;
 import com.simsilica.lemur.event.PopupState;
+import com.simsilica.lemur.list.DefaultCellRenderer;
 import com.simsilica.lemur.text.DocumentModelFilter;
 import com.simsilica.lemur.text.TextFilters;
 import java.io.FileInputStream;
@@ -61,6 +63,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Set;
 import java.util.logging.Level;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
@@ -82,24 +85,24 @@ public class CrowdState extends BaseAppState {
     private Container contTabs;
     private DocumentModelFilter doc;
     private TextField fieldNavMesh;
-    private ListBox listBoxAvoidance;
+    private ListBox<String> listBoxAvoidance;
     private TextField fieldVelocityBias;
     private TextField fieldAdaptiveRings;
     private TextField fieldAdaptiveDivs;
     private TextField fieldAdaptiveDepth;
-    private ListBox listMoveType;
-    private float maxPopupSize;
+    private ListBox<String> listMoveType;
     private TextField fieldMaxAgents;
     private TextField fieldMaxAgentRadius;
-    private ListBox listActiveCrowds;
+    private ListBox<String> listActiveCrowds;
     private TextField fieldCrowdName;
     private HashMap<String, NavMeshQuery> mapCrowds;
     private TextField fieldWeightDesVel;
+    // Keep tracking of which part is selected
+    private VersionedReference<Set<Integer>> selectionRef; 
     
     
     @Override
     protected void initialize(Application app) {
-        maxPopupSize = 800.0f;
         mapCrowds = new HashMap();
     }
 
@@ -177,7 +180,7 @@ public class CrowdState extends BaseAppState {
         //Movement types for the crowd.
         contListMoveType.addChild(new Label("Movement Type"));
         //Movement types for crowd
-        listMoveType = contListMoveType.addChild(new ListBox());
+        listMoveType = contListMoveType.addChild(new ListBox<>());
         listMoveType.getSelectionModel().setSelection(0);
         listMoveType.getModel().add("BETTER_CHARACTER_CONTROL");
         listMoveType.getModel().add("DIRECT");
@@ -193,8 +196,8 @@ public class CrowdState extends BaseAppState {
         contCrowd.addChild(contActiveCrowds, "wrap, flowy, growx, growy");
         
         contActiveCrowds.addChild(new Label("Active Crowds"));
-        listActiveCrowds = contActiveCrowds.addChild(new ListBox(), "growx, growy");  
-        listActiveCrowds.addClickCommands(new RefreshCrowdParams());
+        listActiveCrowds = contActiveCrowds.addChild(new ListBox<>(), "growx, growy"); 
+        selectionRef = listActiveCrowds.getSelectionModel().createReference();  
         //Button to stop the Crowd.
         contActiveCrowds.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top");
         
@@ -262,7 +265,7 @@ public class CrowdState extends BaseAppState {
         contCrowd.addChild(contListBoxAvoidance, "wrap, growx");
         
         //Parameters list.
-        listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox(), "growx"); 
+        listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx"); 
         listBoxAvoidance.setVisibleItems(1);
         
         //The ObstacleAvoidanceParams string for the listbox.      
@@ -285,37 +288,10 @@ public class CrowdState extends BaseAppState {
         //Update a parameter button.
         Button butParam = contListBoxAvoidance.addChild(new Button("Update Parameter"));
         
-        /**
-         * Sets the listbox text and creates a new ObstacleAvoidanceParams object.
-         * Parameters are case sensitive and are as follows:
-         *          'b' sets the Velocity Bias
-         *          'd' sets the Adaptive Divisions
-         *          'D' sets the Adaptive Depth
-         *          'g' sets the Grid Size
-         *          'h' sets the Horizon Time
-         *          'i' sets the Weight To Impact
-         *          'r' sets the Adaptive Rings
-         *          's' sets the Weight Side
-         *          'v' sets the Weight Desired Velocity
-         *          'V' sets the Weight Current Velocity
-         */
         MouseEventControl.addListenersToSpatial(butParam, new DefaultMouseListener() {
             @Override
             protected void click( MouseButtonEvent event, Spatial target, Spatial capture ) {                
-                
-                String params = 
-                          "<=====    " + listBoxAvoidance.getSelectionModel().getSelection() + "    =====>\n"  
-                        + "velBias              = $b\n"
-                        + "weightDesVel  = 'v'\n"
-                        + "weightCurVel   = n\\a\n"
-                        + "weightSide       = n\\a\n"
-                        + "weightToi         = n\\a\n"
-                        + "horizTime         = n\\a\n"
-                        + "gridSize            = n\\a\n"
-                        + "adaptiveDivs    = $d\n"               
-                        + "adaptiveRings  = $r\n"
-                        + "adaptiveDepth = $D";
-                updateParam(params);
+                updateParam();
             }
         });        
         
@@ -407,6 +383,28 @@ public class CrowdState extends BaseAppState {
 //                dumpActiveAgents(i);
 //            }
 //        }
+
+        if( selectionRef.update() ) {
+            // Selection has changed
+            if (selectionRef.get().isEmpty()) {
+                //Load defaults here.
+                LOG.info("Selection ref is NULL, loading defaults.");
+            } else {
+                int selectedIndex = listActiveCrowds.getSelectionModel().getSelection();
+                LOG.info("Crowd         [{}]", selectedIndex);
+                Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedIndex);
+                for (int i = 0; i < 8; i++) {
+                    ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
+                    //Remove selected parameter.
+                    remove(listBoxAvoidance, i);
+                    //Insert the new parameters into the list.
+                    insert(listBoxAvoidance, i, oapToString(oap, i));
+                }
+                listBoxAvoidance.getSelectionModel().setSelection(0);
+                System.out.println("Update Loop-Visually Selected = " + listActiveCrowds.getSelectionModel().getSelection());
+            }
+        }
+
     }
     
     //Explains the agent parameters.
@@ -502,11 +500,11 @@ public class CrowdState extends BaseAppState {
     
     private void shutdown() {
         
-        //Get the Crowd from selectedCrowd.
-        int selectedCrowd = getSelectedCrowd();
+        //Get the Crowd from selectedParam.
+        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
         
         //Check to make sure the crowd has been selected.
-        if (selectedCrowd == -1) {
+        if (selectedCrowd == null) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup("You must select a crowd from the "
@@ -517,7 +515,7 @@ public class CrowdState extends BaseAppState {
         //Get the crowds name from the listActiveCrowds selectedParam.
         String crowdName = listActiveCrowds.getModel().get(selectedCrowd).toString();
 
-        //We check mapGrids to see if the key exists. If not, go no further.
+        //We check mapCrowds to see if the key exists. If not, go no further.
         if (!mapCrowds.containsKey(crowdName)) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
@@ -534,13 +532,14 @@ public class CrowdState extends BaseAppState {
                 //To fully remove the crowd we have to remove it from the 
                 //CrowdManager, mapCrowds (removes the query object also), and 
                 //the listActiveCrowds.
+                System.out.println("removing selection = " + listActiveCrowds.getSelectionModel().getSelection());
                 Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
                 getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
                 remove(listActiveCrowds, selectedCrowd);
                 iterator.remove();
                 break;
             }
-        }    
+        } 
     }
     
     /**
@@ -647,7 +646,7 @@ public class CrowdState extends BaseAppState {
             try {
                 crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
                 //Add to CrowdManager, mapCrowds, and listActiveCrowds.
-                getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);      
+                getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
                 mapCrowds.put(crowdName, query);
                 listActiveCrowds.getModel().add(crowdName);  
             } catch (NoSuchFieldException | IllegalAccessException ex) {
@@ -669,14 +668,14 @@ public class CrowdState extends BaseAppState {
      * 
      * @param format The string to be formatted.
      */
-    private void updateParam(String format) {
+    private void updateParam() {
         float velBias;
         float weightDesVel;
         int adaptiveDivs;
         int adaptiveDepth;
         int adaptiveRings;
         Integer selectedParam;
-        int selectedCrowd;
+        Integer selectedCrowd;
                 
         //The velocity bias settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldVelocityBias.getText()) 
@@ -778,104 +777,31 @@ public class CrowdState extends BaseAppState {
         }
         
         //Get the crowd from listActiveCrowds.
-        selectedCrowd = this.getSelectedCrowd();
+        selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
         
         //Check to make sure a crowd has been selected.
-        if (selectedCrowd == -1) {
+        if (selectedCrowd == null) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup("You must select a [ Active Crowd ] "
                                     + "from the list before a parameter can be updated.", 0));
             return;
         }
-        
-        LOG.info("<========== Beign CrowdState updateParam ==========>");
 
-        //If run into threading problems use StringBuffer.
-        StringBuilder buf               = new StringBuilder();
-        String str                      = format;
-        String i                        = null;
         ObstacleAvoidanceParams params  = new ObstacleAvoidanceParams();
-        
-        for ( int j = 0; j < str.length(); j++ ) {
-            if ( str.charAt(j) != '$' ) {
-                buf.append(str.charAt(j));
-                continue;
-            }
-            
-            char charAt = str.charAt(++j);
-            
-            switch (charAt) {
-                case 'b': //sets the Velocity Bias
-                    i = fieldVelocityBias.getText(); 
-                    params.velBias = velBias;
-                    LOG.info("velBias       [{}]", params.velBias);
-                    break;
-                case 'd': //sets the Adaptive Divisions
-                    i = this.fieldAdaptiveDivs.getText();
-                    params.adaptiveDivs = adaptiveDivs;
-                    LOG.info("adaptiveDivs  [{}]", params.adaptiveDivs);
-                    break;
-                case 'D': //sets the Adaptive Depth
-                    i = this.fieldAdaptiveDepth.getText();
-                    params.adaptiveDepth = adaptiveDepth;
-                    LOG.info("adaptiveRings [{}]", params.adaptiveDepth);
-                    break;
-                case 'g': //sets the Grid Size
-                    LOG.info("gridSize [{}]");
-                    break;
-                case 'h': //sets the Horizon Time
-                    LOG.info("horizTime [{}]");
-                    break;
-                case 'i': //sets the Weight To Impact
-                    LOG.info("weightToi [{}]");
-                    break;
-                case 'r': //sets the Adaptive Rings
-                    i = this.fieldAdaptiveRings.getText();
-                    params.adaptiveRings = adaptiveRings;
-                    LOG.info("adaptiveDepth [{}]", params.adaptiveRings);
-                    break;
-                case 's': //sets the Weight Side
-                    LOG.info("weightSide [{}]");
-                    break;
-                case 'v': //sets the Weight Desired Velocity
-                    i = fieldWeightDesVel.getText();
-                    params.weightDesVel = weightDesVel;
-                    LOG.info("weightDesVel [{}]", params.weightDesVel);
-                    break;
-                case 'V': //sets the Weight Current Velocity
-                    LOG.info("weightCurVel [{}]");
-                    break;
-            }
-            buf.append(i);
-        }        
+        params.velBias          = velBias;
+        params.weightDesVel     = weightDesVel;
+        params.adaptiveDivs     = adaptiveDivs;
+        params.adaptiveDepth    = adaptiveDepth;
+        params.adaptiveRings    = adaptiveRings;
+               
         //Inject the new parameter into the crowd.
-        getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd)
-                .setObstacleAvoidanceParams(selectedParam, params);
-        //Remove selected parameter.
+        getState(CrowdManagerAppstate.class).getCrowdManager()
+                .getCrowd(selectedCrowd).setObstacleAvoidanceParams(selectedParam, params);
+        //Remove selected parameter from listBoxAvoidance.
         remove(listBoxAvoidance, selectedParam);
-        //Insert the new parameters into the list.
-        insert(listBoxAvoidance, selectedParam, buf.toString());
-        
-        
-        //Check the data, remove when ready.
-        ObstacleAvoidanceParams oap = getState(CrowdManagerAppstate.class)
-                .getCrowdManager().getCrowd(selectedCrowd).getObstacleAvoidanceParams(selectedParam);
-        //Check the data, remove when ready.
-        int agentCount = getState(CrowdManagerAppstate.class).getCrowdManager()
-                .getCrowd(selectedCrowd).getAgentCount();
-        
-        //Remove when ready.
-        LOG.info("CrowdState ObsAvParam#        [{}]", selectedParam);
-        LOG.info("CrowdState Crowd#             [{}]", selectedCrowd);
-        LOG.info("CrowdManager agentCount       [{}]", agentCount);
-        LOG.info("CrowdManager velBias          [{}]", oap.velBias);
-        LOG.info("CrowdManager weightDesVel     [{}]", oap.weightDesVel);
-        LOG.info("CrowdManager adaptiveDivs     [{}]", oap.adaptiveDivs);
-        LOG.info("CrowdManager adaptiveDepth    [{}]", oap.adaptiveDepth);
-        LOG.info("CrowdManager adaptiveRings    [{}]", oap.adaptiveRings);
-        LOG.info("<========== End CrowdState updateParam ==========>");
-
+        //Insert the new parameters into listBoxAvoidance.
+        insert(listBoxAvoidance, selectedParam, oapToString(params, listBoxAvoidance.getSelectionModel().getSelection()));
     }
     
     //Insert a parameter string into the List.
@@ -894,13 +820,8 @@ public class CrowdState extends BaseAppState {
      * 
      * @return The active crowd or -1 if no active crowd was selected.
      */
-    public int getSelectedCrowd() {
-        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
-        if (selectedCrowd == null) {
-            return -1;
-        } else {
-            return selectedCrowd;
-        }
+    public Integer getSelectedCrowd() {
+        return listActiveCrowds.getSelectionModel().getSelection();
     }
     
     /**
@@ -911,10 +832,10 @@ public class CrowdState extends BaseAppState {
      * exist in the mapCrowds list.
      */
     public NavMeshQuery getQuery() {
-        int selectedCrowd = getSelectedCrowd();
+        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
         
         //Check to make sure a crowd has been selected.
-        if (selectedCrowd == -1) {
+        if (selectedCrowd == null) {
             return null;
         } 
         
@@ -940,13 +861,97 @@ public class CrowdState extends BaseAppState {
         }
     }
     
-    
-    private class RefreshCrowdParams implements Command {
-
-        @Override
-        public void execute(Object source) {
-            System.out.println(source);
-        }
+    /**
+     * Formats a Obstacle Avoidance Parameter into string form for insertion into  
+     * a listBoxAvoidance selection.
+     * Parameters are case sensitive and are as follows:
+     *          'b' sets the Velocity Bias
+     *          'd' sets the Adaptive Divisions
+     *          'D' sets the Adaptive Depth
+     *          'g' sets the Grid Size
+     *          'h' sets the Horizon Time
+     *          'i' sets the Weight To Impact
+     *          'r' sets the Adaptive Rings
+     *          's' sets the Weight Side
+     *          'v' sets the Weight Desired Velocity
+     *          'V' sets the Weight Current Velocity
+     * 
+     * @param oap The Obstacle Avoidance Parameter that needs string formating.
+     * @param idx The index of the listboxAvoidance parameter.
+     * @return The formated string.
+     */
+    private String oapToString(ObstacleAvoidanceParams oap, int idx) {
+        //If run into threading problems use StringBuffer.
+        StringBuilder buf               = new StringBuilder();
+        String i                        = null;
+        String str = 
+          "<=====    " + idx + "    =====>\n"  
+        + "velBias              = $b\n"
+        + "weightDesVel  = $v\n"
+        + "weightCurVel   = $V\n"
+        + "weightSide       = $s\n"
+        + "weightToi         = $i\n"
+        + "horizTime         = $h\n"
+        + "gridSize            = $g\n"
+        + "adaptiveDivs    = $d\n"               
+        + "adaptiveRings  = $r\n"
+        + "adaptiveDepth = $D";
+        LOG.info("<========== BEGIN CrowdState oapToString ==========>");
+        for ( int j = 0; j < str.length(); j++ ) {
+            if ( str.charAt(j) != '$' ) {
+                buf.append(str.charAt(j));
+                continue;
+            }
+            
+            char charAt = str.charAt(++j);
+            
+            switch (charAt) {
+                case 'b': //Velocity Bias
+                    i = "" + oap.velBias;
+                    LOG.info("velBias       [{}]", oap.velBias);
+                    break;
+                case 'd': //Adaptive Divisions
+                    i = "" + oap.adaptiveDivs;
+                    LOG.info("adaptiveDivs  [{}]", oap.adaptiveDivs);
+                    break;
+                case 'D': //Adaptive Depth
+                    i = "" + oap.adaptiveDepth;
+                    LOG.info("adaptiveDepth [{}]", oap.adaptiveDepth);
+                    break;
+                case 'g': //Grid Size
+                    i = "" + oap.gridSize;
+                    LOG.info("gridSize      [{}]", oap.gridSize);
+                    break;
+                case 'h': //Horizon Time
+                    i = "" + oap.horizTime;
+                    LOG.info("horizTime     [{}]", oap.horizTime);
+                    break;
+                case 'i': //Weight To Impact
+                    i = "" + oap.weightToi;
+                    LOG.info("weightToi     [{}]", oap.weightToi);
+                    break;
+                case 'r': //Adaptive Rings
+                    i = "" + oap.adaptiveRings;
+                    LOG.info("adaptiveRings [{}]", oap.adaptiveRings);
+                    break;
+                case 's': //Weight Side
+                    i = "" + oap.weightSide;
+                    LOG.info("weightSide    [{}]", oap.weightSide);
+                    break;
+                case 'v': //Weight Desired Velocity
+                    i = "" + oap.weightDesVel;
+                    LOG.info("weightDesVel  [{}]", oap.weightDesVel);
+                    break;
+                case 'V': //Weight Current Velocity
+                    i = "" + oap.weightCurVel;
+                    LOG.info("weightCurVel  [{}]", oap.weightCurVel);
+                    break;
+            }
+            buf.append(i);
+        } 
+        LOG.info("<========== END CrowdState oapToString ==========>");
+        return buf.toString();
         
     }
+    
 }
