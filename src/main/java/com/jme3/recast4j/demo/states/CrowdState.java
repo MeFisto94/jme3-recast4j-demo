@@ -40,6 +40,7 @@ import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.Button;
 import com.simsilica.lemur.CallMethodAction;
+import com.simsilica.lemur.Command;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.HAlignment;
@@ -92,6 +93,7 @@ public class CrowdState extends BaseAppState {
     private ListBox listActiveCrowds;
     private TextField fieldCrowdName;
     private HashMap<String, NavMeshQuery> mapCrowds;
+    private TextField fieldWeightDesVel;
     
     
     @Override
@@ -106,9 +108,10 @@ public class CrowdState extends BaseAppState {
         //lemur objects.
         ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
         int size = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
+
         if (size > 0) {
-            for (int i = 0; i < size; i++) {
-                Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i);
+            for (int i = size; i > 0 ; i--) {
+                Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i - 1);
                 getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
             }
         }
@@ -190,6 +193,7 @@ public class CrowdState extends BaseAppState {
         
         contActiveCrowds.addChild(new Label("Active Crowds"));
         listActiveCrowds = contActiveCrowds.addChild(new ListBox(), "growx, growy");  
+        listActiveCrowds.addClickCommands(new RefreshCrowdParams());
         //Button to stop the Crowd.
         contActiveCrowds.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top");
         
@@ -210,13 +214,19 @@ public class CrowdState extends BaseAppState {
         contCrowd.addChild(contAvoidance, "growx, growy");
                 
         //Velocity Bias.
-        contAvoidance.addChild(new Label("Velocity Bias"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("velBias"), "split 2, growx"); 
         fieldVelocityBias = contAvoidance.addChild(new TextField("0.4"));
         fieldVelocityBias.setSingleLine(true);
         fieldVelocityBias.setPreferredWidth(50);
         
+        //Weight desired velocity.
+        contAvoidance.addChild(new Label("weightDesVel"), "split 2, growx"); 
+        fieldWeightDesVel = contAvoidance.addChild(new TextField("2.0"));
+        fieldWeightDesVel.setSingleLine(true);
+        fieldWeightDesVel.setPreferredWidth(50);
+        
         //Adaptive Divisions.
-        contAvoidance.addChild(new Label("Adaptive Divisions"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("adaptiveDivs"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
         doc.setText("7");
@@ -225,7 +235,7 @@ public class CrowdState extends BaseAppState {
         fieldAdaptiveDivs.setPreferredWidth(50);
         
         //Adaptive Rings.
-        contAvoidance.addChild(new Label("Adaptive Rings"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("adaptiveRings"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
         doc.setText("2");
@@ -234,13 +244,13 @@ public class CrowdState extends BaseAppState {
         fieldAdaptiveRings.setPreferredWidth(50);
         
         //Adaptive Rings.
-        contAvoidance.addChild(new Label("Adaptive Depth"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("adaptiveDepth"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
         doc.setText("5");
         fieldAdaptiveDepth = contAvoidance.addChild(new TextField(doc));
         fieldAdaptiveDepth.setSingleLine(true);
-        fieldAdaptiveDepth.setPreferredWidth(50);
+        fieldAdaptiveDepth.setPreferredWidth(50);        
         
         
         
@@ -252,15 +262,21 @@ public class CrowdState extends BaseAppState {
         
         //Parameters list.
         listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox(), "growx"); 
-        listBoxAvoidance.setVisibleItems(3);
+        listBoxAvoidance.setVisibleItems(1);
         
         //The ObstacleAvoidanceParams string for the listbox.      
         for (int i = 0; i < 8; i++) {
             String params = "<=====    " + i + "    =====>\n"  
-                + "velBias                = 0.4\n"
-                + "adaptiveDivs       = 7\n"
-                + "adaptiveRings     = 2\n"
-                + "adaptiveDepth    = 5";
+                + "velBias              = n\\a\n"
+                + "weightDesVel  = n\\a\n"
+                + "weightCurVel   = n\\a\n"
+                + "weightSide       = n\\a\n"
+                + "weightToi         = n\\a\n"
+                + "horizTime         = n\\a\n"
+                + "gridSize            = n\\a\n"
+                + "adaptiveDivs    = n\\a\n"               
+                + "adaptiveRings  = n\\a\n"
+                + "adaptiveDepth = n\\a";
             listBoxAvoidance.getModel().add(params);
         }
         listBoxAvoidance.getSelectionModel().setSelection(0);
@@ -286,23 +302,23 @@ public class CrowdState extends BaseAppState {
             @Override
             protected void click( MouseButtonEvent event, Spatial target, Spatial capture ) {                
                 
-                String params = "<=====    " + listBoxAvoidance.getSelectionModel().getSelection() + "    =====>\n"  
-                        + "velBias                = $b\n"
-                        + "adaptiveDivs       = $d\n"
-                        + "adaptiveRings     = $r\n"
-                        + "adaptiveDepth    = $D";
+                String params = 
+                          "<=====    " + listBoxAvoidance.getSelectionModel().getSelection() + "    =====>\n"  
+                        + "velBias              = $b\n"
+                        + "weightDesVel  = 'v'\n"
+                        + "weightCurVel   = n\\a\n"
+                        + "weightSide       = n\\a\n"
+                        + "weightToi         = n\\a\n"
+                        + "horizTime         = n\\a\n"
+                        + "gridSize            = n\\a\n"
+                        + "adaptiveDivs    = $d\n"               
+                        + "adaptiveRings  = $r\n"
+                        + "adaptiveDepth = $D";
                 updateParam(params);
             }
-        }); 
+        });        
         
-//        //Give this its own row so can align the listBoxes.
-//        Container contActiveLabel = new Container(new MigLayout(null));
-//        contActiveLabel.setName("CrowdState contActiveLabel");
-//        contActiveLabel.setAlpha(0, false);
-//        contActiveLabel.addChild(new Label("Active Crowds"));
-//        contCrowd.addChild(contActiveLabel, "wrap");
         
-       
         
         //Holds the Legend and Setup buttons.
         Container contButton = new Container(new MigLayout(null, // Layout Constraints
@@ -364,8 +380,7 @@ public class CrowdState extends BaseAppState {
         
         int width = getApplication().getCamera().getWidth();
         int height = getApplication().getCamera().getHeight();
-        contTabs.setLocalTranslation(
-                new Vector3f((width- contTabs.getPreferredSize().x)/2, height, 0));
+        contTabs.setLocalTranslation(new Vector3f(0, height, 0));
         
         ((SimpleApplication) getApplication()).getGuiNode().attachChild(contTabs);
     }
@@ -430,44 +445,46 @@ public class CrowdState extends BaseAppState {
         "objects in total. All eight slots are filled with the defaults listed below.", 
         " ",
         "[Defaults]",
-        "velBias             = 0.4f \t   weightDesVel   = 2.0f",
-        "weightCurVel  = 0.75f \t weightSide        = 0.75f",
-        "weightToi         = 2.5f \t   horizTime          = 2.5f",
-        "gridSize            = 33 \t     adaptiveDivs     = 7",
-        "adaptiveRings  = 2 \t       adaptiveDepth  = 5",
-        "                                                               ",
+        "velBias             = 0.4f \t    horizTime         = 2.5f",
+        "weightDesVel = 2.0f \t    gridSize             = 33",
+        "weightCurVel  = 0.75f \t adaptiveDivs     = 7",
+        "weightSide      = 0.75f \t adaptiveRings   = 2",
+        "weightToi         = 2.5f \t   adaptiveDepth  = 5",
+        " ",
         "You may not remove any default parameter from the Crowd, however, you can",
         "overwrite them. To change any parameter, first set the parameters you desire in the",
         "Obstacle Avoidance Parameters section, then select any parameter from the list and", 
         "click the [ Update Parameter ] button.",
         " ",
-        "* Velocity Bias - The velocity bias describes how the sampling patterns is offset from", 
-        "the (0,0) based on the desired velocity. This allows to tighten the sampling area and cull", 
-        "a lot of samples. [Limit: 0-1]",
+        "* velBias - The velocity bias describes how the sampling patterns is offset from the (0,0)", 
+        "based on the desired velocity. This allows to tighten the sampling area and cull a lot of", 
+        "samples. [Limit: 0-1]",
         " ",
-        "* Weight Desired Velocity - How much deviation from desired velocity is penalized, the", 
-        "more penalty applied to this, the more \"goal oriented\" the avoidance is, at the cost of", 
-        "getting more easily stuck at local minima.",
+        "* weightDesVel - How much deviation from desired velocity is penalized, the more", 
+        "penalty applied to this, the more \"goal oriented\" the avoidance is, at the cost of getting", 
+        "more easily stuck at local minima. [Limit: >= 0]",
         " ",
-        "* Weight Current Velocity - How much deviation from current velocity is penalized, the", 
-        "more penalty applied to this, the more stubborn the agent is. This basically is a low pass", 
-        "filter, and very important part of making things work.",
+        "* weightCurVel - How much deviation from current velocity is penalized, the more", 
+        "penalty applied to this, the more stubborn the agent is. This basically is a low pass filter,", 
+        "and very important part of making things work.",
         " ",
-        "* Weight Side - In order to avoid reciprocal dance, the agents prefer to pass from right,", 
+        "* weightSide - In order to avoid reciprocal dance, the agents prefer to pass from right,", 
         "this weight applies penalty to velocities which try to take over from the wrong side.",
         " ",
-        "* Weight To Impact - How much penalty is added based on time to impact. Too much", 
-        "penalty and the agents are shy, too little and they avoid too late.",
+        "* weightToi - How much penalty is added based on time to impact. Too much penalty", 
+        "and the agents are shy, too little and they avoid too late.",
         " ",
-        "* Horrizon Time - Time horizon, this affects how early the agents start to avoid each", 
-        "other. Too long horizon and the agents are scared of going through tight spots, and too", 
-        "small, and they avoid too late (closely related to weightToi).",
+        "* horizTime - Time horizon, this affects how early the agents start to avoid each other.", 
+        "Too long horizon and the agents are scared of going through tight spots, and too small,", 
+        "and they avoid too late (closely related to weightToi).",
         " ",
-        "* Adaptive Divisions - Number of divisions per ring. [Limit: 1-32]",
+        "gridSize - ???",
         " ",
-        "* Adaptive Rings - Number of rings. [Limit: 1-4]",
+        "* adaptiveDivs - Number of divisions per ring. [Limit: 1-32]",
         " ",
-        "* Adaptive Depth - Number of iterations at best velocity." 
+        "* adaptiveRings - Number of rings. [Limit: 1-4]",
+        " ",
+        "* adaptiveDepth - Number of iterations at best velocity." 
         };
         
         Container window = new Container(new MigLayout("wrap"));
@@ -477,7 +494,6 @@ public class CrowdState extends BaseAppState {
         listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
         getState(GuiUtilState.class).centerComp(window);
-//        window.setLocalTranslation(new Vector3f(0, getApplication().getCamera().getHeight(), 0));
         //This assures clicking outside of the message should close the window 
         //but not activate underlying UI components.
         GuiGlobals.getInstance().getPopupState().showPopup(window, PopupState.ClickMode.ConsumeAndClose, null, null);
@@ -649,6 +665,7 @@ public class CrowdState extends BaseAppState {
      */
     private void updateParam(String format) {
         float velBias;
+        float weightDesVel;
         int adaptiveDivs;
         int adaptiveDepth;
         int adaptiveRings;
@@ -660,7 +677,7 @@ public class CrowdState extends BaseAppState {
         ||  fieldVelocityBias.getText().isEmpty()) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Velocity Bias ] requires a valid float value.", 0));
+                            .buildPopup("[ velocityBias ] requires a valid float value.", 0));
             return;
         } else {
             velBias = new Float(fieldVelocityBias.getText());
@@ -668,7 +685,25 @@ public class CrowdState extends BaseAppState {
             if (velBias < 0.0f || velBias > 1) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Velocity Bias ] requires a float value between 0 and 1 inclusive.", 0));
+                                .buildPopup("[ fieldVelocityBias ] requires a float value between 0 and 1 inclusive.", 0));
+                return;
+            }
+        }
+        
+        //The weighted desired velocity settings.
+        if (!getState(GuiUtilState.class).isNumeric(fieldWeightDesVel.getText()) 
+        ||  fieldWeightDesVel.getText().isEmpty()) {
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("[ weightDesVel ] requires a valid float value.", 0));
+            return;
+        } else {
+            weightDesVel = new Float(fieldWeightDesVel.getText());
+            //Stop negative input.
+            if (weightDesVel < 0.0f) {
+                GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("[ weightDesVel ] requires a float value >= 0.", 0));
                 return;
             }
         }
@@ -798,7 +833,9 @@ public class CrowdState extends BaseAppState {
                     LOG.info("weightSide [{}]");
                     break;
                 case 'v': //sets the Weight Desired Velocity
-                    LOG.info("weightDesVel [{}]");
+                    i = fieldWeightDesVel.getText();
+                    params.weightDesVel = weightDesVel;
+                    LOG.info("weightDesVel [{}]", params.weightDesVel);
                     break;
                 case 'V': //sets the Weight Current Velocity
                     LOG.info("weightCurVel [{}]");
@@ -806,14 +843,14 @@ public class CrowdState extends BaseAppState {
             }
             buf.append(i);
         }        
-        
+        //Inject the new parameter into the crowd.
+        getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd)
+                .setObstacleAvoidanceParams(selectedParam, params);
         //Remove selected parameter.
         remove(listBoxAvoidance, selectedParam);
         //Insert the new parameters into the list.
         insert(listBoxAvoidance, selectedParam, buf.toString());
-        //Inject the new parameter into the crowd.
-        getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd)
-                .setObstacleAvoidanceParams(selectedParam, params);
+        
         
         //Check the data, remove when ready.
         ObstacleAvoidanceParams oap = getState(CrowdManagerAppstate.class)
@@ -827,6 +864,7 @@ public class CrowdState extends BaseAppState {
         LOG.info("CrowdState Crowd#             [{}]", selectedCrowd);
         LOG.info("CrowdManager agentCount       [{}]", agentCount);
         LOG.info("CrowdManager velBias          [{}]", oap.velBias);
+        LOG.info("CrowdManager weightDesVel     [{}]", oap.weightDesVel);
         LOG.info("CrowdManager adaptiveDivs     [{}]", oap.adaptiveDivs);
         LOG.info("CrowdManager adaptiveDepth    [{}]", oap.adaptiveDepth);
         LOG.info("CrowdManager adaptiveRings    [{}]", oap.adaptiveRings);
@@ -896,4 +934,13 @@ public class CrowdState extends BaseAppState {
         }
     }
     
+    
+    private class RefreshCrowdParams implements Command {
+
+        @Override
+        public void execute(Object source) {
+            System.out.println(source);
+        }
+        
+    }
 }
