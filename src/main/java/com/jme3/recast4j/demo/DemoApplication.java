@@ -30,7 +30,9 @@ import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
-import com.jme3.recast4j.demo.states.*;
+import com.jme3.recast4j.demo.states.AgentGridState;
+import com.jme3.recast4j.demo.states.AgentParamState;
+import com.jme3.recast4j.demo.states.CrowdState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -52,7 +54,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DemoApplication extends SimpleApplication {
-
     Crowd crowd;
     Spatial worldMap;
     NavMesh navMesh;
@@ -148,9 +149,8 @@ public class DemoApplication extends SimpleApplication {
             ex.printStackTrace();
         }
 
-        //Show wireframe. Helps with parm tweaks.
+        //Show wireframe. Helps with param tweaks.
         showDebugMeshes(meshData, true);
-        
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
 
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
@@ -174,9 +174,12 @@ public class DemoApplication extends SimpleApplication {
                         LOG.info("Neither Start or End reference can be 0. startPoly [{}] endPoly [{}]", startPoly, endPoly);
                         pathGeometries.forEach(Geometry::removeFromParent);
                     } else {
-                        findPathImmediately(characters.get(0), filter, startPoly, endPoly);
+                        if (event.getButtonIndex() == MouseInput.BUTTON_LEFT) {
+                            findPathImmediately(characters.get(0), filter, startPoly, endPoly);
+                        } else if (event.getButtonIndex() == MouseInput.BUTTON_RIGHT) {
+                            findPathSlicedPartial(characters.get(0), filter, startPoly, endPoly);
+                        }
                     }
-                }
 //                else {
 //                    if (crowd == null) {
 //                        crowd = new Crowd(MovementApplicationType.BETTER_CHARACTER_CONTROL, 5, 0.4f, navMesh);
@@ -282,25 +285,68 @@ public class DemoApplication extends SimpleApplication {
         }
     }
 
+    // Partial means canceling before being finished
+    private void findPathSlicedPartial(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+        query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(),
+                endPoly.getNearestPos(), filter, 0);
+        Result<Integer> res;
+        res = query.updateSlicedFindPath(1);
+        Result<List<Long>> fpr = query.finalizeSlicedFindPath();
+
+        query.initSlicedFindPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(),
+                endPoly.getNearestPos(), filter, 0);
+        Result<List<Long>> fpr2 = query.finalizeSlicedFindPathPartial(fpr.result);
+
+        // @TODO: Use NavMeshSliceControl (but then how to do the Debug Graphics?)
+        // @TODO: Try Partial. How would one make this logic with controls etc so it's easy?
+        //query.finalizeSlicedFindPathPartial();
+
+        if (fpr2.succeeded()) {
+            // Get the proper path from the rough polygon listing
+            Result<List<StraightPathItem>> list = query.findStraightPath(startPoly.getNearestPos(), endPoly.getNearestPos(), fpr2.result, Integer.MAX_VALUE, 0);
+            Vector3f oldPos = character.getWorldTranslation();
+            List<Vector3f> vector3fList = new ArrayList<>(list.result.size());
+
+            if (!list.result.isEmpty()) {
+                for (StraightPathItem p: list.result) {
+                    Vector3f nu = DetourUtils.createVector3f(p.getPos());
+                    rootNode.attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
+                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                        rootNode.attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
+                    }
+                    vector3fList.add(nu);
+                    oldPos = nu;
+                }
+
+                character.getControl(PhysicsAgentControl.class).stopFollowing();
+                character.getControl(PhysicsAgentControl.class).followPath(vector3fList);
+            } else {
+                System.err.println("Unable to find straight paths");
+            }
+        } else {
+            System.err.println("I'm sorry, unable to find a path.....");
+        }
+    }
+
     private void setupWorld() {
         BulletAppState bullet = new BulletAppState();
         // Performance is better when threading in parallel
         bullet.setThreadingType(BulletAppState.ThreadingType.PARALLEL);
         stateManager.attach(bullet);
         
-        /** A white, directional light source */ 
+        /* A white, directional light source */
         DirectionalLight sun = new DirectionalLight();
         sun.setDirection((new Vector3f(0.5f, -0.5f, -0.5f)).normalizeLocal());
         sun.setColor(ColorRGBA.White);
         rootNode.addLight(sun); 
         
-        /** A white, directional light source */ 
+        /* A white, directional light source */
         DirectionalLight sun2 = new DirectionalLight();
         sun2.setDirection((new Vector3f(-0.5f, -0.5f, 0.5f)).normalizeLocal());
         sun2.setColor(ColorRGBA.White);
         rootNode.addLight(sun2); 
         
-        /** A white ambient light source. */ 
+        /* A white ambient light source. */
         AmbientLight ambient = new AmbientLight();
         ambient.setColor(ColorRGBA.White.mult(.8f));
         rootNode.addLight(ambient); 
@@ -406,11 +452,11 @@ public class DemoApplication extends SimpleApplication {
 
     private void addAJaime(int idx) {
         Node tmp = (Node)assetManager.loadModel("Models/Jaime/Jaime.j3o");
-        tmp.setLocalTranslation(idx * 0.5f, 5f, (idx % 2 != 0 ? 1f : 0f));
-        tmp.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
+        tmp.setLocalTranslation(idx * 0.5f, 5f * 0f, (idx % 2 != 0 ? 1f : 0f));
+        //tmp.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
 
-        tmp.addControl(new PhysicsAgentControl());
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(tmp);
+        //tmp.addControl(new PhysicsAgentControl());
+        //getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(tmp);
         rootNode.attachChild(tmp);
         characters.add(tmp);
     }

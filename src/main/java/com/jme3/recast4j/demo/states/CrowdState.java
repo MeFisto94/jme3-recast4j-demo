@@ -655,7 +655,7 @@ public class CrowdState extends BaseAppState {
                         .log(Level.SEVERE, null, ex);
             }
             
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             LOG.info("{} {}", CrowdState.class.getName(), ex);
         }
 
