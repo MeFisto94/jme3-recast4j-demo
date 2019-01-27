@@ -40,7 +40,6 @@ import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.Button;
 import com.simsilica.lemur.CallMethodAction;
-import com.simsilica.lemur.Command;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.HAlignment;
@@ -55,11 +54,9 @@ import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.DragHandler;
 import com.simsilica.lemur.event.MouseEventControl;
 import com.simsilica.lemur.event.PopupState;
-import com.simsilica.lemur.list.DefaultCellRenderer;
 import com.simsilica.lemur.text.DocumentModelFilter;
 import com.simsilica.lemur.text.TextFilters;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -99,11 +96,22 @@ public class CrowdState extends BaseAppState {
     private TextField fieldWeightDesVel;
     // Keep tracking of which part is selected
     private VersionedReference<Set<Integer>> selectionRef; 
-    
+    private String defaultOAP;
     
     @Override
     protected void initialize(Application app) {
         mapCrowds = new HashMap();
+        defaultOAP =                
+                  "velBias              = n\\a\n"
+                + "weightDesVel  = n\\a\n"
+                + "weightCurVel   = n\\a\n"
+                + "weightSide       = n\\a\n"
+                + "weightToi         = n\\a\n"
+                + "horizTime         = n\\a\n"
+                + "gridSize            = n\\a\n"
+                + "adaptiveDivs    = n\\a\n"               
+                + "adaptiveRings  = n\\a\n"
+                + "adaptiveDepth = n\\a";
     }
 
     @Override
@@ -270,17 +278,9 @@ public class CrowdState extends BaseAppState {
         
         //The ObstacleAvoidanceParams string for the listbox.      
         for (int i = 0; i < 8; i++) {
-            String params = "<=====    " + i + "    =====>\n"  
-                + "velBias              = n\\a\n"
-                + "weightDesVel  = n\\a\n"
-                + "weightCurVel   = n\\a\n"
-                + "weightSide       = n\\a\n"
-                + "weightToi         = n\\a\n"
-                + "horizTime         = n\\a\n"
-                + "gridSize            = n\\a\n"
-                + "adaptiveDivs    = n\\a\n"               
-                + "adaptiveRings  = n\\a\n"
-                + "adaptiveDepth = n\\a";
+            String params = "<=====    " + i + "    =====>\n"
+                    + defaultOAP; 
+                
             listBoxAvoidance.getModel().add(params);
         }
         listBoxAvoidance.getSelectionModel().setSelection(0);
@@ -388,10 +388,20 @@ public class CrowdState extends BaseAppState {
             // Selection has changed
             if (selectionRef.get().isEmpty()) {
                 //Load defaults here.
-                LOG.info("Selection ref is NULL, loading defaults.");
+                LOG.info("Crowd selection ref is NULL, loading defaults.");
+                        //The ObstacleAvoidanceParams string for the listbox.      
+                for (int i = 0; i < 8; i++) {
+                    String params = "<=====    " + i + "    =====>\n"
+                            + defaultOAP; 
+                    //Remove selected parameter from listBoxAvoidance.
+                    remove(listBoxAvoidance, i);
+                    //Insert the new parameters into listBoxAvoidance.
+                    insert(listBoxAvoidance, i, params);
+                }
+                listBoxAvoidance.getSelectionModel().setSelection(0);
             } else {
                 int selectedIndex = listActiveCrowds.getSelectionModel().getSelection();
-                LOG.info("Crowd         [{}]", selectedIndex);
+                LOG.info("Update Loop - Crowd         [{}]", selectedIndex);
                 Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedIndex);
                 for (int i = 0; i < 8; i++) {
                     ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
@@ -401,7 +411,6 @@ public class CrowdState extends BaseAppState {
                     insert(listBoxAvoidance, i, oapToString(oap, i));
                 }
                 listBoxAvoidance.getSelectionModel().setSelection(0);
-                System.out.println("Update Loop-Visually Selected = " + listActiveCrowds.getSelectionModel().getSelection());
             }
         }
 
@@ -487,7 +496,7 @@ public class CrowdState extends BaseAppState {
         };
         
         Container window = new Container(new MigLayout("wrap"));
-        ListBox listScroll = window.addChild(new ListBox());
+        ListBox<String> listScroll = window.addChild(new ListBox<>());
         listScroll.getModel().addAll(Arrays.asList(msg));
         listScroll.setPreferredSize(new Vector3f(500, 400, 0));
         listScroll.setVisibleItems(20);
@@ -513,7 +522,7 @@ public class CrowdState extends BaseAppState {
         }
         
         //Get the crowds name from the listActiveCrowds selectedParam.
-        String crowdName = listActiveCrowds.getModel().get(selectedCrowd).toString();
+        String crowdName = listActiveCrowds.getModel().get(selectedCrowd);
 
         //We check mapCrowds to see if the key exists. If not, go no further.
         if (!mapCrowds.containsKey(crowdName)) {
@@ -839,7 +848,7 @@ public class CrowdState extends BaseAppState {
             return null;
         } 
         
-        String crowd = listActiveCrowds.getModel().get(selectedCrowd).toString();
+        String crowd = listActiveCrowds.getModel().get(selectedCrowd);
         
         //Make sure the crowd selected exits in the map.
         if (!mapCrowds.containsKey(crowd)) { 

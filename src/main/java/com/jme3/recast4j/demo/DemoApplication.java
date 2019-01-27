@@ -10,6 +10,7 @@ import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
 import com.jme3.collision.CollisionResults;
 import com.jme3.input.KeyInput;
+import com.jme3.input.MouseInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
 import com.jme3.input.event.MouseButtonEvent;
@@ -33,6 +34,9 @@ import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.states.AgentGridState;
 import com.jme3.recast4j.demo.states.AgentParamState;
 import com.jme3.recast4j.demo.states.CrowdState;
+import com.jme3.recast4j.demo.states.GuiUtilState;
+import com.jme3.recast4j.demo.states.LemurConfigState;
+import com.jme3.recast4j.demo.states.ThirdPersonCamState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -205,7 +209,7 @@ public class DemoApplication extends SimpleApplication {
 //                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{0.5f, 0.5f, 0.5f}, new BetterDefaultQueryFilter());
 //                    // @TODO: RequestMoveToTarget shall automatically query the nearest polygon or accept a FindNearestPolyResult
 //                    System.out.println(crowd.requestMoveToTarget(locOnMap, endPoly.getNearestRef()));
-//                }
+                }
             }
         });
     }

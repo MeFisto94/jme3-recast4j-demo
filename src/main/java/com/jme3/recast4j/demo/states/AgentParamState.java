@@ -312,7 +312,7 @@ public class AgentParamState extends BaseAppState {
         };
                 
         Container window = new Container(new MigLayout("wrap"));
-        ListBox listScroll = window.addChild(new ListBox());
+        ListBox<String> listScroll = window.addChild(new ListBox<>());
         listScroll.getModel().addAll(Arrays.asList(msg));
         listScroll.setPreferredSize(new Vector3f(500, 400, 0));
         listScroll.setVisibleItems(20);
@@ -579,7 +579,7 @@ public class AgentParamState extends BaseAppState {
         ap.obstacleAvoidanceType    = obstacleAvoidanceType;
         
         //Temp fix for crowd clearing.
-        resetCrowd(selectedCrowd);
+//        resetCrowd(selectedCrowd);
         
         for (Node agent: listAgents) {
             

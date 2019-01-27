@@ -398,7 +398,7 @@ public class AgentGridState extends BaseAppState {
         };
         
         Container window = new Container(new MigLayout("wrap"));
-        ListBox listScroll = window.addChild(new ListBox());
+        ListBox<String> listScroll = window.addChild(new ListBox<>());
         listScroll.getModel().addAll(Arrays.asList(msg));
         listScroll.setPreferredSize(new Vector3f(500, 400, 0));
         listScroll.setVisibleItems(20);
@@ -652,9 +652,7 @@ public class AgentGridState extends BaseAppState {
                     agent.addControl(new PhysicsAgentControl());
 
                     LOG.info("weight            [{}]", weight);
-                } else {
-                    //Give the agent Crowd controls.
-                }
+                } 
                 LOG.info("radius            [{}]", radius);
                 LOG.info("height            [{}]", height);
                 LOG.info("Position World    [{}]", agent.getWorldTranslation());
@@ -707,7 +705,7 @@ public class AgentGridState extends BaseAppState {
         }
         
         //Get the grids name from the listBoxGrid selectedGrid.
-        String gridName = listBoxGrid.getModel().get(selectedGrid).toString();
+        String gridName = listBoxGrid.getModel().get(selectedGrid);
         
         //We check mapGrids to see if the key exists. If not, go no further.
         if (!mapGrids.containsKey(gridName)) {
