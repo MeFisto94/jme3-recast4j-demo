@@ -61,6 +61,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.logging.Level;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
 import org.recast4j.detour.crowd.CrowdAgent;
@@ -642,12 +643,17 @@ public class CrowdState extends BaseAppState {
             //referenced.  
             NavMeshQuery query = new NavMeshQuery(navMesh);
             
-            Crowd crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
-   
-            //Add to CrowdManager, mapCrowds, and listActiveCrowds.
-            getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);      
-            mapCrowds.put(crowdName, query);
-            listActiveCrowds.getModel().add(crowdName);  
+            Crowd crowd;
+            try {
+                crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
+                //Add to CrowdManager, mapCrowds, and listActiveCrowds.
+                getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);      
+                mapCrowds.put(crowdName, query);
+                listActiveCrowds.getModel().add(crowdName);  
+            } catch (NoSuchFieldException | IllegalAccessException ex) {
+                java.util.logging.Logger.getLogger(CrowdState.class.getName())
+                        .log(Level.SEVERE, null, ex);
+            }
             
         } catch (IOException ex) {
             LOG.info("{} {}", CrowdState.class.getName(), ex);
