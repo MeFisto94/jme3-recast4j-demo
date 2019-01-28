@@ -57,11 +57,11 @@ import com.simsilica.lemur.event.PopupState;
 import com.simsilica.lemur.text.DocumentModelFilter;
 import com.simsilica.lemur.text.TextFilters;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.logging.Level;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
 import org.recast4j.detour.crowd.CrowdAgent;
@@ -82,21 +82,27 @@ public class CrowdState extends BaseAppState {
     private Container contTabs;
     private DocumentModelFilter doc;
     private TextField fieldNavMesh;
-    private ListBox<String> listBoxAvoidance;
-    private TextField fieldVelocityBias;
-    private TextField fieldAdaptiveRings;
-    private TextField fieldAdaptiveDivs;
-    private TextField fieldAdaptiveDepth;
-    private ListBox<String> listMoveType;
     private TextField fieldMaxAgents;
     private TextField fieldMaxAgentRadius;
-    private ListBox<String> listActiveCrowds;
     private TextField fieldCrowdName;
-    private HashMap<String, NavMeshQuery> mapCrowds;
+    private TextField fieldVelocityBias;
     private TextField fieldWeightDesVel;
-    // Keep tracking of which part is selected
+    private TextField fieldWeightCurVel;
+    private TextField fieldWeightSide;
+    private TextField fieldWeightToi;
+    private TextField fieldHorizTime;
+    private TextField fieldGridSize;
+    private TextField fieldAdaptiveRings;
+    private TextField fieldAdaptiveDivs;
+    private TextField fieldAdaptiveDepth;    
+    private ListBox<String> listBoxAvoidance;    
+    private ListBox<String> listMoveType;
+    private ListBox<String> listActiveCrowds;
+    private HashMap<String, NavMeshQuery> mapCrowds;
+    // Keep tracking crowd selected
     private VersionedReference<Set<Integer>> selectionRef; 
     private String defaultOAP;
+
     
     @Override
     protected void initialize(Application app) {
@@ -237,6 +243,39 @@ public class CrowdState extends BaseAppState {
         fieldWeightDesVel.setSingleLine(true);
         fieldWeightDesVel.setPreferredWidth(50);
         
+        //Weight current velocity.
+        contAvoidance.addChild(new Label("weightCurVel"), "split 2, growx"); 
+        fieldWeightCurVel = contAvoidance.addChild(new TextField(".75"));
+        fieldWeightCurVel.setSingleLine(true);
+        fieldWeightCurVel.setPreferredWidth(50);
+        
+        //Weight side.
+        contAvoidance.addChild(new Label("fieldWeightSide"), "split 2, growx"); 
+        fieldWeightSide = contAvoidance.addChild(new TextField(".75"));
+        fieldWeightSide.setSingleLine(true);
+        fieldWeightSide.setPreferredWidth(50);        
+        
+        //Weight to impact.
+        contAvoidance.addChild(new Label("fieldWeightToi"), "split 2, growx"); 
+        fieldWeightToi = contAvoidance.addChild(new TextField("2.5"));
+        fieldWeightToi.setSingleLine(true);
+        fieldWeightToi.setPreferredWidth(50);  
+        
+        //Horrizon time.
+        contAvoidance.addChild(new Label("fieldHorizTime"), "split 2, growx"); 
+        fieldHorizTime = contAvoidance.addChild(new TextField("2.5"));
+        fieldHorizTime.setSingleLine(true);
+        fieldHorizTime.setPreferredWidth(50);                
+                
+        //Grid Size.
+        contAvoidance.addChild(new Label("fieldGridSize"), "split 2, growx"); 
+        doc = new DocumentModelFilter();
+        doc.setInputTransform(TextFilters.numeric());
+        doc.setText("33");
+        fieldGridSize = contAvoidance.addChild(new TextField(doc));
+        fieldGridSize.setSingleLine(true);
+        fieldGridSize.setPreferredWidth(50);
+        
         //Adaptive Divisions.
         contAvoidance.addChild(new Label("adaptiveDivs"), "split 2, growx"); 
         doc = new DocumentModelFilter();
@@ -255,7 +294,7 @@ public class CrowdState extends BaseAppState {
         fieldAdaptiveRings.setSingleLine(true);
         fieldAdaptiveRings.setPreferredWidth(50);
         
-        //Adaptive Rings.
+        //Adaptive Depth.
         contAvoidance.addChild(new Label("adaptiveDepth"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
@@ -270,7 +309,7 @@ public class CrowdState extends BaseAppState {
         Container contListBoxAvoidance = new Container(new MigLayout("wrap", "[grow]"));
         contListBoxAvoidance.setName("CrowdState contListBoxAvoidance");
         contListBoxAvoidance.setAlpha(0, false);
-        contCrowd.addChild(contListBoxAvoidance, "wrap, growx");
+        contCrowd.addChild(contListBoxAvoidance, "wrap, growx, top");
         
         //Parameters list.
         listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx"); 
@@ -355,7 +394,6 @@ public class CrowdState extends BaseAppState {
         rollAgentParam.setOpen(false);
         tabPanel.addTab("Agent Parameters", rollAgentParam);
         
-        int width = getApplication().getCamera().getWidth();
         int height = getApplication().getCamera().getHeight();
         contTabs.setLocalTranslation(new Vector3f(0, height, 0));
         
@@ -389,7 +427,7 @@ public class CrowdState extends BaseAppState {
             if (selectionRef.get().isEmpty()) {
                 //Load defaults here.
                 LOG.info("Crowd selection ref is NULL, loading defaults.");
-                        //The ObstacleAvoidanceParams string for the listbox.      
+                //The ObstacleAvoidanceParams string for the listbox.      
                 for (int i = 0; i < 8; i++) {
                     String params = "<=====    " + i + "    =====>\n"
                             + defaultOAP; 
@@ -541,7 +579,6 @@ public class CrowdState extends BaseAppState {
                 //To fully remove the crowd we have to remove it from the 
                 //CrowdManager, mapCrowds (removes the query object also), and 
                 //the listActiveCrowds.
-                System.out.println("removing selection = " + listActiveCrowds.getSelectionModel().getSelection());
                 Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
                 getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
                 remove(listActiveCrowds, selectedCrowd);
@@ -651,19 +688,12 @@ public class CrowdState extends BaseAppState {
             //referenced.  
             NavMeshQuery query = new NavMeshQuery(navMesh);
             
-            Crowd crowd;
-            try {
-                crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
-                //Add to CrowdManager, mapCrowds, and listActiveCrowds.
-                getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
-                mapCrowds.put(crowdName, query);
-                listActiveCrowds.getModel().add(crowdName);  
-            } catch (NoSuchFieldException | IllegalAccessException ex) {
-                java.util.logging.Logger.getLogger(CrowdState.class.getName())
-                        .log(Level.SEVERE, null, ex);
-            }
-            
-        } catch (Exception ex) {
+            Crowd crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
+            //Add to CrowdManager, mapCrowds, and listActiveCrowds.
+            getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
+            mapCrowds.put(crowdName, query);
+            listActiveCrowds.getModel().add(crowdName);   
+        } catch (IOException | NoSuchFieldException | IllegalAccessException ex) {
             LOG.info("{} {}", CrowdState.class.getName(), ex);
         }
 
@@ -680,6 +710,11 @@ public class CrowdState extends BaseAppState {
     private void updateParam() {
         float velBias;
         float weightDesVel;
+        float weightCurVel;
+        float weightSide;
+        float weightToi;
+        float horizTime;
+        int gridSize;
         int adaptiveDivs;
         int adaptiveDepth;
         int adaptiveRings;
@@ -721,13 +756,102 @@ public class CrowdState extends BaseAppState {
                 return;
             }
         }
+
+        //The weighted current velocity settings.
+        if (!getState(GuiUtilState.class).isNumeric(fieldWeightCurVel.getText()) 
+        ||  fieldWeightCurVel.getText().isEmpty()) {
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("[ fieldWeightCurVel ] requires a valid float value.", 0));
+            return;
+        } else {
+            weightCurVel = new Float(fieldWeightCurVel.getText());
+            //Stop negative input.
+            if (weightCurVel < 0.0f) {
+                GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("[ fieldWeightCurVel ] requires a float value >= 0.", 0));
+                return;
+            }
+        }
+        
+        //The weighted side settings.
+        if (!getState(GuiUtilState.class).isNumeric(fieldWeightSide.getText()) 
+        ||  fieldWeightSide.getText().isEmpty()) {
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("[ fieldWeightSide ] requires a valid float value.", 0));
+            return;
+        } else {
+            weightSide = new Float(fieldWeightSide.getText());
+            //Stop negative input.
+            if (weightSide < 0.0f) {
+                GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("[ fieldWeightSide ] requires a float value >= 0.", 0));
+                return;
+            }
+        }
+        
+        //The weight to impact settings.
+        if (!getState(GuiUtilState.class).isNumeric(fieldWeightToi.getText()) 
+        ||  fieldWeightToi.getText().isEmpty()) {
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("[ fieldWeightToi ] requires a valid float value.", 0));
+            return;
+        } else {
+            weightToi = new Float(fieldWeightToi.getText());
+            //Stop negative input.
+            if (weightToi < 0.0f) {
+                GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("[ fieldWeightToi ] requires a float value >= 0.", 0));
+                return;
+            }
+        }        
+                
+        //The horizon settings.
+        if (!getState(GuiUtilState.class).isNumeric(fieldHorizTime.getText()) 
+        ||  fieldHorizTime.getText().isEmpty()) {
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("[ fieldHorizTime ] requires a valid float value.", 0));
+            return;
+        } else {
+            horizTime = new Float(fieldHorizTime.getText());
+            //Stop negative input.
+            if (weightToi < 0.0f) {
+                GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("[ fieldHorizTime ] requires a float value >= 0.", 0));
+                return;
+            }
+        }       
+        
+        //The grid size settings. Uses numeric doc filter to prevent bad data.
+        if (fieldGridSize.getText().isEmpty()) {
+            GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup("[ fieldGridSize ] requires a valid int value.", 0));
+            return;
+        } else {
+            gridSize = new Integer(fieldGridSize.getText());
+            //Stop useless input.
+            if (gridSize < 1) {
+                GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("[ fieldGridSize ] requires a int value > 1.", 0));
+                return;
+            }
+        }
         
         //The adaptive divisions settings. Uses numeric doc filter to prevent
         //bad data.
         if (fieldAdaptiveDivs.getText().isEmpty()) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Adaptive Divisions ] requires a valid int value.", 0));
+                            .buildPopup("[ adaptiveDivs ] requires a valid int value.", 0));
             return;
         } else {
             adaptiveDivs = new Integer(fieldAdaptiveDivs.getText());
@@ -735,7 +859,7 @@ public class CrowdState extends BaseAppState {
             if (adaptiveDivs < 1 || adaptiveDivs > 32) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Adaptive Divisions ] requires a int value between 1 and 32 inclusive.", 0));
+                                .buildPopup("[ adaptiveDivs ] requires a int value between 1 and 32 inclusive.", 0));
                 return;
             }
         }
@@ -744,7 +868,7 @@ public class CrowdState extends BaseAppState {
         if (fieldAdaptiveDepth.getText().isEmpty()) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Adaptive Divisions ] requires a valid int value.", 0));
+                            .buildPopup("[ adaptiveDepth ] requires a valid int value.", 0));
             return;
         } else {
             adaptiveDepth = new Integer(fieldAdaptiveDepth.getText());
@@ -752,7 +876,7 @@ public class CrowdState extends BaseAppState {
             if (adaptiveDepth < 1 ) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Adaptive Depth ] requires a int value >= 1.", 0));
+                                .buildPopup("[ adaptiveDepth ] requires a int value >= 1.", 0));
                 return;
             }
         }
@@ -761,7 +885,7 @@ public class CrowdState extends BaseAppState {
         if (fieldAdaptiveRings.getText().isEmpty()) {
             GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Adaptive Rings ] requires a valid int value.", 0));
+                            .buildPopup("[ adaptiveRings ] requires a valid int value.", 0));
             return;
         } else {
             adaptiveRings = new Integer(fieldAdaptiveRings.getText());
@@ -769,7 +893,7 @@ public class CrowdState extends BaseAppState {
             if (adaptiveRings < 1 || adaptiveRings > 4) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Adaptive Rings ] requires a int value between 1 and 4 inclusive.", 0));
+                                .buildPopup("[ adaptiveRings ] requires a int value between 1 and 4 inclusive.", 0));
                 return;
             }
         }
@@ -800,6 +924,11 @@ public class CrowdState extends BaseAppState {
         ObstacleAvoidanceParams params  = new ObstacleAvoidanceParams();
         params.velBias          = velBias;
         params.weightDesVel     = weightDesVel;
+        params.weightCurVel     = weightCurVel;
+        params.weightSide       = weightSide;
+        params.weightToi        = weightToi;
+        params.horizTime        = horizTime;
+        params.gridSize         = gridSize;
         params.adaptiveDivs     = adaptiveDivs;
         params.adaptiveDepth    = adaptiveDepth;
         params.adaptiveRings    = adaptiveRings;
@@ -863,9 +992,11 @@ public class CrowdState extends BaseAppState {
         
         for (CrowdAgent ag : crowd.getActiveAgents()) {
             if (ag.isActive()) {
-                LOG.info("Crowd [{}] Active Agents [{}]", i, crowd.getActiveAgents().size());
-                LOG.info("State [{}]", ag.state);
-                LOG.info("Pos [{},{},{}]",ag.npos[0], ag.npos[1], ag.npos[2]);
+                LOG.info("Crowd         [{}] Active Agents [{}]", i, crowd.getActiveAgents().size());
+                LOG.info("State         [{}]", ag.state);
+                LOG.info("Pos           [{},{},{}]",ag.npos[0], ag.npos[1], ag.npos[2]);
+                LOG.info("Target Pos    [{},{},{}]",ag.targetPos[0], ag.targetPos[1], ag.targetPos[2]);
+                LOG.info("Target Ref    [{}]",ag.targetRef);
             }
         }
     }

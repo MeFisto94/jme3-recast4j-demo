@@ -71,6 +71,9 @@ public class AgentParamState extends BaseAppState {
     private TextField fieldPathOptimizeRange;
     private TextField fieldRadius;
     private TextField fieldSeparationWeight;
+    private TextField fieldTargetX;
+    private TextField fieldTargetY;
+    private TextField fieldTargetZ;
     private ListBox<Integer> listBoxAvoidance;
     private Checkbox checkAvoid;
     private Checkbox checkSep;
@@ -79,9 +82,7 @@ public class AgentParamState extends BaseAppState {
     private Checkbox checkVis;
     private Checkbox checkRadius;
     private Checkbox checkHeight;
-    private TextField fieldTargetX;
-    private TextField fieldTargetY;
-    private TextField fieldTargetZ;
+
     
     @SuppressWarnings("unchecked")
     @Override
@@ -528,6 +529,18 @@ public class AgentParamState extends BaseAppState {
         //Everything checks out so far so grab the selected list of agents for 
         //the grid.
         List<Node> listAgents = getState(AgentGridState.class).getAgentList(gridName);
+        Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
+        
+        if (listAgents.size() > crowd.getAgentCount()) {
+            GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("Agent grid size of [" 
+                                        + listAgents.size() 
+                                        +  "] excedes the crowd size ["
+                                        + "]."
+                                        + crowd.getAgentCount(), 0));
+                return;
+        }
                 
         //If checked, we use the fieldRadius for the radius.
         if (checkRadius.isChecked()) {
@@ -584,16 +597,13 @@ public class AgentParamState extends BaseAppState {
         for (Node agent: listAgents) {
             
             //Add agents to the crowd.
-            CrowdAgent createAgent = getState(CrowdManagerAppstate.class)
-                    .getCrowdManager().getCrowd(selectedCrowd).createAgent(agent.getWorldTranslation(), ap);
-            //Is physics agent? set spatial.
-            getState(CrowdManagerAppstate.class).getCrowdManager()
-                    .getCrowd(selectedCrowd).setSpatialForAgent(createAgent, agent);
+            CrowdAgent createAgent = crowd.createAgent(agent.getWorldTranslation(), ap);
+            crowd.setSpatialForAgent(createAgent, agent);
             
             //anything over 2 arguments creates a new object so split this up.
-            LOG.info("<===== Begin AgentParamState addAgentCrowd =====>");
+            LOG.info("<===== BEGIN AgentParamState addAgentCrowd =====>");
             LOG.info("Crowd                 [{}]", selectedCrowd);
-            LOG.info("Active Agents         [{}]", getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd).getActiveAgents().size());
+            LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
             LOG.info("Agent Name            [{}]", agent.getName());
             LOG.info("Position World        [{}]", agent.getWorldTranslation());
             LOG.info("Position Local        [{}]", agent.getLocalTranslation());
@@ -639,14 +649,13 @@ public class AgentParamState extends BaseAppState {
             Float y = new Float(fieldTargetY.getText());
             Float z = new Float(fieldTargetZ.getText());
             Vector3f target = new Vector3f(x, y, z);
+            Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
             
             //Get the query extent for this crowd.
-            float[] ext = getState(CrowdManagerAppstate.class)
-                    .getCrowdManager().getCrowd(selectedCrowd).getQueryExtents();
+            float[] ext = crowd.getQueryExtents();
             
             //Agents in the crowd.
-            int agentCount = getState(CrowdManagerAppstate.class).getCrowdManager()
-                .getCrowd(selectedCrowd).getAgentCount();
+            int agentCount = crowd.getAgentCount();
             
             //Get the query object.
             NavMeshQuery query = getState(CrowdState.class).getQuery();
@@ -659,19 +668,29 @@ public class AgentParamState extends BaseAppState {
                                         + "[ Crowd ] tab.", 0));  
                return;
             }
-            
+            LOG.info("<========== BEGIN AgentParamState setTarget ==========>");
+            LOG.info("queryExt              [{}]", ext);
+            LOG.info("setTarget             [{}]", target);
             //Locate the nearest poly ref/pos.
             FindNearestPolyResult nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
             //Set the target.
-            for (int i = 0; i < agentCount; i++) {
-                CrowdAgent ag = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd).getAgent(i);
-                if (!ag.isActive()) {
-                    continue;
-                }
-            
-                getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd)
-                        .requestMoveTarget(i, nearest.getNearestRef(), nearest.getNearestPos());
+//            for (int i = 0; i < agentCount; i++) {
+//                CrowdAgent ag = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd).getAgent(i);
+//                if (!ag.isActive()) {
+//                    continue;
+//                }
+//            
+//                getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd)
+//                        .requestMoveTarget(i, nearest.getNearestRef(), nearest.getNearestPos());
+//            }
+
+            LOG.info("nearesPos             [{}] nearestRef [{}]", nearest.getNearestPos(), nearest.getNearestRef());
+            if (nearest.getNearestRef() == 0) {
+                LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
+            } else {
+            crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
             }
+            LOG.info("<========== END AgentParamState setTarget ==========>");
         }
     }
     
@@ -704,7 +723,7 @@ public class AgentParamState extends BaseAppState {
         List<CrowdAgent> activeAgents = crowd1.getActiveAgents();
         for (CrowdAgent agent: activeAgents) {
             crowd1.resetMoveTarget(activeAgents.indexOf(agent));
-//            crowd1.removeAgent(agent);
+            crowd1.removeAgent(agent);
         }
     }
     
