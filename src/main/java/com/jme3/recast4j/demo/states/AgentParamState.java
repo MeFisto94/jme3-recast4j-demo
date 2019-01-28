@@ -335,9 +335,9 @@ public class AgentParamState extends BaseAppState {
         float maxSpeed;   
         float colQueryRange;
         float pathOptimizeRange;
+        float separationWeight;
         int updateFlags;
         int obstacleAvoidanceType;
-        float separationWeight;
         
         Integer selectedCrowd = getState(CrowdState.class).getSelectedCrowd();
         
@@ -530,16 +530,26 @@ public class AgentParamState extends BaseAppState {
         //the grid.
         List<Node> listAgents = getState(AgentGridState.class).getAgentList(gridName);
         Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
-        
+
         if (listAgents.size() > crowd.getAgentCount()) {
             GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
                                 .buildPopup("Agent grid size of [" 
                                         + listAgents.size() 
                                         +  "] excedes the crowd size ["
-                                        + "]."
-                                        + crowd.getAgentCount(), 0));
-                return;
+                                        + crowd.getAgentCount()
+                                        + "].", 0));
+            return;
+        } else if ((listAgents.size() + crowd.getActiveAgents().size()) > crowd.getAgentCount()) {
+            GuiGlobals.getInstance().getPopupState()
+                        .showModalPopup(getState(GuiUtilState.class)
+                                .buildPopup("Agent grid size of [" + listAgents.size() 
+                                        +  "] plus active agents of [" 
+                                        + crowd.getActiveAgents().size()
+                                        + "] excedes the crowd size ["
+                                        + crowd.getAgentCount()
+                                        + "].", 0));
+            return;
         }
                 
         //If checked, we use the fieldRadius for the radius.

@@ -841,7 +841,7 @@ public class CrowdState extends BaseAppState {
             if (gridSize < 1) {
                 GuiGlobals.getInstance().getPopupState()
                         .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldGridSize ] requires a int value > 1.", 0));
+                                .buildPopup("[ fieldGridSize ] requires a int value >= 1.", 0));
                 return;
             }
         }
