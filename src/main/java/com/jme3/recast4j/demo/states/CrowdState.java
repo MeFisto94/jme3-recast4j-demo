@@ -61,6 +61,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
@@ -101,6 +102,8 @@ public class CrowdState extends BaseAppState {
     private HashMap<String, NavMeshQuery> mapCrowds;
     // Keep tracking crowd selected
     private VersionedReference<Set<Integer>> selectionRef; 
+        // Keep tracking crowd selected
+    private VersionedReference<List<String>> modelRef; 
     private String defaultOAP;
 
     
@@ -195,6 +198,7 @@ public class CrowdState extends BaseAppState {
         contListMoveType.addChild(new Label("Movement Type"));
         //Movement types for crowd
         listMoveType = contListMoveType.addChild(new ListBox<>());
+        listMoveType.setName("listMoveType");
         listMoveType.getSelectionModel().setSelection(0);
         listMoveType.getModel().add("BETTER_CHARACTER_CONTROL");
         listMoveType.getModel().add("DIRECT");
@@ -211,7 +215,9 @@ public class CrowdState extends BaseAppState {
         
         contActiveCrowds.addChild(new Label("Active Crowds"));
         listActiveCrowds = contActiveCrowds.addChild(new ListBox<>(), "growx, growy"); 
+        listActiveCrowds.setName("listActiveCrowds");
         selectionRef = listActiveCrowds.getSelectionModel().createReference();  
+        modelRef = listActiveCrowds.getModel().createReference();
         //Button to stop the Crowd.
         contActiveCrowds.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top");
         
@@ -313,6 +319,7 @@ public class CrowdState extends BaseAppState {
         
         //Parameters list.
         listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx"); 
+        listBoxAvoidance.setName("listBoxAvoidance");
         listBoxAvoidance.setVisibleItems(1);
         
         //The ObstacleAvoidanceParams string for the listbox.      
@@ -344,7 +351,7 @@ public class CrowdState extends BaseAppState {
         contCrowd.addChild(contButton, "growx, span 2"); //cell col row span w h
         
         //Legend
-        contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
+        contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
         //Button to start the Crowd.
         contButton.addChild(new ActionButton(new CallMethodAction("Start Crowd", this, "startCrowd")));
         
@@ -422,40 +429,50 @@ public class CrowdState extends BaseAppState {
 //            }
 //        }
 
-        if( selectionRef.update() ) {
-            // Selection has changed
-            if (selectionRef.get().isEmpty()) {
-                //Load defaults here.
-                LOG.info("Crowd selection ref is NULL, loading defaults.");
+        //Have to check for both selectionRef(the selections themselves) and 
+        //modelRef(the list of crowd names) updates to fully know whether the 
+        //reference has been updated.
+        if( selectionRef.update() || modelRef.update()) {
+            // Selection has changed and the model or selection is empty.
+            if ( selectionRef.get().isEmpty() ||  modelRef.get().isEmpty()) {
+                //Load defaults since there is no data to update.
+                LOG.info("Update Loop empty reference - selectionRef [{}] modelRef [{}]", selectionRef.get().isEmpty(), modelRef.get().isEmpty());
                 //The ObstacleAvoidanceParams string for the listbox.      
                 for (int i = 0; i < 8; i++) {
-                    String params = "<=====    " + i + "    =====>\n"
-                            + defaultOAP; 
+                    String params = "<=====    " + i + "    =====>\n" + defaultOAP; 
                     //Remove selected parameter from listBoxAvoidance.
                     remove(listBoxAvoidance, i);
                     //Insert the new parameters into listBoxAvoidance.
                     insert(listBoxAvoidance, i, params);
                 }
-                listBoxAvoidance.getSelectionModel().setSelection(0);
             } else {
-                int selectedIndex = listActiveCrowds.getSelectionModel().getSelection();
-                LOG.info("Update Loop - Crowd         [{}]", selectedIndex);
-                Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedIndex);
-                for (int i = 0; i < 8; i++) {
-                    ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
-                    //Remove selected parameter.
-                    remove(listBoxAvoidance, i);
-                    //Insert the new parameters into the list.
-                    insert(listBoxAvoidance, i, oapToString(oap, i));
+                Integer selectedIndex = listActiveCrowds.getSelectionModel().getSelection();
+                int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
+                //The selectedIndex does not update when removing or adding 
+                //objects to the listBox. This leads to situations where 
+                //selectedIndex will be the same as the numberOfCrowds. in those 
+                //cases we skip updating listBoxAvoidance. Failure to make the 
+                //check throws an index out of bounds exception.
+                if (selectedIndex != null && selectedIndex <  numberOfCrowds) {
+                    LOG.info("Update Loop updated OAP - Crowd [{}] selectedIndex [{}]", listActiveCrowds.getModel().get(selectedIndex), selectedIndex);
+
+                    Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedIndex);
+                    for (int i = 0; i < 8; i++) {
+                        ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
+                        //Remove selected parameter.
+                        remove(listBoxAvoidance, i);
+                        //Insert the new parameters into the list by converting
+                        //the oap to string.
+                        insert(listBoxAvoidance, i, oapToString(oap, i));
+                    }
                 }
-                listBoxAvoidance.getSelectionModel().setSelection(0);
             }
         }
 
     }
     
     //Explains the agent parameters.
-    private void showLegend() {
+    private void showHelp() {
                 
         String[] msg = { 
         "NavMesh - The navigation mesh to use for planning.",
@@ -552,10 +569,7 @@ public class CrowdState extends BaseAppState {
         
         //Check to make sure the crowd has been selected.
         if (selectedCrowd == null) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a crowd from the "
-                                    + "[ Active Crowds ] list.", 0));
+            displayMessage("Select a crowd from the [ Active Crowds ] list.", 0);
             return;
         }
         
@@ -564,9 +578,7 @@ public class CrowdState extends BaseAppState {
 
         //We check mapCrowds to see if the key exists. If not, go no further.
         if (!mapCrowds.containsKey(crowdName)) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("No crowd found by that name.", 0));
+            displayMessage("No crowd found by that name.", 0);
             return;
         }
         
@@ -599,9 +611,7 @@ public class CrowdState extends BaseAppState {
 
         //The name of the mesh to load.                
         if (fieldNavMesh.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must enter a [ NavMesh ] name.", 0));
+            displayMessage("You must enter a [ NavMesh ] name.", 0);
             return;
         } else {
             mesh = fieldNavMesh.getText();
@@ -610,17 +620,13 @@ public class CrowdState extends BaseAppState {
         
         //The name of this crowd.                
         if (fieldCrowdName.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must enter a [ Crowd ] name.", 0));
+            displayMessage("You must enter a [ Crowd ] name.", 0);
             return;
         } else if (mapCrowds.containsKey(fieldCrowdName.getText())) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ " 
-                                    + fieldCrowdName.getText() 
-                                    + " ] has already been activated. "
-                                    + "Change the crowd name or remove the existing crowd before proceeding.", 0));
+            displayMessage(
+                      "[ " + fieldCrowdName.getText() 
+                    + " ] has already been activated. "
+                    + "Change the crowd name or remove the existing crowd before proceeding.", 0);
             return;
         } else {
             crowdName = fieldCrowdName.getText();
@@ -628,17 +634,13 @@ public class CrowdState extends BaseAppState {
         
         //The max agents for the crowd. Uses numeric doc filter to prevent bad data.
         if (fieldMaxAgents.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Max Agents ] requires a valid int value.", 0));
+            displayMessage("[ Max Agents ] requires a valid int value.", 0);
             return;
         } else {
             maxAgents = new Integer(fieldMaxAgents.getText());
             //Stop useless input.
             if (maxAgents < 1) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Max Agents ] requires a int value >= 1", 0));
+                displayMessage("[ Max Agents ] requires a int value >= 1", 0);
                 return;
             }
         }
@@ -646,17 +648,13 @@ public class CrowdState extends BaseAppState {
         //The max agent radius for an agent in the crowd.
         if (!getState(GuiUtilState.class).isNumeric(fieldMaxAgentRadius.getText()) 
         ||  fieldMaxAgentRadius.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Max Agent Radius ] requires a valid float value.", 0));
+            displayMessage("[ Max Agent Radius ] requires a valid float value.", 0);
             return;
         } else {
             maxAgentRadius = new Float(fieldMaxAgentRadius.getText());
             //Stop negative input.
             if (maxAgentRadius <= 0.0f ) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Max Agent Radius ] requires a float value between > 0.", 0));
+                displayMessage("[ Max Agent Radius ] requires a float value between > 0.", 0);
                 return;
             }
         }
@@ -692,7 +690,7 @@ public class CrowdState extends BaseAppState {
             //Add to CrowdManager, mapCrowds, and listActiveCrowds.
             getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
             mapCrowds.put(crowdName, query);
-            listActiveCrowds.getModel().add(crowdName);   
+            listActiveCrowds.getModel().add(crowdName); 
         } catch (IOException | NoSuchFieldException | IllegalAccessException ex) {
             LOG.info("{} {}", CrowdState.class.getName(), ex);
         }
@@ -724,17 +722,13 @@ public class CrowdState extends BaseAppState {
         //The velocity bias settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldVelocityBias.getText()) 
         ||  fieldVelocityBias.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ velocityBias ] requires a valid float value.", 0));
+            displayMessage("[ velocityBias ] requires a valid float value.", 0);
             return;
         } else {
             velBias = new Float(fieldVelocityBias.getText());
             //Stop negative input.
             if (velBias < 0.0f || velBias > 1) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldVelocityBias ] requires a float value between 0 and 1 inclusive.", 0));
+                displayMessage("[ fieldVelocityBias ] requires a float value between 0 and 1 inclusive.", 0);
                 return;
             }
         }
@@ -742,17 +736,13 @@ public class CrowdState extends BaseAppState {
         //The weighted desired velocity settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldWeightDesVel.getText()) 
         ||  fieldWeightDesVel.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ weightDesVel ] requires a valid float value.", 0));
+            displayMessage("[ weightDesVel ] requires a valid float value.", 0);
             return;
         } else {
             weightDesVel = new Float(fieldWeightDesVel.getText());
             //Stop negative input.
             if (weightDesVel < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ weightDesVel ] requires a float value >= 0.", 0));
+                displayMessage("[ weightDesVel ] requires a float value >= 0.", 0);
                 return;
             }
         }
@@ -760,17 +750,13 @@ public class CrowdState extends BaseAppState {
         //The weighted current velocity settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldWeightCurVel.getText()) 
         ||  fieldWeightCurVel.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ fieldWeightCurVel ] requires a valid float value.", 0));
+            displayMessage("[ fieldWeightCurVel ] requires a valid float value.", 0);
             return;
         } else {
             weightCurVel = new Float(fieldWeightCurVel.getText());
             //Stop negative input.
             if (weightCurVel < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldWeightCurVel ] requires a float value >= 0.", 0));
+                displayMessage("[ fieldWeightCurVel ] requires a float value >= 0.", 0);
                 return;
             }
         }
@@ -778,17 +764,13 @@ public class CrowdState extends BaseAppState {
         //The weighted side settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldWeightSide.getText()) 
         ||  fieldWeightSide.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ fieldWeightSide ] requires a valid float value.", 0));
+            displayMessage("[ fieldWeightSide ] requires a valid float value.", 0);
             return;
         } else {
             weightSide = new Float(fieldWeightSide.getText());
             //Stop negative input.
             if (weightSide < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldWeightSide ] requires a float value >= 0.", 0));
+                displayMessage("[ fieldWeightSide ] requires a float value >= 0.", 0);
                 return;
             }
         }
@@ -796,17 +778,13 @@ public class CrowdState extends BaseAppState {
         //The weight to impact settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldWeightToi.getText()) 
         ||  fieldWeightToi.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ fieldWeightToi ] requires a valid float value.", 0));
+            displayMessage("[ fieldWeightToi ] requires a valid float value.", 0);
             return;
         } else {
             weightToi = new Float(fieldWeightToi.getText());
             //Stop negative input.
             if (weightToi < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldWeightToi ] requires a float value >= 0.", 0));
+                displayMessage("[ fieldWeightToi ] requires a float value >= 0.", 0);
                 return;
             }
         }        
@@ -814,34 +792,26 @@ public class CrowdState extends BaseAppState {
         //The horizon settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldHorizTime.getText()) 
         ||  fieldHorizTime.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ fieldHorizTime ] requires a valid float value.", 0));
+            displayMessage("[ fieldHorizTime ] requires a valid float value.", 0);
             return;
         } else {
             horizTime = new Float(fieldHorizTime.getText());
             //Stop negative input.
             if (weightToi < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldHorizTime ] requires a float value >= 0.", 0));
+                displayMessage("[ fieldHorizTime ] requires a float value >= 0.", 0);
                 return;
             }
         }       
         
         //The grid size settings. Uses numeric doc filter to prevent bad data.
         if (fieldGridSize.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ fieldGridSize ] requires a valid int value.", 0));
+            displayMessage("[ fieldGridSize ] requires a valid int value.", 0);
             return;
         } else {
             gridSize = new Integer(fieldGridSize.getText());
             //Stop useless input.
             if (gridSize < 1) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ fieldGridSize ] requires a int value >= 1.", 0));
+                displayMessage("[ fieldGridSize ] requires a int value >= 1.", 0);
                 return;
             }
         }
@@ -849,51 +819,39 @@ public class CrowdState extends BaseAppState {
         //The adaptive divisions settings. Uses numeric doc filter to prevent
         //bad data.
         if (fieldAdaptiveDivs.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ adaptiveDivs ] requires a valid int value.", 0));
+            displayMessage("[ adaptiveDivs ] requires a valid int value.", 0);
             return;
         } else {
             adaptiveDivs = new Integer(fieldAdaptiveDivs.getText());
             //Stop useless input.
             if (adaptiveDivs < 1 || adaptiveDivs > 32) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ adaptiveDivs ] requires a int value between 1 and 32 inclusive.", 0));
+                displayMessage("[ adaptiveDivs ] requires a int value between 1 and 32 inclusive.", 0);
                 return;
             }
         }
         
          //The adaptive depth settings. Uses numeric doc filter to prevent bad data.
         if (fieldAdaptiveDepth.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ adaptiveDepth ] requires a valid int value.", 0));
+            displayMessage("[ adaptiveDepth ] requires a valid int value.", 0);
             return;
         } else {
             adaptiveDepth = new Integer(fieldAdaptiveDepth.getText());
             //Stop useless input.
             if (adaptiveDepth < 1 ) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ adaptiveDepth ] requires a int value >= 1.", 0));
+                displayMessage("[ adaptiveDepth ] requires a int value >= 1.", 0);
                 return;
             }
         }
         
         //The adaptive depth settings. Uses numeric doc filter to prevent bad data.
         if (fieldAdaptiveRings.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ adaptiveRings ] requires a valid int value.", 0));
+            displayMessage("[ adaptiveRings ] requires a valid int value.", 0);
             return;
         } else {
             adaptiveRings = new Integer(fieldAdaptiveRings.getText());
             //Stop negative input.
             if (adaptiveRings < 1 || adaptiveRings > 4) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ adaptiveRings ] requires a int value between 1 and 4 inclusive.", 0));
+                displayMessage("[ adaptiveRings ] requires a int value between 1 and 4 inclusive.", 0);
                 return;
             }
         }
@@ -903,9 +861,7 @@ public class CrowdState extends BaseAppState {
         
         //Check to make sure a an avoidance parmeter has been selected.
         if (selectedParam == null) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a [ Parameter ] from the list before it can be updated.", 0));
+            displayMessage("You must select a [ Parameter ] from the list before it can be updated.", 0);
             return;
         }
         
@@ -914,10 +870,8 @@ public class CrowdState extends BaseAppState {
         
         //Check to make sure a crowd has been selected.
         if (selectedCrowd == null) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a [ Active Crowd ] "
-                                    + "from the list before a parameter can be updated.", 0));
+            displayMessage("You must select a [ Active Crowd ] " 
+                    + "from the list before a parameter can be updated.", 0);
             return;
         }
 
@@ -939,52 +893,17 @@ public class CrowdState extends BaseAppState {
         //Remove selected parameter from listBoxAvoidance.
         remove(listBoxAvoidance, selectedParam);
         //Insert the new parameters into listBoxAvoidance.
-        insert(listBoxAvoidance, selectedParam, oapToString(params, listBoxAvoidance.getSelectionModel().getSelection()));
+        insert(listBoxAvoidance, selectedParam, oapToString(params, selectedParam));
     }
     
     //Insert a parameter string into the List.
     protected void insert(ListBox list, int idx, String txt) {
         list.getModel().add(idx, txt);
-        list.getSelectionModel().setSelection(idx);
     }
     
     //Remove parameter string from a listBox.
     protected void remove(ListBox list, int idx) {
         list.getModel().remove(idx);
-    }
-    
-    /**
-     * Gets the currently selected crowd from the list of active crowds.
-     * 
-     * @return The active crowd or -1 if no active crowd was selected.
-     */
-    public Integer getSelectedCrowd() {
-        return listActiveCrowds.getSelectionModel().getSelection();
-    }
-    
-    /**
-     * Gets the query object for any selected crowd.
-     * 
-     * @return The query object for a selected crowd or null if the crowd has 
-     * not been selected in the Active Crowds list or if the query object doesn't
-     * exist in the mapCrowds list.
-     */
-    public NavMeshQuery getQuery() {
-        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
-        
-        //Check to make sure a crowd has been selected.
-        if (selectedCrowd == null) {
-            return null;
-        } 
-        
-        String crowd = listActiveCrowds.getModel().get(selectedCrowd);
-        
-        //Make sure the crowd selected exits in the map.
-        if (!mapCrowds.containsKey(crowd)) { 
-           return null;
-        }
-        
-        return mapCrowds.get(crowd);
     }
     
     protected void dumpActiveAgents(int i) {
@@ -1036,7 +955,7 @@ public class CrowdState extends BaseAppState {
         + "adaptiveDivs    = $d\n"               
         + "adaptiveRings  = $r\n"
         + "adaptiveDepth = $D";
-        LOG.info("<========== BEGIN CrowdState oapToString ==========>");
+        LOG.info("<========== BEGIN CrowdState oapToString [{}]==========>", idx);
         for ( int j = 0; j < str.length(); j++ ) {
             if ( str.charAt(j) != '$' ) {
                 buf.append(str.charAt(j));
@@ -1089,9 +1008,54 @@ public class CrowdState extends BaseAppState {
             }
             buf.append(i);
         } 
-        LOG.info("<========== END CrowdState oapToString ==========>");
+        LOG.info("<========== END CrowdState oapToString [{}] ==========>", idx);
         return buf.toString();
         
     }
     
+    /**
+     * Gets the query object for any selected crowd.
+     * 
+     * @return The query object for a selected crowd or null if the crowd has 
+     * not been selected in the Active Crowds list or if the query object doesn't
+     * exist in the mapCrowds list.
+     */
+    public NavMeshQuery getQuery() {
+        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
+        
+        //Check to make sure a crowd has been selected.
+        if (selectedCrowd == null) {
+            return null;
+        } 
+        
+        String crowd = listActiveCrowds.getModel().get(selectedCrowd);
+        
+        //Make sure the crowd selected exits in the map.
+        if (!mapCrowds.containsKey(crowd)) { 
+           return null;
+        }
+        
+        return mapCrowds.get(crowd);
+    }    
+    
+    /**
+     * Gets the currently selected crowd from the list of active crowds.
+     * 
+     * @return The active crowd or -1 if no active crowd was selected.
+     */
+    public Integer getSelectedCrowd() {
+        return listActiveCrowds.getSelectionModel().getSelection();
+    }    
+    
+    /**
+     * Displays a modal popup message.
+     * 
+     * @param txt The text for the popup.
+     * @param width The maximum width for wrap. 
+     */
+    private void displayMessage(String txt, float width) {
+        GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup(txt, width));
+    }
 }

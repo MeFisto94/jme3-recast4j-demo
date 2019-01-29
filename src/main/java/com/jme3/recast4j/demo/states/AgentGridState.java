@@ -34,7 +34,6 @@ import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.objects.PhysicsRigidBody;
-import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
@@ -60,7 +59,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Holds the agent grid panel components.
+ * 
  * @author Robert
  */
 public class AgentGridState extends BaseAppState {
@@ -94,7 +94,7 @@ public class AgentGridState extends BaseAppState {
         // Holds all active grids.
         mapGrids = new HashMap<>();
         //Set the maximum size a popup can be.
-        maxPopupSize = 600.0f;
+        maxPopupSize = 500.0f;
         
         //The top container for this gui.
         contAgentGrid = new Container(new MigLayout("align center"));
@@ -140,11 +140,6 @@ public class AgentGridState extends BaseAppState {
         fieldDistance.setSingleLine(true);
         fieldDistance.setPreferredWidth(50);
         
-//        //Separator label
-//        Panel separator = contStartPos.addChild(new Panel(), "growx");
-//        ((QuadBackgroundComponent) separator.getBackground()).setColor(new ColorRGBA(0.5f, 0.9f, 0.9f, 0.9f));
-//        separator.setPreferredSize(new Vector3f(200, 2, 0));
-        
 
 
         //Container that holds the listbox for the models/agents.
@@ -180,13 +175,9 @@ public class AgentGridState extends BaseAppState {
         }
         listBoxSize.getSelectionModel().setSelection(0);
         
-//        //Separator label
-//        Panel separator2 = contStartPos.addChild(new Panel(), "growx");
-//        ((QuadBackgroundComponent) separator2.getBackground()).setColor(new ColorRGBA(0.5f, 0.9f, 0.9f, 0.9f));
-//        separator2.setPreferredSize(new Vector3f(200, 2, 0));
+
+
         
-
-
         //Container that holds the active grid components.
         Container contGrid = new Container(new MigLayout("wrap", "[grow]"));
         contGrid.setName("AgentGridState contGrid");
@@ -199,11 +190,6 @@ public class AgentGridState extends BaseAppState {
         //Use the method call to set the checkGrids boolean to true.
         contGrid.addChild(new ActionButton(new CallMethodAction("Remove Grid", this, "removeGrid")));
                         
-//        //Separator label
-//        Panel separator3 = contStartPos.addChild(new Panel(), "growx");
-//        ((QuadBackgroundComponent) separator3.getBackground()).setColor(new ColorRGBA(0.5f, 0.9f, 0.9f, 0.9f));
-//        separator3.setPreferredSize(new Vector3f(200, 2, 0));
-           
 
 
         //Holds all the underlying components for this gui.
@@ -240,7 +226,7 @@ public class AgentGridState extends BaseAppState {
         contAgentGrid.addChild(contButton, "growx");
         
         //Buttons.
-        contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
+        contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
         contButton.addChild(new ActionButton(new CallMethodAction("Add Agent Grid", this, "addGrid")));
         
     }
@@ -351,7 +337,7 @@ public class AgentGridState extends BaseAppState {
     /**
      * Explains the settings for the Grid Generator.
      */
-    private void showLegend() {
+    private void showHelp() {
         String[] msg = {
         "Grid Name - The name used for the grid. The agents used in the grid will all be named",
         "according to their insertion point into the grid of agents. This is a required setting.",
@@ -423,9 +409,7 @@ public class AgentGridState extends BaseAppState {
             //The agent radius. 
             if (fieldRadius.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Radius ] requires a valid float value.", 0));
+                displayMessage("[ Agent Radius ] requires a valid float value.", 0);
                 return;
             } 
         }
@@ -435,9 +419,7 @@ public class AgentGridState extends BaseAppState {
             //The agent height. 
             if (fieldHeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Height ] requires a valid float value.", 0));
+                displayMessage("[ Agent Height ] requires a valid float value.", 0);
                 return;
             }
         }
@@ -448,9 +430,7 @@ public class AgentGridState extends BaseAppState {
             //The agent weight. 
             if (fieldWeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldWeight.getText())) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Weight ] requires a valid float value.", 0));
+                displayMessage("[ Agent Weight ] requires a valid float value.", 0);
                 return;
             }
         }
@@ -458,17 +438,13 @@ public class AgentGridState extends BaseAppState {
         //Garbage in?, no grid.
         if (!getState(GuiUtilState.class).isNumeric(fieldDistance.getText()) 
         ||  fieldDistance.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Agent Separation ] requires a valid float value.", 0));
+            displayMessage("[ Agent Separation ] requires a valid float value.", 0);
             return;
         } else {
             separation = new Float(fieldDistance.getText());
             //Stop negative separation input for agentPath grid.
             if (separation < 0.1f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Separation ] requires a float value >= 0.1f.", 0));
+                displayMessage("[ Agent Separation ] requires a float value >= 0.1f.", 0);
                 return;
             }
         }
@@ -492,9 +468,7 @@ public class AgentGridState extends BaseAppState {
         if (!getState(GuiUtilState.class).isNumeric(fieldPosX.getText()) || fieldPosX.getText().isEmpty() 
         ||  !getState(GuiUtilState.class).isNumeric(fieldPosY.getText()) || fieldPosY.getText().isEmpty() 
         ||  !getState(GuiUtilState.class).isNumeric(fieldPosZ.getText()) || fieldPosZ.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Start Position ] requires a valid float value.", 0));
+            displayMessage("[ Start Position ] requires a valid float value.", 0);
             return;
         } else {
             Float x = new Float(fieldPosX.getText());
@@ -505,17 +479,13 @@ public class AgentGridState extends BaseAppState {
 
         //The name of this grid.                
         if (fieldGridName.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must enter a grid name.", 0));
+            displayMessage("You must enter a grid name.", 0);
             return;
         } else if (mapGrids.containsKey(fieldGridName.getText())) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ " 
-                                    + fieldGridName.getText() 
-                                    + " ] has already been activated. "
-                                    + "Change the grid name or remove the existing grid before proceeding.", maxPopupSize));
+            displayMessage(
+                      "[ " + fieldGridName.getText() 
+                    + " ] has already been activated. "
+                    + "Change the grid name or remove the existing grid before proceeding.", maxPopupSize);
             return;
         } else {
             gridName = fieldGridName.getText();
@@ -583,9 +553,7 @@ public class AgentGridState extends BaseAppState {
                     radius = new Float(fieldRadius.getText());
                     //Stop negative radius input.
                     if (radius < 0.0f) {
-                        GuiGlobals.getInstance().getPopupState()
-                                .showModalPopup(getState(GuiUtilState.class)
-                                        .buildPopup("[ Agent Radius ] requires a float value >= 0.", 0));
+                        displayMessage("[ Agent Radius ] requires a float value >= 0.", 0);
                         listAgents = null;
                         return;
                     }
@@ -604,9 +572,7 @@ public class AgentGridState extends BaseAppState {
                     height = new Float(fieldHeight.getText());
                     //Stop negative height input.
                     if (height <= 0.0f) {
-                        GuiGlobals.getInstance().getPopupState()
-                                .showModalPopup(getState(GuiUtilState.class)
-                                        .buildPopup("[ Agent Height ] requires a float value > 0.", 0));
+                        displayMessage("[ Agent Height ] requires a float value > 0.", 0);
                         listAgents = null;
                         return;
                     }
@@ -634,9 +600,7 @@ public class AgentGridState extends BaseAppState {
                         weight = new Float(fieldWeight.getText());
                         //Stop negative weight input.
                         if (weight <= 0.0f) {
-                            GuiGlobals.getInstance().getPopupState()
-                                    .showModalPopup(getState(GuiUtilState.class)
-                                            .buildPopup("[ Agent Weight ] requires a float value > 0.", 0));
+                            displayMessage("[ Agent Weight ] requires a float value > 0.", 0);
                             listAgents = null;
                             return;
                         }
@@ -679,6 +643,18 @@ public class AgentGridState extends BaseAppState {
     private void addMapGrid(String key, Grid value) {
         mapGrids.put(key, value);
     }
+    
+    /**
+     * Displays a modal popup message.
+     * 
+     * @param txt The text for the popup.
+     * @param width The maximum width for wrap. 
+     */
+    private void displayMessage(String txt, float width) {
+        GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup(txt, width));
+    }
 
     /**
      * Returns true if mapGrids map contains the specified key.
@@ -698,9 +674,7 @@ public class AgentGridState extends BaseAppState {
         
         //Check to make sure a grid has been selected.
         if (selectedGrid == null) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a grid before it can be removed.", 0));
+            displayMessage("You must select a grid before it can be removed.", 0);
             return;
         }
         
@@ -709,9 +683,7 @@ public class AgentGridState extends BaseAppState {
         
         //We check mapGrids to see if the key exists. If not, go no further.
         if (!mapGrids.containsKey(gridName)) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("No grid found by that name.", 0));
+            displayMessage("No grid found by that name.", 0);
             return;
         }
         

@@ -56,7 +56,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Holds the agent parameter panel components.
+ * 
  * @author Robert
  */
 public class AgentParamState extends BaseAppState {
@@ -144,12 +145,6 @@ public class AgentParamState extends BaseAppState {
         fieldSeparationWeight.setSingleLine(true);
         fieldSeparationWeight.setPreferredWidth(50);
         
-//        //Separator label.
-//        Panel panel = new Panel();
-//        ((QuadBackgroundComponent) panel.getBackground()).setColor(new ColorRGBA(0.5f, 0.9f, 0.9f, 0.9f));
-//        panel.setPreferredSize(new Vector3f(200, 2, 0));
-//        contAgentParams.addChild(panel, "growx, wrap");
-        
 
 
         Container contAvoidance = new Container(new MigLayout("wrap"));
@@ -223,7 +218,7 @@ public class AgentParamState extends BaseAppState {
         contAgentParams.addChild(contButton, "growx");
         
         //Buttons.
-        contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showLegend")));
+        contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showHelp")));
         contButton.addChild(new ActionButton(new CallMethodAction("Add Agents Crowd", this, "addAgentCrowd")));
 
     }
@@ -262,18 +257,11 @@ public class AgentParamState extends BaseAppState {
     public void update(float tpf) {
         //TODO: implement behavior during runtime
     }
-
-    /**
-     * @return The contAgentParams.
-     */
-    public Container getContAgentParams() {
-        return contAgentParams;
-    }
     
     /**
      * Explains the agent parameters.
      */
-    private void showLegend() {
+    private void showHelp() {
 
         String[] msg = {
         "Agent Radius - The radius of the agent. When presented with an opening  they are to", 
@@ -343,10 +331,7 @@ public class AgentParamState extends BaseAppState {
         
         //Must select a crowd before anything else.
         if (selectedCrowd == null) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a [ Active Crowd ] "
-                                    + "from the [ Crowd ] tab.", 0)); 
+            displayMessage("You must select a [ Active Crowd ] from the [ Crowd ] tab.", 0); 
             return;
         }
         
@@ -357,9 +342,7 @@ public class AgentParamState extends BaseAppState {
 
         //Check to make sure a grid has been selected.
         if (selectedAgentGrid == null) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a [ Active Grid ] from the [ Agent Grid ] tab.", 0));
+            displayMessage("You must select a [ Active Grid ] from the [ Agent Grid ] tab.", 0);
             return;
         }
 
@@ -369,9 +352,7 @@ public class AgentParamState extends BaseAppState {
 
         //We check mapGrids to see if the key exists. If not, go no further.
         if (!getState(AgentGridState.class).hasMapGrid(gridName)) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("No grid found by that name.", 0));
+            displayMessage("No grid found by that name.", 0);
             return;
         }
 
@@ -379,9 +360,7 @@ public class AgentParamState extends BaseAppState {
         if (checkRadius.isChecked()) {
             if (fieldRadius.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Radius ] requires a valid float value.", 0));
+                displayMessage("[ Agent Radius ] requires a valid float value.", 0);
                 return;
             } 
         } 
@@ -391,9 +370,7 @@ public class AgentParamState extends BaseAppState {
         if (checkHeight.isChecked()) {
             if (fieldHeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Height ] requires a valid float value.", 0));
+                displayMessage("[ Agent Height ] requires a valid float value.", 0);
                 return;
             } 
         }
@@ -401,17 +378,13 @@ public class AgentParamState extends BaseAppState {
         //The max acceleration settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldMaxAccel.getText()) 
         ||  fieldMaxAccel.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Max Acceleration ] requires a valid float value.", 0));
+            displayMessage("[ Max Acceleration ] requires a valid float value.", 0);
             return;
         } else {
             maxAccel = new Float(fieldMaxAccel.getText());
-            //Stop negative acceleration input.
+            //Stop negative input.
             if (maxAccel < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Max Acceleration ] requires a float value >= 0.0f.", 0));
+                displayMessage("[ Max Acceleration ] requires a float value >= 0.0f.", 0);
                 return;
             }
         }
@@ -419,17 +392,13 @@ public class AgentParamState extends BaseAppState {
         //The max speed settings.
         if (!getState(GuiUtilState.class).isNumeric(fieldMaxSpeed.getText()) 
         ||  fieldMaxSpeed.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Max Speed ] requires a valid float value.", 0));
+            displayMessage("[ Max Speed ] requires a valid float value.", 0);
             return;
         } else {
             maxSpeed = new Float(fieldMaxSpeed.getText());
             //Stop negative input.
             if (maxSpeed < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Max Speed ] requires a float value >= 0.0f.", 0));
+                displayMessage("[ Max Speed ] requires a float value >= 0.0f.", 0);
                 return;
             }
         }
@@ -437,17 +406,13 @@ public class AgentParamState extends BaseAppState {
         //The collision query range.
         if (!getState(GuiUtilState.class).isNumeric(fieldColQueryRange.getText()) 
         ||  fieldColQueryRange.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Collision Query Range ] requires a valid float value.", 0));
+            displayMessage("[ Collision Query Range ] requires a valid float value.", 0);
             return;
         } else {
             colQueryRange = new Float(fieldColQueryRange.getText());
-            //Stop negative height input.
+            //Stop negative input.
             if (colQueryRange <= 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Collision Query Range ] requires a float value > 0.0f.", 0));
+                displayMessage("[ Collision Query Range ] requires a float value > 0.0f.", 0);
                 return;
             }
         }
@@ -455,17 +420,13 @@ public class AgentParamState extends BaseAppState {
         //The path optimize range.
         if (!getState(GuiUtilState.class).isNumeric(fieldPathOptimizeRange.getText()) 
         ||  fieldPathOptimizeRange.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Path Optimize Range ] requires a valid float value.", 0));
+            displayMessage("[ Path Optimize Range ] requires a valid float value.", 0);
             return;
         } else {
             pathOptimizeRange = new Float(fieldPathOptimizeRange.getText());
-            //Stop negative height input.
+            //Stop negative input.
             if (pathOptimizeRange <= 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Path Optimize Range ] requires a float value > 0.0f.", 0));
+                displayMessage("[ Path Optimize Range ] requires a float value > 0.0f.", 0);
                 return;
             }
         }
@@ -494,9 +455,7 @@ public class AgentParamState extends BaseAppState {
         &&  !checkTopo.isChecked() 
         &&  !checkVis.isChecked() 
         &&  !checkSep.isChecked()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("Select at least one [ Update Flag ].", 0));
+            displayMessage("Select at least one [ Update Flag ].", 0);
             return;
         } else {
             updateFlags = 0;
@@ -532,34 +491,24 @@ public class AgentParamState extends BaseAppState {
         Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
 
         if (listAgents.size() > crowd.getAgentCount()) {
-            GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("Agent grid size of [" 
-                                        + listAgents.size() 
-                                        +  "] excedes the crowd size ["
-                                        + crowd.getAgentCount()
-                                        + "].", 0));
+            displayMessage(
+                      "Agent grid size of [" + listAgents.size() + "] excedes the crowd size ["
+                    + crowd.getAgentCount() + "].", 0);
             return;
         } else if ((listAgents.size() + crowd.getActiveAgents().size()) > crowd.getAgentCount()) {
-            GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("Agent grid size of [" + listAgents.size() 
-                                        +  "] plus active agents of [" 
-                                        + crowd.getActiveAgents().size()
-                                        + "] excedes the crowd size ["
-                                        + crowd.getAgentCount()
-                                        + "].", 0));
+            displayMessage(
+                      "Agent grid size of [" + listAgents.size() + "] plus active agents of [" 
+                    + crowd.getActiveAgents().size() + "] excedes the crowd size ["
+                    + crowd.getAgentCount() + "].", 0);
             return;
         }
                 
         //If checked, we use the fieldRadius for the radius.
         if (checkRadius.isChecked()) {
             radius = new Float(fieldRadius.getText());
-            //Stop negative radius input.
+            //Stop negative input.
             if (radius < 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Radius ] requires a float value >= 0.", 0));
+                displayMessage("[ Agent Radius ] requires a float value >= 0.", 0);
                 return;
             }
         } else {
@@ -575,11 +524,9 @@ public class AgentParamState extends BaseAppState {
         //If checked, we use the fieldHeight for height.
         if (checkHeight.isChecked()) {
             height = new Float(fieldHeight.getText());
-            //Stop negative height input.
+            //Stop negative input.
             if (height <= 0.0f) {
-                GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("[ Agent Height ] requires a float value > 0.", 0));
+                displayMessage("[ Agent Height ] requires a float value > 0.", 0);
                 return;
             }
         } else {
@@ -640,10 +587,7 @@ public class AgentParamState extends BaseAppState {
         
         //Check to make sure a crowd has been selected.
         if (selectedCrowd == -1) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("You must select a [ Active Crowd ] "
-                                    + "from the [ Crowd ] tab before a target can be updated.", 0)); 
+            displayMessage("Select an [ Active Crowd ] from the [ Crowd ] tab to set the target for.", 0); 
             return;
         } 
         
@@ -651,9 +595,7 @@ public class AgentParamState extends BaseAppState {
         if (!getState(GuiUtilState.class).isNumeric(fieldTargetX.getText()) || fieldTargetX.getText().isEmpty() 
         ||  !getState(GuiUtilState.class).isNumeric(fieldTargetY.getText()) || fieldTargetY.getText().isEmpty() 
         ||  !getState(GuiUtilState.class).isNumeric(fieldTargetZ.getText()) || fieldTargetZ.getText().isEmpty()) {
-            GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup("[ Start Position ] requires a valid float value.", 0));
+            displayMessage("[ Start Position ] requires a valid float value.", 0);
         } else {
             Float x = new Float(fieldTargetX.getText());
             Float y = new Float(fieldTargetY.getText());
@@ -671,11 +613,8 @@ public class AgentParamState extends BaseAppState {
             NavMeshQuery query = getState(CrowdState.class).getQuery();
         
             if (query == null) {
-               GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
-                                .buildPopup("Query object not found. Make sure to"
-                                        + "select an [ Active Crowd ] from the "
-                                        + "[ Crowd ] tab.", 0));  
+               displayMessage("Query object not found. Select an "
+                       + "[ Active Crowd ] from the [ Crowd ] tab first.", 0);  
                return;
             }
             LOG.info("<========== BEGIN AgentParamState setTarget ==========>");
@@ -698,25 +637,24 @@ public class AgentParamState extends BaseAppState {
             if (nearest.getNearestRef() == 0) {
                 LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
             } else {
-            crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
+                crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
             }
+            
             LOG.info("<========== END AgentParamState setTarget ==========>");
         }
     }
     
     /**
-     * Sets the target by converting vector3f to string.
+     * Displays a modal popup message.
      * 
-     * @param target The requested target value to set.
+     * @param txt The text for the popup.
+     * @param width The maximum width for wrap. 
      */
-    public void setFieldTargetXYZ(Vector3f target) {
-        String x = "" + target.x;
-        String y = "" + target.y;
-        String z = "" + target.z;
-        this.fieldTargetX.setText(x);
-        this.fieldTargetY.setText(y);
-        this.fieldTargetZ.setText(z);
-    }
+    private void displayMessage(String txt, float width) {
+        GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup(txt, width));
+    }    
 
     /**
      * Resets all crowd agent move targets for the selected crowd. 
@@ -736,5 +674,26 @@ public class AgentParamState extends BaseAppState {
             crowd1.removeAgent(agent);
         }
     }
+    
+    /**
+     * @return The contAgentParams.
+     */
+    public Container getContAgentParams() {
+        return contAgentParams;
+    }
+    
+    /**
+     * Sets the target by converting vector3f to string.
+     * 
+     * @param target The requested target value to set.
+     */
+    public void setFieldTargetXYZ(Vector3f target) {
+        String x = "" + target.x;
+        String y = "" + target.y;
+        String z = "" + target.z;
+        this.fieldTargetX.setText(x);
+        this.fieldTargetY.setText(y);
+        this.fieldTargetZ.setText(z);
+    }    
     
 }
