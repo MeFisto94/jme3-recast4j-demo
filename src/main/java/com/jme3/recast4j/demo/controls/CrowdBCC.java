@@ -53,7 +53,7 @@ public class CrowdBCC extends BetterCharacterControl  {
     }
     
     public PhysicsRigidBody getPhysicsRigidBody() {
-        return this.rigidBody;
+        return super.rigidBody;
     }
 }
 
