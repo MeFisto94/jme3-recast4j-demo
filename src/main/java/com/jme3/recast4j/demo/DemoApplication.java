@@ -511,16 +511,6 @@ public class DemoApplication extends SimpleApplication {
 //        player.addControl(new CrowdBCC(0.3f, 1.5f, 20f)); // values taken from recast defaults
         player.addControl(new PhysicsAgentControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(player);
-        Torus halo = new Torus(16, 16, 0.1f, 0.3f);
-        Geometry haloGeom = new Geometry("halo", halo);
-        Material haloMat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
-        haloMat.setColor("Color", ColorRGBA.Cyan);
-        haloGeom.setMaterial(haloMat);
-        haloGeom.setLocalTranslation(0, 2, 0);
-        Quaternion pitch90 = new Quaternion();
-        pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
-        haloGeom.setLocalRotation(pitch90);
-        player.attachChild(haloGeom);
         getRootNode().attachChild(player);
         characters.add(player);
     }
