@@ -215,8 +215,10 @@ public class AgentParamState extends BaseAppState {
         fieldTargetZ.setPreferredWidth(75);
         
         //Set the target for the crowd.
-        contTarget.addChild(new ActionButton(new CallMethodAction("Set Target", this, "setTarget")));
-        
+        contTarget.addChild(new ActionButton(new CallMethodAction("Set Target", this, "setTarget")), "split 2");
+        //The movement request halo checkbox.
+        checkMoveRequest = contTarget.addChild(new Checkbox("Debug Movement"), "gap left push");
+        checkMoveRequest.getModel().setChecked(true);
         
         
         //Holds the Legend and Setup buttons.
@@ -228,10 +230,8 @@ public class AgentParamState extends BaseAppState {
         
         //Buttons.
         contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
-        //The movement request halo checkbox.
-        checkMoveRequest = contButton.addChild(new Checkbox("Display Movement Type"));
-        checkMoveRequest.getModel().setChecked(true);
-        contButton.addChild(new ActionButton(new CallMethodAction("Add Agents Crowd", this, "addAgentCrowd")));
+        contButton.addChild(new ActionButton(new CallMethodAction("Add Agents Crowd", this, "addAgentCrowd")));        
+
 
     }
 
