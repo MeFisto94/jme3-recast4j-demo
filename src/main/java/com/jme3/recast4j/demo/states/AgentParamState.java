@@ -30,13 +30,20 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.bounding.BoundingBox;
+import com.jme3.material.Material;
+import com.jme3.math.ColorRGBA;
+import com.jme3.math.FastMath;
+import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.DetourUtils;
+import com.jme3.recast4j.demo.controls.DebugMoveControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
+import com.jme3.scene.shape.Torus;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
@@ -83,6 +90,7 @@ public class AgentParamState extends BaseAppState {
     private Checkbox checkVis;
     private Checkbox checkRadius;
     private Checkbox checkHeight;
+    private Checkbox checkMoveRequest;
 
     
     @SuppressWarnings("unchecked")
@@ -184,7 +192,7 @@ public class AgentParamState extends BaseAppState {
         
         //Container that holds the start position components.
         Container contTarget = new Container(new MigLayout(null, "[grow]"));
-        contTarget.setName("CrowdState contTarget");
+        contTarget.setName("CrowdBuilderState contTarget");
         contTarget.setAlpha(0, false);
         contAgentParams.addChild(contTarget, "wrap, growx");
         
@@ -210,6 +218,7 @@ public class AgentParamState extends BaseAppState {
         contTarget.addChild(new ActionButton(new CallMethodAction("Set Target", this, "setTarget")));
         
         
+        
         //Holds the Legend and Setup buttons.
         Container contButton = new Container(new MigLayout(null, // Layout Constraints
                 "[]push[][]")); // Column constraints [min][pref][max]
@@ -218,7 +227,10 @@ public class AgentParamState extends BaseAppState {
         contAgentParams.addChild(contButton, "growx");
         
         //Buttons.
-        contButton.addChild(new ActionButton(new CallMethodAction("Legend", this, "showHelp")));
+        contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
+        //The movement request halo checkbox.
+        checkMoveRequest = contButton.addChild(new Checkbox("Display Movement Type"));
+        checkMoveRequest.getModel().setChecked(true);
         contButton.addChild(new ActionButton(new CallMethodAction("Add Agents Crowd", this, "addAgentCrowd")));
 
     }
@@ -226,24 +238,25 @@ public class AgentParamState extends BaseAppState {
     @Override
     protected void cleanup(Application app) {
         //The removal of the gui components is a by product of the removal of 
-        //CrowdState where this gui lives.
+        //CrowdBuilderState where this gui lives.
     }
 
     /**
-     * Called by AgentGridState(onEnable). CrowdState needs AgentGridState and 
-     * AgentParamState to build its gui. This is the middle of the attachment chain. 
-     * AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdState(onEnable)
+     * Called by AgentGridState(onEnable). CrowdBuilderState needs 
+     * AgentGridState and AgentParamState to build its gui. This is the middle 
+     * of the attachment chain. 
+     * AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdBuilderState(onEnable)
      */
     @Override
     protected void onEnable() {
-        getStateManager().attach(new CrowdState());
+        getStateManager().attach(new CrowdBuilderState());
     }
 
     /**
-     * Called by CrowdState(onDisable) as part of a chain detachment of states. 
+     * Called by CrowdBuilderState(onDisable) as part of a chain detachment of states. 
      * This is the middle of the detachment chain. Lemur cleanup for all states 
-     * is done from CrowdState.
-     * CrowdState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
+     * is done from CrowdBuilderState.
+     * CrowdBuilderState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
      */
     @Override
     protected void onDisable() {
@@ -327,7 +340,7 @@ public class AgentParamState extends BaseAppState {
         int updateFlags;
         int obstacleAvoidanceType;
         
-        Integer selectedCrowd = getState(CrowdState.class).getSelectedCrowd();
+        Integer selectedCrowd = getState(CrowdBuilderState.class).getSelectedCrowd();
         
         //Must select a crowd before anything else.
         if (selectedCrowd == null) {
@@ -556,6 +569,26 @@ public class AgentParamState extends BaseAppState {
             //Add agents to the crowd.
             CrowdAgent createAgent = crowd.createAgent(agent.getWorldTranslation(), ap);
             crowd.setSpatialForAgent(createAgent, agent);
+                        
+            if (checkMoveRequest.isChecked()) {
+                Torus halo = new Torus(16, 16, 0.1f, 0.3f);
+                Geometry haloGeom = new Geometry("halo", halo);
+                Material haloMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+                haloMat.setColor("Color", ColorRGBA.Cyan);
+                haloGeom.setMaterial(haloMat);
+                haloGeom.setLocalTranslation(0, 2, 0);
+                Quaternion pitch90 = new Quaternion();
+                pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
+                haloGeom.setLocalRotation(pitch90);
+
+                DebugMoveControl catControl = new DebugMoveControl(crowd, createAgent, haloGeom);
+                agent.addControl(catControl);
+
+            } else {
+                if (agent.getControl(DebugMoveControl.class) != null) {
+                    agent.removeControl(DebugMoveControl.class);
+                } 
+            }
             
             //anything over 2 arguments creates a new object so split this up.
             LOG.info("<===== BEGIN AgentParamState addAgentCrowd =====>");
@@ -583,7 +616,7 @@ public class AgentParamState extends BaseAppState {
      */
     private void setTarget() {
 
-        int selectedCrowd = getState(CrowdState.class).getSelectedCrowd();
+        int selectedCrowd = getState(CrowdBuilderState.class).getSelectedCrowd();
         
         //Check to make sure a crowd has been selected.
         if (selectedCrowd == -1) {
@@ -610,13 +643,14 @@ public class AgentParamState extends BaseAppState {
             int agentCount = crowd.getAgentCount();
             
             //Get the query object.
-            NavMeshQuery query = getState(CrowdState.class).getQuery();
+            NavMeshQuery query = getState(CrowdBuilderState.class).getQuery();
         
             if (query == null) {
                displayMessage("Query object not found. Select an "
                        + "[ Active Crowd ] from the [ Crowd ] tab first.", 0);  
                return;
             }
+
             LOG.info("<========== BEGIN AgentParamState setTarget ==========>");
             LOG.info("queryExt              [{}]", ext);
             LOG.info("setTarget             [{}]", target);

@@ -234,7 +234,7 @@ public class AgentGridState extends BaseAppState {
     /**
      * Removing this state from StateManager will clear all agents from the 
      * physics space and gui node. The removal of the gui components is a by
-     * product of the removal of CrowdState where this gui lives.
+     * product of the removal of CrowdBuilderState where this gui lives.
      */
     @Override
     protected void cleanup(Application app) {
@@ -257,10 +257,10 @@ public class AgentGridState extends BaseAppState {
     }
 
     /**
-     * Called by the DemoApplication F1 button ActionListener. CrowdState needs 
+     * Called by the DemoApplication F1 button ActionListener. CrowdBuilderState needs 
      * AgentGridState and AgentParamState to build its gui. This is the start of 
      * the attachment chain. 
-     * AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdState(onEnable)
+     * AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdBuilderState(onEnable)
      */
     @Override
     protected void onEnable() {
@@ -270,8 +270,8 @@ public class AgentGridState extends BaseAppState {
     /**
      * Called by AgentParamState(onDisable) as part of a chain detachment of 
      * states. This is the end of the detachment chain. Lemur cleanup for all 
-     * states is done from CrowdState.
-     * CrowdState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
+     * states is done from CrowdBuilderState.
+     * CrowdBuilderState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
      */
     @Override
     protected void onDisable() {
@@ -617,6 +617,7 @@ public class AgentGridState extends BaseAppState {
 
                     LOG.info("weight            [{}]", weight);
                 } 
+                
                 LOG.info("radius            [{}]", radius);
                 LOG.info("height            [{}]", height);
                 LOG.info("Position World    [{}]", agent.getWorldTranslation());

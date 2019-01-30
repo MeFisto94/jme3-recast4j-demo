@@ -76,9 +76,9 @@ import org.slf4j.LoggerFactory;
  * @author Robert
  */
 @SuppressWarnings("unchecked")
-public class CrowdState extends BaseAppState {
+public class CrowdBuilderState extends BaseAppState {
 
-    private static final Logger LOG = LoggerFactory.getLogger(CrowdState.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(CrowdBuilderState.class.getName());
 
     private Container contTabs;
     private DocumentModelFilter doc;
@@ -102,7 +102,7 @@ public class CrowdState extends BaseAppState {
     private HashMap<String, NavMeshQuery> mapCrowds;
     // Keep tracking crowd selected
     private VersionedReference<Set<Integer>> selectionRef; 
-        // Keep tracking crowd selected
+    // Keep tracking crowd selected
     private VersionedReference<List<String>> modelRef; 
     private String defaultOAP;
 
@@ -139,23 +139,24 @@ public class CrowdState extends BaseAppState {
     }
 
     /**
-     * Called by AgentParamState(onEnable). CrowdState needs AgentGridState and 
-     * AgentParamState to build its gui. This is the end of the attachment chain. 
-     * AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdState(onEnable)
+     * Called by AgentParamState(onEnable). CrowdBuilderState needs 
+     * AgentGridState and AgentParamState to build its gui. This is the end of 
+     * the attachment chain. 
+     * AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdBuilderState(onEnable)
      */
     @Override
     protected void onEnable() {
         
         //The top container for the crowd builder panel.
         Container contCrowd = new Container(new MigLayout("align center"));
-        contCrowd.setName("CrowdState contBuildCrowdGui");
+        contCrowd.setName("CrowdBuilderState contCrowd");
         contCrowd.setAlpha(0, false);
         
         
         
         //Container that holds the parameters for starting the crowd.
         Container contCrowdParam = new Container(new MigLayout("wrap", "[grow]"));
-        contCrowdParam.setName("CrowdState contCrowdParam");
+        contCrowdParam.setName("CrowdBuilderState contCrowdParam");
         contCrowdParam.setAlpha(0, false);
         contCrowd.addChild(contCrowdParam, "growx, growy"); 
         
@@ -190,7 +191,7 @@ public class CrowdState extends BaseAppState {
         
         //Container for list movement.
         Container contListMoveType = new Container(new MigLayout("wrap"));
-        contListMoveType.setName("CrowdState contListMoveType");
+        contListMoveType.setName("CrowdBuilderState contListMoveType");
         contListMoveType.setAlpha(0, false);
         contCrowd.addChild(contListMoveType, "top");
         
@@ -209,7 +210,7 @@ public class CrowdState extends BaseAppState {
         
         //Container that holds to Active Crowds.
         Container contActiveCrowds = new Container(new MigLayout("wrap"));
-        contActiveCrowds.setName("CrowdState contActiveCrowds");
+        contActiveCrowds.setName("CrowdBuilderState contActiveCrowds");
         contActiveCrowds.setAlpha(0, false);
         contCrowd.addChild(contActiveCrowds, "wrap, flowy, growx, growy");
         
@@ -225,7 +226,7 @@ public class CrowdState extends BaseAppState {
         
         //Give this its own row so can can align parameters with the listBox
         Container contAvoidLabel = new Container(new MigLayout(null));
-        contAvoidLabel.setName("CrowdState contAvoidLabel");
+        contAvoidLabel.setName("CrowdBuilderState contAvoidLabel");
         contAvoidLabel.setAlpha(0, false);
         contAvoidLabel.addChild(new Label("Obstacle Avoidance Parameters")); 
         contCrowd.addChild(contAvoidLabel, "wrap");
@@ -233,7 +234,7 @@ public class CrowdState extends BaseAppState {
         //Container that holds the obstacle avoidance parameters for the crowd 
         //agents.
         Container contAvoidance = new Container(new MigLayout("wrap", "[grow]"));
-        contAvoidance.setName("CrowdState contAvoidance");
+        contAvoidance.setName("CrowdBuilderState contAvoidance");
         contAvoidance.setAlpha(0, false);
         contCrowd.addChild(contAvoidance, "growx, growy");
                 
@@ -313,7 +314,7 @@ public class CrowdState extends BaseAppState {
         
         //Holds the listbox for avoidance parameters.
         Container contListBoxAvoidance = new Container(new MigLayout("wrap", "[grow]"));
-        contListBoxAvoidance.setName("CrowdState contListBoxAvoidance");
+        contListBoxAvoidance.setName("CrowdBuilderState contListBoxAvoidance");
         contListBoxAvoidance.setAlpha(0, false);
         contCrowd.addChild(contListBoxAvoidance, "wrap, growx, top");
         
@@ -346,7 +347,7 @@ public class CrowdState extends BaseAppState {
         //Holds the Legend and Setup buttons.
         Container contButton = new Container(new MigLayout(null, // Layout Constraints
                 "[]push[][]")); // Column constraints [min][pref][max]
-        contButton.setName("CrowdState contButton");
+        contButton.setName("CrowdBuilderState contButton");
         contButton.setAlpha(1, false);
         contCrowd.addChild(contButton, "growx, span 2"); //cell col row span w h
         
@@ -358,7 +359,7 @@ public class CrowdState extends BaseAppState {
         //Create the container that will hold the tab panel for BuildGridGui and 
         //BuildParamGui gui.
         contTabs = new Container(new MigLayout("wrap"));
-        contTabs.setName("CrowdState contTabs");
+        contTabs.setName("CrowdBuilderState contTabs");
         //Make it dragable.
         DragHandler dragHandler = new DragHandler();
         CursorEventControl.addListenersToSpatial(contTabs, dragHandler);
@@ -410,7 +411,7 @@ public class CrowdState extends BaseAppState {
     /**
      * Called by the DemoApplication F1 button ActionListener as part of a chain 
      * detachment of states. This is the start of the detachment chain.
-     * CrowdState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
+     * CrowdBuilderState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
      */
     @Override
     protected void onDisable() {
@@ -692,7 +693,7 @@ public class CrowdState extends BaseAppState {
             mapCrowds.put(crowdName, query);
             listActiveCrowds.getModel().add(crowdName); 
         } catch (IOException | NoSuchFieldException | IllegalAccessException ex) {
-            LOG.info("{} {}", CrowdState.class.getName(), ex);
+            LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
 
     }
@@ -955,7 +956,7 @@ public class CrowdState extends BaseAppState {
         + "adaptiveDivs    = $d\n"               
         + "adaptiveRings  = $r\n"
         + "adaptiveDepth = $D";
-        LOG.info("<========== BEGIN CrowdState oapToString [{}]==========>", idx);
+        LOG.info("<========== BEGIN CrowdBuilderState oapToString [{}]==========>", idx);
         for ( int j = 0; j < str.length(); j++ ) {
             if ( str.charAt(j) != '$' ) {
                 buf.append(str.charAt(j));
@@ -1008,7 +1009,7 @@ public class CrowdState extends BaseAppState {
             }
             buf.append(i);
         } 
-        LOG.info("<========== END CrowdState oapToString [{}] ==========>", idx);
+        LOG.info("<========== END CrowdBuilderState oapToString [{}] ==========>", idx);
         return buf.toString();
         
     }
