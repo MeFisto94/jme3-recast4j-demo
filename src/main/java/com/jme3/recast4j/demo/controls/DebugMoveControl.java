@@ -51,6 +51,7 @@ public class DebugMoveControl extends AbstractControl {
     private float timer;
     
     public DebugMoveControl(Crowd crowd, CrowdAgent agent, Geometry halo) {
+        this.crowd = crowd;
         this.agent = agent;
         this.halo = halo;
         this.white = new ColorRGBA(ColorRGBA.White);
