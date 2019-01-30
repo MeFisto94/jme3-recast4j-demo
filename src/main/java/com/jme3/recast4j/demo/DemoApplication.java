@@ -18,6 +18,8 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
+import com.jme3.math.FastMath;
+import com.jme3.math.Quaternion;
 import com.jme3.math.Ray;
 import com.jme3.math.Vector3f;
 import com.jme3.post.FilterPostProcessor;
@@ -33,7 +35,7 @@ import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.states.AgentGridState;
 import com.jme3.recast4j.demo.states.AgentParamState;
-import com.jme3.recast4j.demo.states.CrowdState;
+import com.jme3.recast4j.demo.states.CrowdBuilderState;
 import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.ThirdPersonCamState;
@@ -43,6 +45,7 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
+import com.jme3.scene.shape.Torus;
 import com.jme3.system.AppSettings;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
@@ -74,6 +77,7 @@ public class DemoApplication extends SimpleApplication {
                 new StatsAppState(),
                 new AudioListenerState(),
                 new DebugKeysAppState(),
+                new CrowdManagerAppstate(new CrowdManager()),
                 new LemurConfigState(),
                 new GuiUtilState()
         );
@@ -98,8 +102,8 @@ public class DemoApplication extends SimpleApplication {
     @Override
     public void simpleInitApp() {
         initKeys();
-        crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
-        getStateManager().attach(crowdManagerAppstate);
+//        crowdManagerAppstate = new CrowdManagerAppstate(new CrowdManager());
+//        getStateManager().attach(crowdManagerAppstate);
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
 
@@ -507,6 +511,16 @@ public class DemoApplication extends SimpleApplication {
 //        player.addControl(new CrowdBCC(0.3f, 1.5f, 20f)); // values taken from recast defaults
         player.addControl(new PhysicsAgentControl());
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(player);
+        Torus halo = new Torus(16, 16, 0.1f, 0.3f);
+        Geometry haloGeom = new Geometry("halo", halo);
+        Material haloMat = new Material(assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+        haloMat.setColor("Color", ColorRGBA.Cyan);
+        haloGeom.setMaterial(haloMat);
+        haloGeom.setLocalTranslation(0, 2, 0);
+        Quaternion pitch90 = new Quaternion();
+        pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
+        haloGeom.setLocalRotation(pitch90);
+        player.attachChild(haloGeom);
         getRootNode().attachChild(player);
         characters.add(player);
     }
@@ -514,18 +528,18 @@ public class DemoApplication extends SimpleApplication {
     private ActionListener actionListener = new ActionListener() {
         @Override
         public void onAction(String name, boolean keyPressed, float tpf) {
-            //This is a chain method of attaching states. CrowdState needs 
+            //This is a chain method of attaching states. CrowdBuilderState needs 
             //both AgentGridState and AgentParamState to be enabled 
             //before it can create its GUI. All AppStates do their own cleanup.
-            //Lemur cleanup for all states is done from CrowdState.
+            //Lemur cleanup for all states is done from CrowdBuilderState.
             if (name.equals("crowd builder") && !keyPressed) {
                 //Each state handles its own removal and cleanup.
-                //CrowdState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
+                //CrowdBuilderState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
                 if (getStateManager().getState(AgentGridState.class) != null) {
-                    getStateManager().getState(CrowdState.class).setEnabled(false);
+                    getStateManager().getState(CrowdBuilderState.class).setEnabled(false);
                 //If AgentGridState is not attached, it starts the chain from its 
                 //enabled method as shown here.
-                //AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdState(onEnable)    
+                //AgentGridState(onEnable)=>AgentParamState(onEnable)=>CrowdBuilderState(onEnable)    
                 } else {
                     getStateManager().attach(new AgentGridState());
                 }
