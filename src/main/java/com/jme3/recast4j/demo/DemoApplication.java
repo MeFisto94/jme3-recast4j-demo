@@ -65,7 +65,6 @@ public class DemoApplication extends SimpleApplication {
     Spatial worldMap;
     NavMesh navMesh;
     NavMeshQuery query;
-    FilterPostProcessor fpp;
     List<Node> characters;
     List<Geometry> pathGeometries;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
@@ -361,10 +360,6 @@ public class DemoApplication extends SimpleApplication {
 
         getCamera().setLocation(new Vector3f(0f, 40f, 0f));
         getCamera().lookAtDirection(new Vector3f(0f, -1f, 0f), Vector3f.UNIT_Z);
-
-        fpp = new FilterPostProcessor(assetManager);
-        viewPort.addProcessor(fpp);
-        fpp.addFilter(new SSAOFilter(1f, 1f, 0.1f, 0.1f));
     }
 
     private void showDebugMeshes(MeshData meshData, boolean wireframe) {
