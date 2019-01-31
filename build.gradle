@@ -52,12 +52,12 @@ dependencies {
 //    implementation 'com.github.ppiastucki.recast4j:detour:master-SNAPSHOT'
     
     // @TODO: Not yet transitive from jme3-recast4j
-    implementation 'org.recast4j:parent:1.2.0'
-    implementation 'org.recast4j:detour-tile-cache:1.2.0'
-    implementation 'org.recast4j:detour-crowd:1.2.0'
-    implementation 'org.recast4j:detour-extras:1.2.0'
-    implementation 'org.recast4j:recast:1.2.0'
-    implementation 'org.recast4j:detour:1.2.0'
+    implementation 'org.recast4j:parent:1.2.3'
+    implementation 'org.recast4j:detour-tile-cache:1.2.3'
+    implementation 'org.recast4j:detour-crowd:1.2.3'
+    implementation 'org.recast4j:detour-extras:1.2.3'
+    implementation 'org.recast4j:recast:1.2.3'
+    implementation 'org.recast4j:detour:1.2.3'
     
     compile 'org.slf4j:slf4j-api:1.7.21'
     compile 'org.slf4j:slf4j-simple:1.7.21'

@@ -32,6 +32,8 @@ import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.renderer.RenderManager;
 import com.jme3.renderer.ViewPort;
 import com.jme3.scene.Geometry;
+import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import com.jme3.scene.control.AbstractControl;
 import org.recast4j.detour.crowd.CrowdAgent;
 
@@ -62,9 +64,8 @@ public class DebugMoveControl extends AbstractControl {
 
     @Override
     protected void controlUpdate(float tpf) {
-        timer++;
-        //one time per second or so.
-        if (timer > 1000) {
+        timer += tpf;
+        if (isEnabled() && spatial != null && timer > 1.0f) {
             if (crowd.isForming(agent)) {
                 halo.getMaterial().setColor("Color", white);
             } else if (crowd.isMoving(agent)) {
@@ -78,6 +79,24 @@ public class DebugMoveControl extends AbstractControl {
         }
     }
 
+    @Override 
+    public void setSpatial(Spatial spatial) {   
+        super.setSpatial(spatial);      
+        if (spatial != null){       
+            ((Node) spatial).attachChild(halo);
+        } 
+    }
+    
+    @Override   
+    public void setEnabled(boolean enabled) {  
+        if (!enabled) {
+            ((Node) spatial).detachChild(halo);
+        } else {
+            ((Node) spatial).attachChild(halo);
+        }
+        this.enabled = enabled;  
+    } 
+    
     /**
      * @param agent the agent to set
      */

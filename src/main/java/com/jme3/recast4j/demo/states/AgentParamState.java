@@ -562,7 +562,7 @@ public class AgentParamState extends BaseAppState {
         ap.obstacleAvoidanceType    = obstacleAvoidanceType;
         
         //Temp fix for crowd clearing.
-//        resetCrowd(selectedCrowd);
+        resetCrowd(selectedCrowd);
         
         for (Node agent: listAgents) {
             
@@ -570,23 +570,27 @@ public class AgentParamState extends BaseAppState {
             CrowdAgent createAgent = crowd.createAgent(agent.getWorldTranslation(), ap);
             crowd.setSpatialForAgent(createAgent, agent);
                         
-            if (checkMoveRequest.isChecked()) {
-                Torus halo = new Torus(16, 16, 0.1f, 0.3f);
-                Geometry haloGeom = new Geometry("halo", halo);
-                Material haloMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-                haloMat.setColor("Color", ColorRGBA.Cyan);
-                haloGeom.setMaterial(haloMat);
-                haloGeom.setLocalTranslation(0, 2, 0);
-                Quaternion pitch90 = new Quaternion();
-                pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
-                haloGeom.setLocalRotation(pitch90);
+            if (checkMoveRequest.isChecked() ) {
+                if (agent.getControl(DebugMoveControl.class) == null) {
+                    Torus halo = new Torus(16, 16, 0.1f, 0.3f);
+                    Geometry haloGeom = new Geometry("halo", halo);
+                    Material haloMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+                    haloMat.setColor("Color", ColorRGBA.Cyan);
+                    haloGeom.setMaterial(haloMat);
+                    haloGeom.setLocalTranslation(0, 2, 0);
+                    Quaternion pitch90 = new Quaternion();
+                    pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
+                    haloGeom.setLocalRotation(pitch90);
 
-                DebugMoveControl catControl = new DebugMoveControl(crowd, createAgent, haloGeom);
-                agent.addControl(catControl);
+                    DebugMoveControl catControl = new DebugMoveControl(crowd, createAgent, haloGeom);
+                    agent.addControl(catControl);
+                } else {
+                    agent.getControl(DebugMoveControl.class).setEnabled(true);
+                }
 
             } else {
                 if (agent.getControl(DebugMoveControl.class) != null) {
-                    agent.removeControl(DebugMoveControl.class);
+                    agent.getControl(DebugMoveControl.class).setEnabled(false);
                 } 
             }
             
