@@ -36,72 +36,95 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.control.AbstractControl;
 import org.recast4j.detour.crowd.CrowdAgent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- *
+ * A debugging control that displays visual, verbose or both debug information 
+ * about an agents MoveRequestState inside the crowd. 
+ * 
  * @author Robert
  */
 public class DebugMoveControl extends AbstractControl {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DebugMoveControl.class.getName());
     
     private CrowdAgent agent;
     private Crowd crowd;
     private Geometry halo;
-    private final ColorRGBA white;
-    private final ColorRGBA cyan;
-    private final ColorRGBA magenta;
-    private final ColorRGBA black;  
+    private ColorRGBA curColor;
+    private boolean visual;
+    private boolean verbose;
     private float timer;
     
+    /**
+     * This control will display a visual, verbose, or both representation of an 
+     * agents MoveRequestState while inside the given crowd.
+     *      White   = isForming
+     *      Magenta = isMoving / MoveRequestState.DT_CROWDAGENT_TARGET_VALID
+     *      Cyan    = hasNoTarget / MoveRequestState.DT_CROWDAGENT_TARGET_NONE
+     *      Black   = none of the above
+     * 
+     * @param crowd The crowd the agent is a member of.
+     * @param agent The agent to look for inside the crowd.
+     * @param halo A Geometry that will be used as the visual representation for
+     * the agents MoveRequestState.
+     */
     public DebugMoveControl(Crowd crowd, CrowdAgent agent, Geometry halo) {
         this.crowd = crowd;
         this.agent = agent;
+        halo.setName("halo");
         this.halo = halo;
-        this.white = new ColorRGBA(ColorRGBA.White);
-        this.cyan = new ColorRGBA(ColorRGBA.Cyan);
-        this.magenta = new ColorRGBA(ColorRGBA.Magenta);
-        this.black = new ColorRGBA(ColorRGBA.Black);
     }
 
     @Override
     protected void controlUpdate(float tpf) {
         timer += tpf;
         if (isEnabled() && spatial != null && timer > 1.0f) {
-            if (crowd.isForming(agent)) {
-                halo.getMaterial().setColor("Color", white);
-            } else if (crowd.isMoving(agent)) {
-                halo.getMaterial().setColor("Color", magenta);
-            } else if (crowd.hasNoTarget(agent)) {
-                halo.getMaterial().setColor("Color", cyan);
-            } else {
-                halo.getMaterial().setColor("Color", black);
+            if (visual) {
+                
+                if (crowd.isForming(agent)) {
+                    if (curColor != ColorRGBA.White) {
+                        halo.getMaterial().setColor("Color", ColorRGBA.White);
+                        curColor = ColorRGBA.White;
+                    }
+                } else if (crowd.isMoving(agent)) {
+                    if (curColor != ColorRGBA.Magenta) {
+                        halo.getMaterial().setColor("Color", ColorRGBA.Magenta);
+                        curColor = ColorRGBA.Magenta;
+                    }
+                } else if (crowd.hasNoTarget(agent)) {
+                    if (curColor != ColorRGBA.Cyan) {
+                        halo.getMaterial().setColor("Color", ColorRGBA.Cyan);
+                        curColor = ColorRGBA.Cyan;
+                    }
+                } else {
+                    if (curColor != ColorRGBA.Black) {
+                        halo.getMaterial().setColor("Color", ColorRGBA.Black);
+                        curColor = ColorRGBA.Black;
+                    }
+                }
             }
+            
+            if (verbose) {
+                LOG.info("<========== BEGIN DebugMoveControl [{}] ==========>", spatial.getName());
+                LOG.info("isActive [{}] targetState [{}]", agent.active, agent.targetState);
+                LOG.info("<========== END DebugMoveControl   [{}] ==========>", spatial.getName());
+            }
+            
             timer = 0;
         }
     }
 
     @Override 
     public void setSpatial(Spatial spatial) {   
-        super.setSpatial(spatial);      
+        super.setSpatial(spatial);
+        //Add the halo to the spatial.
         if (spatial != null){       
             ((Node) spatial).attachChild(halo);
-        } 
-    }
-    
-    @Override   
-    public void setEnabled(boolean enabled) {  
-        if (!enabled) {
-            ((Node) spatial).detachChild(halo);
         } else {
-            ((Node) spatial).attachChild(halo);
+            halo.removeFromParent(); //Must remove when control removed.
         }
-        this.enabled = enabled;  
-    } 
-    
-    /**
-     * @param agent the agent to set
-     */
-    public void setAgent(CrowdAgent agent) {
-        this.agent = agent;
     }
 
     @Override
@@ -110,10 +133,52 @@ public class DebugMoveControl extends AbstractControl {
     }
 
     /**
-     * @param halo the halo to set
+     * If true, the halo is not culled.
+     * 
+     * @return The visual state of the halo.
      */
-    public void setHalo(Geometry halo) {
-        this.halo = halo;
+    public boolean isVisual() {
+        return visual;
+    }
+
+    /**
+     * Sets the cullHint of the halo to inherit if true, otherwise always culled.
+     * 
+     * @param visual the visual to set.
+     */
+    public void setVisual(boolean visual) {
+        if (visual) {
+            this.halo.setCullHint(Spatial.CullHint.Inherit);
+        } else {
+            this.halo.setCullHint(Spatial.CullHint.Always);
+        }
+        
+        this.visual = visual;
+    }
+
+    /**
+     * If true, logging is on. 
+     * 
+     * @return Whether logging is on or off.
+     */
+    public boolean isVerbose() {
+        return verbose;
+    }
+
+    /**
+     * Turns logging on or off.
+     * 
+     * @param verbose True for logging.
+     */
+    public void setVerbose(boolean verbose) {
+        this.verbose = verbose;
+    }
+
+    /**
+     * @param agent the agent to set
+     */
+    public void setAgent(CrowdAgent agent) {
+        this.agent = agent;
     }
 
     /**

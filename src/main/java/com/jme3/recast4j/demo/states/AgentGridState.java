@@ -36,6 +36,7 @@ import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.objects.PhysicsRigidBody;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
+import com.jme3.recast4j.demo.controls.DebugMoveControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.scene.Node;
@@ -250,6 +251,9 @@ public class AgentGridState extends BaseAppState {
                         getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(agent);
                     }
                 }
+                if (agent.getControl(DebugMoveControl.class) != null) {
+                    agent.removeControl(DebugMoveControl.class);
+                }
                 ((SimpleApplication) getApplication()).getRootNode().detachChild(agent);
             }
             iterator.remove();
@@ -318,8 +322,11 @@ public class AgentGridState extends BaseAppState {
                             PhysicsRigidBody prb = agent.getControl(CrowdBCC.class).getPhysicsRigidBody();
                             if (getStateManager().getState(BulletAppState.class).getPhysicsSpace().getRigidBodyList().contains(prb)) {
                                 getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(agent);
-                            }
+                            }                            
                         }
+                        if (agent.getControl(DebugMoveControl.class) != null) {
+                            agent.removeControl(DebugMoveControl.class);
+                        }                        
                         ((SimpleApplication) getApplication()).getRootNode().detachChild(agent);
                     }
                     iterator.remove();
