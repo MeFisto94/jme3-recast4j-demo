@@ -351,10 +351,12 @@ public class CrowdBuilderState extends BaseAppState {
         contButton.setAlpha(1, false);
         contCrowd.addChild(contButton, "growx, span 2"); //cell col row span w h
         
-        //Legend
+        //Help
         contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
         //Button to start the Crowd.
         contButton.addChild(new ActionButton(new CallMethodAction("Start Crowd", this, "startCrowd")));
+        
+        
         
         //Create the container that will hold the tab panel for BuildGridGui and 
         //BuildParamGui gui.
@@ -365,8 +367,12 @@ public class CrowdBuilderState extends BaseAppState {
         CursorEventControl.addListenersToSpatial(contTabs, dragHandler);
         contTabs.addChild(new Label("Crowd Builder"));
         
+        
+        
         //Create the tabbed panel.
         TabbedPanel tabPanel = contTabs.addChild(new TabbedPanel());
+        
+        
         
         //Modify tabs to stretch collapse button. MigLayout(null, "[grow, fill]"))
         //Add a rollup panel for the crowd settings panel.
@@ -380,6 +386,8 @@ public class CrowdBuilderState extends BaseAppState {
         rollCrowd.setOpen(false);
         tabPanel.addTab("Crowd", rollCrowd);
         
+        
+        
         //Add a rollup panel so can hide agent grid.
         RollupPanel rollAgentGrid = new RollupPanel("Expand / Collapse", 
                 getState(AgentGridState.class).getContAgentGrid(), "glass");
@@ -391,6 +399,8 @@ public class CrowdBuilderState extends BaseAppState {
         rollAgentGrid.setOpen(false);
         tabPanel.addTab("Agent Grid", rollAgentGrid);
         
+        
+        
         //Add a rollup panel so can hide agent parameters.
         RollupPanel rollAgentParam = new RollupPanel("Expand / Collapse", 
                 getState(AgentParamState.class).getContAgentParams(), "glass");
@@ -401,6 +411,8 @@ public class CrowdBuilderState extends BaseAppState {
         rollAgentParam.setAlpha(0, false); 
         rollAgentParam.setOpen(false);
         tabPanel.addTab("Agent Parameters", rollAgentParam);
+        
+        
         
         int height = getApplication().getCamera().getHeight();
         contTabs.setLocalTranslation(new Vector3f(0, height, 0));

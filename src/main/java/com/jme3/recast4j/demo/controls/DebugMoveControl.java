@@ -73,7 +73,6 @@ public class DebugMoveControl extends AbstractControl {
     public DebugMoveControl(Crowd crowd, CrowdAgent agent, Geometry halo) {
         this.crowd = crowd;
         this.agent = agent;
-        halo.setName("halo");
         this.halo = halo;
     }
 

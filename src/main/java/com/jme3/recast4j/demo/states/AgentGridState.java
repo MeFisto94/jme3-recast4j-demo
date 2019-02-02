@@ -149,7 +149,7 @@ public class AgentGridState extends BaseAppState {
         contAgent.setAlpha(0, false);
         contAgentGrid.addChild(contAgent, "wrap, wmin 100");
         
-        //The agentPath listbox. Add new model name here. Add the asset path to the 
+        //The agentPath listbox. Add new model name here. Add the asset path 
         contAgent.addChild(new Label("Agent"));
         //models in butAddAgentGrid listener under the #Model Section.
         listBoxAgent = contAgent.addChild(new ListBox<>());
@@ -517,7 +517,7 @@ public class AgentGridState extends BaseAppState {
      * 
      * If weight is left unchecked, a default weight of 1.0f will be assigned.
      * 
-     * If checkPhysics is left unchecked, a CrowdBCC will be used. The Radius 
+     * If checkPhysics is left unchecked, no control will be used. The Radius 
      * and height of the spatial is determined as noted above except weight is ignored.
      * 
      * @param agentPath The Path of the agent to be used for this grid.

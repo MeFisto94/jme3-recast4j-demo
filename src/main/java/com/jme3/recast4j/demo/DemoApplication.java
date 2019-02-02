@@ -18,24 +18,19 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
-import com.jme3.math.FastMath;
-import com.jme3.math.Quaternion;
 import com.jme3.math.Ray;
 import com.jme3.math.Vector3f;
-import com.jme3.post.FilterPostProcessor;
-import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
-import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
-import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.states.AgentGridState;
 import com.jme3.recast4j.demo.states.AgentParamState;
 import com.jme3.recast4j.demo.states.CrowdBuilderState;
+import com.jme3.recast4j.demo.states.CrowdState;
 import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.ThirdPersonCamState;
@@ -45,13 +40,10 @@ import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
-import com.jme3.scene.shape.Torus;
 import com.jme3.system.AppSettings;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
 import org.recast4j.detour.*;
-import org.recast4j.detour.crowd.CrowdAgent;
-import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilderConfig;
 import org.slf4j.Logger;
@@ -77,6 +69,7 @@ public class DemoApplication extends SimpleApplication {
                 new AudioListenerState(),
                 new DebugKeysAppState(),
                 new CrowdManagerAppstate(new CrowdManager()),
+                /*new CrowdState(),*/
                 new LemurConfigState(),
                 new GuiUtilState()
         );
@@ -517,8 +510,11 @@ public class DemoApplication extends SimpleApplication {
             //both AgentGridState and AgentParamState to be enabled 
             //before it can create its GUI. All AppStates do their own cleanup.
             //Lemur cleanup for all states is done from CrowdBuilderState.
+            //If we activate from key, the current build of navmesh will be used.
             if (name.equals("crowd builder") && !keyPressed) {
                 //Each state handles its own removal and cleanup.
+                //Check for AgentGridState.class first becasue if its enabled
+                // all are enabled.
                 //CrowdBuilderState(onDisable)=>AgentParamState(onDisable)=>AgentGridState(onDisable)
                 if (getStateManager().getState(AgentGridState.class) != null) {
                     getStateManager().getState(CrowdBuilderState.class).setEnabled(false);
@@ -534,6 +530,11 @@ public class DemoApplication extends SimpleApplication {
                 if (getStateManager().getState(AgentParamState.class) != null) {
                     Vector3f locOnMap = getLocationOnMap(); // Don't calculate three times
                     getStateManager().getState(AgentParamState.class).setFieldTargetXYZ(locOnMap);
+                } 
+                
+                if (getStateManager().getState(CrowdState.class) != null) {
+                    Vector3f locOnMap = getLocationOnMap(); // Don't calculate three times
+                    getStateManager().getState(CrowdState.class).setTarget(locOnMap);
                 }
             }
         }
