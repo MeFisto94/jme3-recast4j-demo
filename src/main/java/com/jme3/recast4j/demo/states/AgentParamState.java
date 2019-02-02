@@ -375,7 +375,7 @@ public class AgentParamState extends BaseAppState {
         int updateFlags;
         int obstacleAvoidanceType;
         
-        //Get the selected crowd from the CrowdbuilderState where all crowds live.
+        //Get the selected crowd from the CrowdBuilderState where all crowds live.
         Crowd crowd = getState(CrowdBuilderState.class).getSelectedCrowd();
         
         //Must select a crowd before anything else.

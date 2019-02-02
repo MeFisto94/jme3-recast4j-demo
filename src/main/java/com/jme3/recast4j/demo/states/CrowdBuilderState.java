@@ -149,14 +149,14 @@ public class CrowdBuilderState extends BaseAppState {
     @Override
     protected void onEnable() {
         
-        //The top container for the crowdName builder panel.
+        //The top container for the crowd builder panel.
         Container contCrowd = new Container(new MigLayout("align center"));
         contCrowd.setName("CrowdBuilderState contCrowd");
         contCrowd.setAlpha(0, false);
         
         
         
-        //Container that holds the parameters for starting the crowdName.
+        //Container that holds the parameters for starting the crowd.
         Container contCrowdParam = new Container(new MigLayout("wrap", "[grow]"));
         contCrowdParam.setName("CrowdBuilderState contCrowdParam");
         contCrowdParam.setAlpha(0, false);
@@ -174,7 +174,7 @@ public class CrowdBuilderState extends BaseAppState {
         fieldCrowdName = contCrowdParam.addChild(new TextField("Crowd"), "growx");
         fieldCrowdName.setSingleLine(true);
         
-        //Max agents for the crowdName.
+        //Max agents for the crowd.
         contCrowdParam.addChild(new Label("Max Agents"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
@@ -183,7 +183,7 @@ public class CrowdBuilderState extends BaseAppState {
         fieldMaxAgents.setSingleLine(true);
         fieldMaxAgents.setPreferredWidth(50);
         
-        //Max agent radius for an agent in the crowdName.
+        //Max agent radius for an agent in the crowd.
         contCrowdParam.addChild(new Label("Max Agent Radius"), "split 2, growx");
         fieldMaxAgentRadius = contCrowdParam.addChild(new TextField("0.6"));
         fieldMaxAgentRadius.setSingleLine(true);
@@ -197,9 +197,9 @@ public class CrowdBuilderState extends BaseAppState {
         contListMoveType.setAlpha(0, false);
         contCrowd.addChild(contListMoveType, "top");
         
-        //Movement types for the crowdName.
+        //Movement types for the crowd.
         contListMoveType.addChild(new Label("Movement Type"));
-        //Movement types for crowdName
+        //Movement types for crowd
         listMoveType = contListMoveType.addChild(new ListBox<>());
         listMoveType.setName("listMoveType");
         listMoveType.getSelectionModel().setSelection(0);
@@ -233,7 +233,7 @@ public class CrowdBuilderState extends BaseAppState {
         contAvoidLabel.addChild(new Label("Obstacle Avoidance Parameters")); 
         contCrowd.addChild(contAvoidLabel, "wrap");
         
-        //Container that holds the obstacle avoidance parameters for the crowdName 
+        //Container that holds the obstacle avoidance parameters for the crowd 
         //agents.
         Container contAvoidance = new Container(new MigLayout("wrap", "[grow]"));
         contAvoidance.setName("CrowdBuilderState contAvoidance");
@@ -377,7 +377,7 @@ public class CrowdBuilderState extends BaseAppState {
         
         
         //Modify tabs to stretch collapse button. MigLayout(null, "[grow, fill]"))
-        //Add a rollup panel for the crowdName settings panel.
+        //Add a rollup panel for the crowd settings panel.
         RollupPanel rollCrowd = new RollupPanel("Expand / Collapse", 
                 contCrowd, "glass");
         rollCrowd.getTitleContainer().setLayout(new MigLayout(null, "[grow, fill]"));
@@ -445,7 +445,7 @@ public class CrowdBuilderState extends BaseAppState {
 //        }
 
         //Have to check for both selectionRef(the selections themselves) and 
-        //modelRef(the list of crowdName names) updates to fully know whether the 
+        //modelRef(the list of crowd names) updates to fully know whether the 
         //reference has been updated.
         if( selectionRef.update() || modelRef.update()) {
             // Selection has changed and the model or selection is empty.
@@ -471,7 +471,7 @@ public class CrowdBuilderState extends BaseAppState {
                 if (selectedIndex != null && selectedIndex <  numberOfCrowds) {
                     LOG.info("Update Loop updated OAP - Crowd [{}] selectedIndex [{}]", listActiveCrowds.getModel().get(selectedIndex), selectedIndex);
                     Crowd crowd = getSelectedCrowd();
-                    //Look for the crowdName in mapCrowds rather than pulling 
+                    //Look for the crowd in mapCrowds rather than pulling 
                     //directly from CrowdManager in case CrowdState is running
                     //at same time as gui.
                     if (crowd != null) {
@@ -597,7 +597,7 @@ public class CrowdBuilderState extends BaseAppState {
         //from listActiveCrowds.
         Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
         
-        //Check to make sure the crowdName has been selected.
+        //Check to make sure the crowd has been selected.
         if (selectedCrowd == null) {
             displayMessage("Select a crowd from the [ Active Crowds ] list.", 0);
             return;
@@ -630,7 +630,7 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
-     * Starts and adds a crowdName to the CrowdManager.
+     * Starts and adds a crowd to the CrowdManager.
      */
     private void startCrowd() {
         int maxAgents;
@@ -647,7 +647,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
         
         
-        //The name of this crowdName.                
+        //The name of this crowd.                
         if (fieldCrowdName.getText().isEmpty()) {
             displayMessage("You must enter a [ Crowd ] name.", 0);
             return;
@@ -661,7 +661,7 @@ public class CrowdBuilderState extends BaseAppState {
             crowdName = fieldCrowdName.getText();
         }
         
-        //The max agents for the crowdName. Uses numeric doc filter to prevent bad data.
+        //The max agents for the crowd. Uses numeric doc filter to prevent bad data.
         if (fieldMaxAgents.getText().isEmpty()) {
             displayMessage("[ Max Agents ] requires a valid int value.", 0);
             return;
@@ -674,7 +674,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
         }
         
-        //The max agent radius for an agent in the crowdName.
+        //The max agent radius for an agent in the crowd.
         if (!getState(GuiUtilState.class).isNumeric(fieldMaxAgentRadius.getText()) 
         ||  fieldMaxAgentRadius.getText().isEmpty()) {
             displayMessage("[ Max Agent Radius ] requires a valid float value.", 0);
@@ -711,11 +711,11 @@ public class CrowdBuilderState extends BaseAppState {
             //fieldCrowdName.
             NavMesh navMesh = msr.read(new FileInputStream(mesh), 3);
             //Create the query object for pathfinding in this Crowd. Will be 
-            //added to the mapCrowds as a value so each crowdName query object is
+            //added to the mapCrowds as a value so each crowd query object is
             //referenced.  
             NavMeshQuery query = new NavMeshQuery(navMesh);
             
-            //Create the crowdName.
+            //Create the crowd.
             Crowd crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
             
             //Add to CrowdManager, mapCrowds, and listActiveCrowds.
@@ -907,10 +907,10 @@ public class CrowdBuilderState extends BaseAppState {
         params.adaptiveDepth    = adaptiveDepth;
         params.adaptiveRings    = adaptiveRings;
 
-        //Inject the new parameter into the crowdName. Check for the crowdName in 
-        //mapcrowds and if exists update OAP params. Pulls the crowdName reference 
+        //Inject the new parameter into the crowd. Check for the crowd in 
+        //mapcrowds and if exists update OAP params. Pulls the crowd reference 
         //from the CrowdNQuery obj rather than the CrowdManager in case 
-        //CrowdState is running to keep our crowdName lookups in sync.
+        //CrowdState is running to keep our crowd lookups in sync.
         if (getSelectedCrowd() != null) {
             getSelectedCrowd().setObstacleAvoidanceParams(selectedParam, params);
             //Remove selected parameter from listBoxAvoidance.
@@ -925,11 +925,11 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
-     * Gets a crowdName number from the CrowdManager by checking the CrowdManager 
- for the crowdName object. Not really useful for anything other than logging.
+     * Gets a crowd number from the CrowdManager by checking the CrowdManager 
+     * for the crowd object. Not really useful for anything other than logging.
      * 
-     * @param crowd The crowdName to lookup.
-     * @return The crowdName number for the given crowdName.
+     * @param crowd The crowd to lookup.
+     * @return The crowd number for the given crowd.
      */
     public int getCrowdNumber(Crowd crowd) {
         int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
@@ -951,7 +951,7 @@ public class CrowdBuilderState extends BaseAppState {
         list.getModel().remove(idx);
     }
     
-    //Logs crowdName info to the console.
+    //Logs crowd info to the console.
     protected void dumpActiveAgents(int i) {
         Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i);
         
@@ -1060,10 +1060,10 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
-     * Gets the query object for any selected crowdName.
+     * Gets the query object for any selected crowd.
      * 
-     * @return The query object for a selected crowdName or null if the 
-     * crowdName has not been selected in the Active Crowds list or if the query 
+     * @return The query object for a selected crowd or null if the 
+     * crowd has not been selected in the Active Crowds list or if the query 
      * object doesn't exist in the mapCrowds list.
      */
     public NavMeshQuery getQuery() {
@@ -1079,8 +1079,8 @@ public class CrowdBuilderState extends BaseAppState {
     }    
     
     /**
-     * Gets the currently selected crowdName from the Active Crowds list as a crowdName 
- object.
+     * Gets the currently selected crowdName from the Active Crowds list as a 
+     * crowd object.
      * 
      * @return The string name of the selection.
      */
@@ -1103,7 +1103,7 @@ public class CrowdBuilderState extends BaseAppState {
         //Get the crowdName from listActiveCrowds.
         Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
         
-        //Check to make sure a crowdName has been selected.
+        //Check to make sure a crowd has been selected.
         if (selectedCrowd == null) {
             return null;
         }
@@ -1134,7 +1134,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
 
         /**
-         * @return the crowdName
+         * @return the crowd
          */
         public Crowd getCrowd() {
             return crowd;
