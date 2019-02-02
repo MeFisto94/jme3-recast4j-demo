@@ -135,7 +135,7 @@ public class AgentGridState extends BaseAppState {
         fieldWeight.setSingleLine(true);
         fieldWeight.setPreferredWidth(50);
         
-        //The crowd separation field.
+        //The grid separation field.
         contStats.addChild(new Label("Agent Separation"), "split 2, growx");
         fieldDistance = contStats.addChild(new TextField("1.0"));
         fieldDistance.setSingleLine(true);

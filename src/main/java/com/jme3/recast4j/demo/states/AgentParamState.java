@@ -36,7 +36,6 @@ import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
-import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.demo.controls.DebugMoveControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
@@ -376,13 +375,14 @@ public class AgentParamState extends BaseAppState {
         int updateFlags;
         int obstacleAvoidanceType;
         
-        Integer selectedCrowd = getState(CrowdBuilderState.class).getSelectedCrowd();
+        //Get the selected crowd from the CrowdbuilderState where all crowds live.
+        Crowd crowd = getState(CrowdBuilderState.class).getSelectedCrowd();
         
         //Must select a crowd before anything else.
-        if (selectedCrowd == null) {
+        if (crowd == null) {
             displayMessage("You must select a [ Active Crowd ] from the [ Crowd ] tab.", 0); 
             return;
-        }
+        }        
         
         //Must select a agent grid.
         //Get the selectedAgentGrid from listBoxGrid.
@@ -570,9 +570,7 @@ public class AgentParamState extends BaseAppState {
             float y = bounds.getYExtent();
             height = y*2;
         }
-        
-        //Get the selected crowd.
-        Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
+
         //Temp fix for crowd clearing.
         resetCrowd(crowd);
         
@@ -669,7 +667,7 @@ public class AgentParamState extends BaseAppState {
                 } 
             }
 
-            LOG.info("Crowd                 [{}]", selectedCrowd);
+            LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
             LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
             LOG.info("<===== End AgentParamState addAgentCrowd =====>");
         }
@@ -681,10 +679,11 @@ public class AgentParamState extends BaseAppState {
      */
     private void setTarget() {
 
-        int selectedCrowd = getState(CrowdBuilderState.class).getSelectedCrowd();
+        //Get the selected crowd from the CrowdBuilderState where all crowds live.
+        Crowd crowd = getState(CrowdBuilderState.class).getSelectedCrowd();
         
         //Check to make sure a crowd has been selected.
-        if (selectedCrowd == -1) {
+        if (crowd == null) {
             displayMessage("Select an [ Active Crowd ] from the [ Crowd ] tab to set the target for.", 0); 
             return;
         } 
@@ -699,7 +698,6 @@ public class AgentParamState extends BaseAppState {
             Float y = new Float(fieldTargetY.getText());
             Float z = new Float(fieldTargetZ.getText());
             Vector3f target = new Vector3f(x, y, z);
-            Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(selectedCrowd);
             
             //Get the query extent for this crowd.
             float[] ext = crowd.getQueryExtents();
