@@ -130,13 +130,13 @@ public class CrowdBuilderState extends BaseAppState {
         //Removing will also cleanup the AgentGridState and AgentParamState
         //lemur objects.
         ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
-        int size = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
 
-        if (size > 0) {
-            for (int i = size; i > 0 ; i--) {
-                Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i - 1);
-                getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
-            }
+        Iterator<Map.Entry<String, CrowdNQuery>> iterator = mapCrowds.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, CrowdNQuery> entry = iterator.next();
+            Crowd crowd = entry.getValue().getCrowd();
+            getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
+            iterator.remove();
         }
     }
 
@@ -455,39 +455,32 @@ public class CrowdBuilderState extends BaseAppState {
                 //The ObstacleAvoidanceParams string for the listbox.      
                 for (int i = 0; i < 8; i++) {
                     String params = "<=====    " + i + "    =====>\n" + defaultOAP; 
-                    //Remove selected parameter from listBoxAvoidance.
-                    remove(listBoxAvoidance, i);
+                    //Remove selected parameter from listBoxAvoidance. When 
+                    //remove or insert is used on a Lemur ListBox, getSelection()
+                    //will not be updated to anything other than the last item 
+                    //in the ListBox. If the ListBox size is not affected
+                    //by removal, such as following it with an insert, this can 
+                    //be ignored. Otherwise it's best to setSelection(-1) and
+                    //force the user to make a selection.
+                    listBoxAvoidance.getModel().remove(i);
                     //Insert the new parameters into listBoxAvoidance.
-                    insert(listBoxAvoidance, i, params);
+                    listBoxAvoidance.getModel().add(i, params);
                 }
             } else {
-                Integer selectedIndex = listActiveCrowds.getSelectionModel().getSelection();
-                int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
-                //The selectedIndex does not update when removing or adding 
-                //objects to the listBox. This leads to situations where 
-                //selectedIndex will be the same as the numberOfCrowds. In those 
-                //cases we skip updating listBoxAvoidance. Failure to make the 
-                //check throws an index out of bounds exception.
-                if (selectedIndex != null && selectedIndex <  numberOfCrowds) {
-                    LOG.info("Update Loop updated OAP - Crowd [{}] selectedIndex [{}]", listActiveCrowds.getModel().get(selectedIndex), selectedIndex);
-                    Crowd crowd = getSelectedCrowd();
-                    //Look for the crowd in mapCrowds rather than pulling 
-                    //directly from CrowdManager in case CrowdState is running
-                    //at same time as gui.
-                    if (crowd != null) {
-                        for (int i = 0; i < 8; i++) {
-                            ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
-                            //Remove selected parameter.
-                            remove(listBoxAvoidance, i);
-                            //Insert the new parameters into the list by converting
-                            //the oap to string.
-                            insert(listBoxAvoidance, i, oapToString(oap, i));
-                        }
-                    } else {
-                        LOG.error("Failed to update OAP. No Crowd index found by that name [{}]", listActiveCrowds.getModel().get(selectedIndex));
-                        displayMessage("Failed to update OAP. No Crowd index found by that name = " + listActiveCrowds.getModel().get(selectedIndex), 0);
+                Crowd crowd = getSelectedCrowd();
+                //Look for the crowd in mapCrowds rather than pulling 
+                //directly from CrowdManager in case CrowdState is running
+                //at same time as gui.
+                if (crowd != null) {
+                    for (int i = 0; i < 8; i++) {
+                        ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
+                        //Remove selected parameter.
+                        listBoxAvoidance.getModel().remove(i);
+                        //Insert the new parameters into the list by converting
+                        //the oap to string.
+                        listBoxAvoidance.getModel().add(i, oapToString(oap, i));
                     }
-                }
+                } 
             }
         }
 
@@ -537,9 +530,10 @@ public class CrowdBuilderState extends BaseAppState {
         "weightToi         = 2.5f \t   adaptiveDepth  = 5",
         " ",
         "You may not remove any default parameter from the Crowd, however, you can",
-        "overwrite them. To change any parameter, first set the parameters you desire in the",
-        "Obstacle Avoidance Parameters section, then select any parameter from the list and", 
-        "click the [ Update Parameter ] button.",
+        "overwrite them. To change any parameter, select the crowd to be updated from the",
+        "Active Crowds window, set the parameters you desire in the Obstacle Avoidance", 
+        "Parameters section, then select any parameter from the list and click the",
+        "[ Update Parameter ] button.",
         " ",
         "* velBias - The velocity bias describes how the sampling patterns is offset from the (0,0)", 
         "based on the desired velocity. This allows to tighten the sampling area and cull a lot of", 
@@ -563,7 +557,7 @@ public class CrowdBuilderState extends BaseAppState {
         "Too long horizon and the agents are scared of going through tight spots, and too small,", 
         "and they avoid too late (closely related to weightToi).",
         " ",
-        "gridSize - ???",
+        "* gridSize - ???",
         " ",
         "* adaptiveDivs - Number of divisions per ring. [Limit: 1-32]",
         " ",
@@ -592,7 +586,7 @@ public class CrowdBuilderState extends BaseAppState {
      * also so taking the long way home is more efficient.
      */
     private void shutdown() {
-        
+
         //Get the Crowd from selectedParam. we need this for accurate removal 
         //from listActiveCrowds.
         Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
@@ -622,11 +616,16 @@ public class CrowdBuilderState extends BaseAppState {
                 //CrowdManager, mapCrowds (removes the query object also), and 
                 //the listActiveCrowds.
                 getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(entry.getValue().getCrowd());
-                remove(listActiveCrowds, selectedCrowd);
+                listActiveCrowds.getModel().remove((int)selectedCrowd);
+                //Lemur getSelected() does not update if you remove or insert 
+                //into a listBox. Best to set it to -1 (unselected) and force
+                //user to reselect.
+                listActiveCrowds.getSelectionModel().setSelection(-1);
                 iterator.remove();
                 break;
             }
         } 
+
     }
     
     /**
@@ -908,15 +907,15 @@ public class CrowdBuilderState extends BaseAppState {
         params.adaptiveRings    = adaptiveRings;
 
         //Inject the new parameter into the crowd. Check for the crowd in 
-        //mapcrowds and if exists update OAP params. Pulls the crowd reference 
+        //mapcrowds and if exists, update OAP params. Pulls the crowd reference 
         //from the CrowdNQuery obj rather than the CrowdManager in case 
-        //CrowdState is running to keep our crowd lookups in sync.
+        //CrowdState is running. This will keep our crowd lookups in sync.
         if (getSelectedCrowd() != null) {
             getSelectedCrowd().setObstacleAvoidanceParams(selectedParam, params);
             //Remove selected parameter from listBoxAvoidance.
-            remove(listBoxAvoidance, selectedParam);
+            listBoxAvoidance.getModel().remove((int)selectedParam);
             //Insert the new parameters into listBoxAvoidance.
-            insert(listBoxAvoidance, selectedParam, oapToString(params, selectedParam));
+            listBoxAvoidance.getModel().add(selectedParam, oapToString(params, selectedParam));
         } else {
             LOG.error("Failed to find the selected crowd in mapCrowds [{}]", getCrowdName());
             displayMessage("You must select a [ Active Crowd ] " 
@@ -924,32 +923,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
     }
     
-    /**
-     * Gets a crowd number from the CrowdManager by checking the CrowdManager 
-     * for the crowd object. Not really useful for anything other than logging.
-     * 
-     * @param crowd The crowd to lookup.
-     * @return The crowd number for the given crowd.
-     */
-    public int getCrowdNumber(Crowd crowd) {
-        int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
-        for (int i = 0; i < numberOfCrowds; i++) {
-            if (getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i).equals(crowd)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-    
-    //Insert a parameter string into the List.
-    protected void insert(ListBox list, int idx, String txt) {
-        list.getModel().add(idx, txt);
-    }
-    
-    //Remove parameter string from a listBox.
-    protected void remove(ListBox list, int idx) {
-        list.getModel().remove(idx);
-    }
+
     
     //Logs crowd info to the console.
     protected void dumpActiveAgents(int i) {
@@ -1060,6 +1034,18 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
+     * Displays a modal popup message.
+     * 
+     * @param txt The text for the popup.
+     * @param width The maximum width for wrap. 
+     */
+    private void displayMessage(String txt, float width) {
+        GuiGlobals.getInstance().getPopupState()
+                    .showModalPopup(getState(GuiUtilState.class)
+                            .buildPopup(txt, width));
+    }
+    
+    /**
      * Gets the query object for any selected crowd.
      * 
      * @return The query object for a selected crowd or null if the 
@@ -1102,7 +1088,7 @@ public class CrowdBuilderState extends BaseAppState {
     public String getCrowdName() {
         //Get the crowdName from listActiveCrowds.
         Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
-        
+
         //Check to make sure a crowd has been selected.
         if (selectedCrowd == null) {
             return null;
@@ -1113,15 +1099,20 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
-     * Displays a modal popup message.
+     * Gets a crowd number from the CrowdManager by checking the CrowdManager 
+     * for the crowd object. Not really useful for anything other than logging.
      * 
-     * @param txt The text for the popup.
-     * @param width The maximum width for wrap. 
+     * @param crowd The crowd to lookup.
+     * @return The crowd number for the given crowd.
      */
-    private void displayMessage(String txt, float width) {
-        GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
-                            .buildPopup(txt, width));
+    public int getCrowdNumber(Crowd crowd) {
+        int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
+        for (int i = 0; i < numberOfCrowds; i++) {
+            if (getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i).equals(crowd)) {
+                return i;
+            }
+        }
+        return -1;
     }
     
     private class CrowdNQuery {

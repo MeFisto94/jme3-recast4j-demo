@@ -37,8 +37,10 @@ import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.DetourUtils;
+import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.DebugMoveControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.recast4j.demo.states.AgentGridState.CrowdUserData;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Torus;
@@ -61,7 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Holds the agent parameter panel components.
+ * Holds the spatial parameter panel components.
  * 
  * @author Robert
  */
@@ -107,7 +109,7 @@ public class AgentParamState extends BaseAppState {
         contParams.setAlpha(0, false);
         contAgentParams.addChild(contParams, "top, growx");
 
-        //Begin the crowd agent parameters section.
+        //Begin the crowd spatial parameters section.
         contParams.addChild(new Label("Crowd Agent Parameters"));
         
         //The auto-generate radius checkbox.
@@ -276,11 +278,16 @@ public class AgentParamState extends BaseAppState {
     }
     
     /**
-     * Explains the agent parameters.
+     * Explains the spatial parameters.
      */
     private void showHelp() {
 
         String[] msg = {
+        "Agent Parameters - These are crowd specific parameters for the agents you select in",
+        "the [ Agent Grid ] [ Active Grids ] window. To add or update any active grid setting in this", 
+        "panel, simply make your chages and [Add Agents Crowd] and the selected  grid will be", 
+        "updated.",
+        " ",
         "Agent Radius - The radius of the agent. When presented with an opening  they are to", 
         "large to enter, pathFinding will try to navigate around it. If checked, the given value will", 
         "be used for the radius of Crowd navigation. Left unchecked, and the radius assigned to", 
@@ -311,21 +318,8 @@ public class AgentParamState extends BaseAppState {
         "agent. Currently, the max number of avoidance types that can be configured for the", 
         "Crowd is eight. See [ Crowd ] [ Obstacle Avoidance Parameters ]. [Limits: 0 <= value < 8]",
         " ",
-        "Debug Movement - Adds a debug control if [ Visual ], [ Verbose ], or both are checked", 
-        "and no existing control is found when adding the agent to the crowd. To remove the", 
-        "control, deselect both options and [ Add Agents Crowd ]. To update the visual or", 
-        "verbose state of the control, select one or both and [ Add Agents Crowd ].",
-        " " ,
-        "* Visual - The control will display a visual representation of an agents", 
-        "MoveRequestState while inside the selected crowd.",
-        "\tWhite   = Forming",
-        "\tMagenta = Moving / MoveRequestState.DT_CROWDAGENT_TARGET_VALID",
-        "\tCyan    = NoTarget / MoveRequestState.DT_CROWDAGENT_TARGET_NONE",
-        "\tBlack   = none of the above",
-        "",
-        "* Verbose - Logs the information to the console.",
-        " ",
         "Update Flags - Crowd agent update flags. This is a required setting.",
+        " ",
         "* ANTICIPATE_TURNS",
         " ",
         "* OBSTACLE_AVOIDANCE",
@@ -343,8 +337,28 @@ public class AgentParamState extends BaseAppState {
         " ",
         "* SEPARATION",
         " ",
-        "Target Position - This is the target for the crowd to move to. You can set it manually or", 
-        "by hovering your mouse pointer over the desired target and selecting the [ Shift ] key.",
+        "Debug Movement - Adds a debug control if [ Visual ], [ Verbose ], or both are checked", 
+        "and no existing control is found when adding the agent to the crowd. To remove the", 
+        "control, deselect both options and [ Add Agents Crowd ]. To update the visual or", 
+        "verbose state of the control, select one or both and [ Add Agents Crowd ].",
+        " " ,
+        "* Visual - Display a visual representation of an agents MoveRequestState while inside", 
+        "the selected crowd.",
+        " ",
+        "\tWhite   = Forming",
+        "\tMagenta = Moving / MoveRequestState.DT_CROWDAGENT_TARGET_VALID",
+        "\tCyan    = NoTarget / MoveRequestState.DT_CROWDAGENT_TARGET_NONE",
+        "\tBlack   = none of the above",
+        "",
+        "* Verbose - Logs the information to the console.",
+        " ",
+        "Target Position - This is the target for the crowd you have selected in the [ Crowd ]", 
+        "panel. You can set it manually or by hovering your mouse pointer over the desired", 
+        "target and selecting the [ Shift ] key.",
+        " ",
+        "Add Agents Crowd - Add the active grid selected in the [ Add Grid ] [ Active Grids ]", 
+        "window to the crowd selected in the [ Crowd ] [ Active Crowd ] window. It will also", 
+        "update any active grid Agent Parameters as explained above.",
         };
                 
         Container window = new Container(new MigLayout("wrap"));
@@ -360,7 +374,7 @@ public class AgentParamState extends BaseAppState {
     }
     
     /**
-     * Adds an agent to the specified crowd but does not set the target. Resets 
+     * Adds an spatial to the specified crowd but does not set the target. Resets 
      * and removes all agents from the crowd prior to add.
      */
     private void addAgentCrowd() {
@@ -374,7 +388,8 @@ public class AgentParamState extends BaseAppState {
         float separationWeight;
         int updateFlags;
         int obstacleAvoidanceType;
-        
+        boolean updatedParams = false;
+
         //Get the selected crowd from the CrowdBuilderState where all crowds live.
         Crowd crowd = getState(CrowdBuilderState.class).getSelectedCrowd();
         
@@ -384,7 +399,7 @@ public class AgentParamState extends BaseAppState {
             return;
         }        
         
-        //Must select a agent grid.
+        //Must select a spatial grid.
         //Get the selectedAgentGrid from listBoxGrid.
         Integer selectedAgentGrid = getState(AgentGridState.class)
                 .getListBoxGrid().getSelectionModel().getSelection();
@@ -405,7 +420,7 @@ public class AgentParamState extends BaseAppState {
             return;
         }
 
-        //The agent radius. 
+        //The spatial radius. 
         if (checkRadius.isChecked()) {
             if (fieldRadius.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
@@ -414,8 +429,8 @@ public class AgentParamState extends BaseAppState {
             } 
         } 
 
-        //The agent height. If empty we will use auto generated settings gathered
-        //when the agent was added to its grid in the Add Grid tab.
+        //The spatial height. If empty we will use auto generated settings gathered
+        //when the spatial was added to its grid in the Add Grid tab.
         if (checkHeight.isChecked()) {
             if (fieldHeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
@@ -536,7 +551,7 @@ public class AgentParamState extends BaseAppState {
         
         //Everything checks out so far so grab the selected list of agents for 
         //the grid.
-        List<Node> listAgents = getState(AgentGridState.class).getAgentList(gridName);
+        List<CrowdUserData> listAgents = getState(AgentGridState.class).getAgentList(gridName);
                 
         //If checked, we use the fieldRadius for the radius.
         if (checkRadius.isChecked()) {
@@ -548,7 +563,7 @@ public class AgentParamState extends BaseAppState {
             }
         } else {
             //Auto calculate based on bounds.
-            BoundingBox bounds = (BoundingBox) listAgents.get(0).getWorldBound();
+            BoundingBox bounds = (BoundingBox) listAgents.get(0).getSpatialForAgent().getWorldBound();
             float x = bounds.getXExtent();
             float z = bounds.getZExtent();
 
@@ -565,14 +580,12 @@ public class AgentParamState extends BaseAppState {
                 return;
             }
         } else {
-            //Auto calculate based on bounds.
-            BoundingBox bounds = (BoundingBox) listAgents.get(0).getWorldBound();
+            //Auto calculate based on bounds. All agents are the same so grab 
+            //first one.
+            BoundingBox bounds = (BoundingBox) listAgents.get(0).getSpatialForAgent().getWorldBound();
             float y = bounds.getYExtent();
             height = y*2;
         }
-
-        //Temp fix for crowd clearing.
-        resetCrowd(crowd);
         
         if (listAgents.size() > crowd.getAgentCount()) {
             displayMessage(
@@ -588,6 +601,8 @@ public class AgentParamState extends BaseAppState {
         }        
         
         LOG.info("<===== BEGIN AgentParamState addAgentCrowd =====>");        
+        LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
+        LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
 
         //Build the params object.
         CrowdAgentParams ap = new CrowdAgentParams();
@@ -599,7 +614,7 @@ public class AgentParamState extends BaseAppState {
         ap.pathOptimizationRange    = pathOptimizeRange;
         ap.separationWeight         = separationWeight;
         ap.updateFlags              = updateFlags;
-        ap.obstacleAvoidanceType    = obstacleAvoidanceType;
+        ap.obstacleAvoidanceType    = obstacleAvoidanceType;        
         
         LOG.info("radius                [{}]", ap.radius);
         LOG.info("height                [{}]", ap.height);
@@ -611,67 +626,139 @@ public class AgentParamState extends BaseAppState {
         LOG.info("obstacleAvoidanceType [{}]", ap.obstacleAvoidanceType);
         LOG.info("updateFlags           [{}]", ap.updateFlags);
         
-        for (Node agent: listAgents) {
-            
-            LOG.info("Agent Name            [{}]", agent.getName());
-            LOG.info("Position World        [{}]", agent.getWorldTranslation());
-            LOG.info("Position Local        [{}]", agent.getLocalTranslation());
-            
-            //Add agents to the crowd.
-            CrowdAgent createAgent = crowd.createAgent(agent.getWorldTranslation(), ap);
-            crowd.setSpatialForAgent(createAgent, agent);
-
-            /**
-             * Adds a debug control if checkDebugVisual, checkDebugVerbose, or 
-             * both are checked and no existing control is found when adding the 
-             * agent to the crowd. 
-             * 
-             * Removes the control if one exists prior to adding the agent to 
-             * the crowd and both checkDebugVisual and checkDebugVerbose are not
-             * checked. 
-             * 
-             * The control will update the visual or verbose state if either or 
-             * both checkDebugVisual or checkDebugVerbose are selected and the 
-             * control exists when adding the agent to the crowd.
-             */
-            if (checkDebugVisual.isChecked() || checkDebugVerbose.isChecked()) {
-                if (agent.getControl(DebugMoveControl.class) == null) {
-                    //Create the geometry for the halo
-                    Torus halo = new Torus(16, 16, 0.1f, 0.3f);
-                    Geometry haloGeom = new Geometry("halo", halo);
-                    Material haloMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-                    haloGeom.setMaterial(haloMat);
-                    haloGeom.setLocalTranslation(0, ap.height + 0.5f, 0);
-                    Quaternion pitch90 = new Quaternion();
-                    pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
-                    haloGeom.setLocalRotation(pitch90);
-                    //Add the control and set its visual and verbose state.
-                    DebugMoveControl dmc = new DebugMoveControl(crowd, createAgent, haloGeom);
-                    dmc.setVisual(checkDebugVisual.isChecked()); 
-                    dmc.setVerbose(checkDebugVerbose.isChecked());                    
-                    agent.addControl(dmc);
-                    LOG.info("Adding debug control.");
-                } else {
-                    //Set the control to display selected option.
-                    agent.getControl(DebugMoveControl.class).setVisual(checkDebugVisual.isChecked()); 
-                    agent.getControl(DebugMoveControl.class).setVerbose(checkDebugVerbose.isChecked());
-                    agent.getControl(DebugMoveControl.class).setCrowd(crowd);
-                    agent.getControl(DebugMoveControl.class).setAgent(createAgent);
-                    LOG.info("Updating debug control");
+        /**
+         * Update an existing agent for the crowd. This loop checks the listAgents 
+         * against the active agents groupList for the selected crowd. If they 
+         * have exactly the same group members, update the parameters rather 
+         * than creating new ones. If we update, we don't create a new CrowdAgent.
+         * This works only because having a matched list means they are all 
+         * members of this crowd which was created when adding them to the crowd. 
+         * If an individual member were to be removed, then this would fall apart.
+         */
+        for (CrowdAgent ca: crowd.getActiveAgents()) {
+            //If the listAgents and CrowdAgent groupList are identicle, we update.
+            if (((Group) ca.params.userData).getGroup().containsAll(listAgents)) {
+                //We keep the old CrowdUserData obj;
+                ap.userData = ca.params.userData;
+                //Update the parameters for the userData.
+                crowd.updateAgentParameters(ca.idx, ap);
+                //Check for update of DebugMoveControl.
+                List<CrowdUserData> group = ((Group) ca.params.userData).getGroup();
+                for (CrowdUserData groupMember: group) {
+                    if (groupMember.getCrowdAgent().equals(ca)) {
+                        checkDebugMove(groupMember.getSpatialForAgent(), crowd, ca);
+                    }
                 }
-            } else {
-                //Nothing checked for debug, remove control if exists.
-                if (agent.getControl(DebugMoveControl.class) != null) {
-                    agent.removeControl(DebugMoveControl.class);
-                    LOG.info("Removing debug control");
-                } 
+                //We updated userData so no new agents will be created.
+                updatedParams = true;
+                
+                //Verify information was updated in logging. Serves no other 
+                //purpose.
+                CrowdAgentParams cap = crowd.getAgent(ca.idx).params;
+                
+                LOG.info("<========== BEGIN Update CAP Check Agent [{}] ==========>", ca.idx);
+                LOG.info("radius                [{}]", cap.radius);
+                LOG.info("height                [{}]", cap.height);
+                LOG.info("maxAcceleration       [{}]", cap.maxAcceleration);
+                LOG.info("maxSpeed              [{}]", cap.maxSpeed);
+                LOG.info("colQueryRange         [{}]", cap.collisionQueryRange);
+                LOG.info("pathOptimizationRange [{}]", cap.pathOptimizationRange);
+                LOG.info("separationWeight      [{}]", cap.separationWeight);
+                LOG.info("obstacleAvoidanceType [{}]", cap.obstacleAvoidanceType);
+                LOG.info("updateFlags           [{}]", cap.updateFlags);
+                LOG.info("Agents Group          [{}]", ((Group) cap.userData).getGroup());
+                LOG.info("<========== END Update CAP Check Agent [{}] ==========>", ca.idx);
             }
-
-            LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
-            LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
-            LOG.info("<===== End AgentParamState addAgentCrowd =====>");
         }
+        
+        /**
+         * Add a new agent to the crowd.
+         */
+        if (!updatedParams) {
+            
+            //New userData, new group.
+            ap.userData = new Group(listAgents);
+            
+            for (CrowdUserData userData: listAgents) {
 
+                LOG.info("<========== BEGIN Adding New Agent [{}] ==========>", userData.getSpatialForAgent().getName());
+                LOG.info("Position World        [{}]", userData.getSpatialForAgent().getWorldTranslation());
+                LOG.info("Position Local        [{}]", userData.getSpatialForAgent().getLocalTranslation());
+
+                //Add agents to the crowd.
+                CrowdAgent createAgent = crowd.createAgent(userData.getSpatialForAgent().getWorldTranslation(), ap);
+                crowd.setSpatialForAgent(createAgent, userData.getSpatialForAgent());
+                
+                //Set the agent for the spatial.
+                userData.setCrowdAgent(createAgent);
+                
+                //No CrowdChangecontrol then add one.
+                if (userData.getSpatialForAgent().getControl(CrowdChangeControl.class) == null) {
+                    LOG.info("Adding CrowdChangeControl agent [{}].", userData.getSpatialForAgent().getName());
+                    userData.getSpatialForAgent().addControl(new CrowdChangeControl(crowd, createAgent));
+                } else {
+                    //Existing control so update.
+                    LOG.info("Updating CrowdChangeControl agent [{}].", userData.getSpatialForAgent().getName());
+                    userData.getSpatialForAgent().getControl(CrowdChangeControl.class).setCrowd(crowd, createAgent);
+                }
+                
+                //Check for DebugMoveControl.
+                checkDebugMove(userData.getSpatialForAgent(), crowd, createAgent);
+
+                LOG.info("Agents Group           {]", ((Group) ap.userData).getGroup());
+                LOG.info("<========== END Adding New Agent [{}] ==========>", userData.getSpatialForAgent().getName());
+            }
+        } 
+        LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
+        LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
+        LOG.info("<===== END AgentParamState addAgentCrowd =====>");
+    }
+    
+    /**
+     * Adds a debug control if checkDebugVisual, checkDebugVerbose, or both are 
+     * checked and no existing control is found when adding the userData to the 
+     * crowd. 
+     * 
+     * Removes the control if one exists prior to adding the userData to the 
+     * crowd and both checkDebugVisual and checkDebugVerbose are not checked. 
+     * 
+     * The control will update the visual or verbose state if either or both 
+     * checkDebugVisual or checkDebugVerbose are selected and the control exists 
+     * when adding the userData to the crowd.
+     */
+    private void checkDebugMove(Node agent, Crowd crowd, CrowdAgent crowdAgent) {
+        if (checkDebugVisual.isChecked() || checkDebugVerbose.isChecked()) {
+            if (agent.getControl(DebugMoveControl.class) == null) {
+                //Create the geometry for the halo
+                Torus halo = new Torus(16, 16, 0.1f, 0.3f);
+                Geometry haloGeom = new Geometry("halo", halo);
+                Material haloMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+                haloGeom.setMaterial(haloMat);
+                haloGeom.setLocalTranslation(0, crowdAgent.params.height + 0.5f, 0);
+                Quaternion pitch90 = new Quaternion();
+                pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
+                haloGeom.setLocalRotation(pitch90);
+                //Add the control and set its visual and verbose state.
+                DebugMoveControl dmc = new DebugMoveControl(crowd, crowdAgent, haloGeom);
+                dmc.setVisual(checkDebugVisual.isChecked()); 
+                dmc.setVerbose(checkDebugVerbose.isChecked());                    
+                agent.addControl(dmc);
+                LOG.info("Adding DebugMoveControl to agent [{}].", agent.getName());
+            } else {
+                //Set the control to display selected option.
+                agent.getControl(DebugMoveControl.class).setVisual(checkDebugVisual.isChecked()); 
+                agent.getControl(DebugMoveControl.class).setVerbose(checkDebugVerbose.isChecked());
+                agent.getControl(DebugMoveControl.class).setCrowd(crowd);
+                agent.getControl(DebugMoveControl.class).setAgent(crowdAgent);
+                LOG.info("Updating DebugMoveControl agent [{}].", agent.getName());
+            }
+        } else {
+            //Nothing checked for debug, remove control if exists.
+            if (agent.getControl(DebugMoveControl.class) != null) {
+                agent.removeControl(DebugMoveControl.class);
+                LOG.info("Removing DebugMoveControl [{}].", agent.getName());
+            } 
+        }
     }
 
     /**
@@ -722,7 +809,7 @@ public class AgentParamState extends BaseAppState {
             if (nearest.getNearestRef() == 0) {
                 LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
             } else {
-                //Sets all agent targets at same time.
+                //Sets all spatial targets at same time.
                 crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
             }
             
@@ -741,24 +828,6 @@ public class AgentParamState extends BaseAppState {
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup(txt, width));
     }    
-
-    /**
-     * Resets all crowd agent move targets for the selected crowd. 
-     * targetRef = 0;
-     * targetPos( 0, 0, 0);
-     * dvel( 0, 0, 0);
-     * targetPathqRef = PathQueue.DT_PATHQ_INVALID;
-     * targetReplan = false;
-     * targetState = MoveRequestState.DT_CROWDAGENT_TARGET_NONE;
-     * @param crowd The crowd to reset.
-     */
-    private void resetCrowd(Crowd crowd) {
-        List<CrowdAgent> activeAgents = crowd.getActiveAgents();
-        for (CrowdAgent agent: activeAgents) {
-            crowd.resetMoveTarget(activeAgents.indexOf(agent));
-            crowd.removeAgent(agent);
-        }
-    }
     
     /**
      * @return The contAgentParams.
@@ -779,6 +848,23 @@ public class AgentParamState extends BaseAppState {
         this.fieldTargetX.setText(x);
         this.fieldTargetY.setText(y);
         this.fieldTargetZ.setText(z);
-    }    
+    }
+    
+    private class Group {
+        
+        private List<CrowdUserData> group;
+
+        public Group(List<CrowdUserData> group) {
+            this.group = group;
+        }
+
+        /**
+         * @return the group
+         */
+        public List<CrowdUserData> getGroup() {
+            return group;
+        }
+
+    }
     
 }
