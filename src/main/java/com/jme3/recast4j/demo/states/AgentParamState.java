@@ -63,7 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Holds the spatial parameter panel components.
+ * Holds the agent parameter panel components.
  * 
  * @author Robert
  */
@@ -109,7 +109,7 @@ public class AgentParamState extends BaseAppState {
         contParams.setAlpha(0, false);
         contAgentParams.addChild(contParams, "top, growx");
 
-        //Begin the crowd spatial parameters section.
+        //Begin the crowd agent parameters section.
         contParams.addChild(new Label("Crowd Agent Parameters"));
         
         //The auto-generate radius checkbox.
@@ -278,7 +278,7 @@ public class AgentParamState extends BaseAppState {
     }
     
     /**
-     * Explains the spatial parameters.
+     * Explains the agent parameters.
      */
     private void showHelp() {
 
@@ -374,7 +374,7 @@ public class AgentParamState extends BaseAppState {
     }
     
     /**
-     * Adds an spatial to the specified crowd but does not set the target. Resets 
+     * Adds an agent to the specified crowd but does not set the target. Resets 
      * and removes all agents from the crowd prior to add.
      */
     private void addAgentCrowd() {
@@ -399,7 +399,7 @@ public class AgentParamState extends BaseAppState {
             return;
         }        
         
-        //Must select a spatial grid.
+        //Must select a agent grid.
         //Get the selectedAgentGrid from listBoxGrid.
         Integer selectedAgentGrid = getState(AgentGridState.class)
                 .getListBoxGrid().getSelectionModel().getSelection();
@@ -420,7 +420,7 @@ public class AgentParamState extends BaseAppState {
             return;
         }
 
-        //The spatial radius. 
+        //The agent radius. 
         if (checkRadius.isChecked()) {
             if (fieldRadius.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
@@ -429,8 +429,8 @@ public class AgentParamState extends BaseAppState {
             } 
         } 
 
-        //The spatial height. If empty we will use auto generated settings gathered
-        //when the spatial was added to its grid in the Add Grid tab.
+        //The agent height. If empty we will use auto generated settings gathered
+        //when the agent was added to its grid in the Add Grid tab.
         if (checkHeight.isChecked()) {
             if (fieldHeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
@@ -689,7 +689,7 @@ public class AgentParamState extends BaseAppState {
                 CrowdAgent createAgent = crowd.createAgent(userData.getSpatialForAgent().getWorldTranslation(), ap);
                 crowd.setSpatialForAgent(createAgent, userData.getSpatialForAgent());
                 
-                //Set the agent for the spatial.
+                //Set the agent for the agent.
                 userData.setCrowdAgent(createAgent);
                 
                 //No CrowdChangecontrol then add one.
@@ -809,7 +809,7 @@ public class AgentParamState extends BaseAppState {
             if (nearest.getNearestRef() == 0) {
                 LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
             } else {
-                //Sets all spatial targets at same time.
+                //Sets all agent targets at same time.
                 crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
             }
             

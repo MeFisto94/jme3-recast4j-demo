@@ -235,8 +235,8 @@ public class AgentGridState extends BaseAppState {
     }
 
     /**
-     * Removing this state from StateManager will clear all userData from the 
- physics space and gui node. The removal of the gui components is a by
+     * Removing this state from StateManager will clear all agents from the 
+     * physics space and gui node. The removal of the gui components is a by
      * product of the removal of CrowdBuilderState where this gui lives.
      */
     @Override
@@ -296,7 +296,7 @@ public class AgentGridState extends BaseAppState {
     @Override
     public void update(float tpf) {
                     
-        //Look for incactive grid to activate. Loads the userData into the physics
+        //Look for incactive grid to activate. Loads the agents into the physics
         //space and attaches them to the rootNode.
         if (newGrid) {
             mapGrids.forEach((key, value)-> {
@@ -318,7 +318,7 @@ public class AgentGridState extends BaseAppState {
             newGrid = false;
         }
         
-        //Look for grids to remove. Removes the userData from the root node and 
+        //Look for grids to remove. Removes the agents from the root node and 
         //physics space. Use iterator to avoid ConcurrentModificationException.
         if (checkGrids) {
             Iterator<Map.Entry<String, Grid>> iterator = mapGrids.entrySet().iterator();
@@ -486,7 +486,7 @@ public class AgentGridState extends BaseAppState {
             default: agentPath = null;
         }
 
-        //Number of userData to place into the grid in rows and columns.
+        //Number of agents to place into the grid in rows and columns.
         //Selection is set when creating the listBoxSize so shouldn't need to 
         //check for null.
         int size = listBoxSize.getSelectionModel().getSelection() + 1;
@@ -543,7 +543,7 @@ public class AgentGridState extends BaseAppState {
      * 
      * @param agentPath The Path of the crowdUserData to be used for this grid.
      * @param size The size of the grid to be created.
-     * @param distance The spacing between userData in the grid.
+     * @param distance The spacing between agents in the grid.
      * @param startPos The start position of the crowdUserData. This has no 
      * other use outside of initial grid generation. 
      * @param gridName The name for this grid. This will also used when applying 
@@ -639,7 +639,7 @@ public class AgentGridState extends BaseAppState {
                     //physics space from update loop.
                     //PhysicsRigidBody from CrowdBCC is detectable for cleanup
                     //so had to extend it just to add the getter.
-//                    crowdUserData.addControl(new BetterCharacterControl(radius, height, weight));
+//                    agent.addControl(new BetterCharacterControl(radius, height, weight));
                     agent.addControl(new CrowdBCC(radius, height, weight));
                     agent.addControl(new PhysicsAgentControl());
 
@@ -650,7 +650,7 @@ public class AgentGridState extends BaseAppState {
                 LOG.info("height            [{}]", height);
                 LOG.info("Position World    [{}]", agent.getWorldTranslation());
                 LOG.info("Position Local    [{}]", agent.getLocalTranslation());
-                //Add to userData list.
+                //Add to agents list.
                 CrowdUserData userData = new CrowdUserData(agent);
                 listAgents.add(userData);
             }
@@ -727,7 +727,7 @@ public class AgentGridState extends BaseAppState {
      * Grabs the crowdUserData list for the requested grid.
      * 
      * @param gridName The name of the grid to look for.
-     * @return The list of userData for the supplied grid name.
+     * @return The list of agents for the supplied grid name.
      */
     public List<CrowdUserData> getAgentList(String gridName) {
         return mapGrids.get(gridName).listAgents;
@@ -773,7 +773,7 @@ public class AgentGridState extends BaseAppState {
         }
 
         /**
-         * A setting of true will trigger the removal of the grid. All userData 
+         * A setting of true will trigger the removal of the grid. All agents 
          * associated with the grid will be removed from the physics space and
          * rootNode. Removal takes place in the next pass of the update loop.
          * 
@@ -785,7 +785,7 @@ public class AgentGridState extends BaseAppState {
         
         /**
          * If grid is inactive it will be activated on the next update and all 
-         * userData loaded into the rootNode and physics space from the update loop.
+         * agents loaded into the rootNode and physics space from the update loop.
          * 
          * @return the activeGrid
          */
@@ -795,7 +795,7 @@ public class AgentGridState extends BaseAppState {
 
         /**
          * A setting of true will keep the grid active in the mapGrid and prevent
-         * the loading of this grids userData.
+         * the loading of this grids agents.
          * 
          * @param activeGrid the activeGrid to set
          */
@@ -813,7 +813,7 @@ public class AgentGridState extends BaseAppState {
         }
 
         /**
-         * The list of userData to be used for this crowd grid.
+         * The list of agents to be used for this crowd grid.
          * 
          * @return the listAgents
          */
