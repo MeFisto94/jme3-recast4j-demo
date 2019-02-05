@@ -174,7 +174,7 @@ public class CrowdBuilderState extends BaseAppState {
         fieldCrowdName = contCrowdParam.addChild(new TextField("Crowd"), "growx");
         fieldCrowdName.setSingleLine(true);
         
-        //Max agents for the crowd.
+        //Max CrowdAgents for the crowd.
         contCrowdParam.addChild(new Label("Max Agents"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
@@ -183,7 +183,7 @@ public class CrowdBuilderState extends BaseAppState {
         fieldMaxAgents.setSingleLine(true);
         fieldMaxAgents.setPreferredWidth(50);
         
-        //Max agent radius for an agent in the crowd.
+        //Max CrowdAgent radius for an agent in the crowd.
         contCrowdParam.addChild(new Label("Max Agent Radius"), "split 2, growx");
         fieldMaxAgentRadius = contCrowdParam.addChild(new TextField("0.6"));
         fieldMaxAgentRadius.setSingleLine(true);
@@ -233,8 +233,7 @@ public class CrowdBuilderState extends BaseAppState {
         contAvoidLabel.addChild(new Label("Obstacle Avoidance Parameters")); 
         contCrowd.addChild(contAvoidLabel, "wrap");
         
-        //Container that holds the obstacle avoidance parameters for the crowd 
-        //agents.
+        //Container that holds the obstacle avoidance parameters for CrowdAgents.
         Container contAvoidance = new Container(new MigLayout("wrap", "[grow]"));
         contAvoidance.setName("CrowdBuilderState contAvoidance");
         contAvoidance.setAlpha(0, false);
@@ -403,7 +402,7 @@ public class CrowdBuilderState extends BaseAppState {
         
         
         
-        //Add a rollup panel so can hide agent parameters.
+        //Add a rollup panel so can hide CrowdAgent parameters.
         RollupPanel rollAgentParam = new RollupPanel("Expand / Collapse", 
                 getState(AgentParamState.class).getContAgentParams(), "glass");
         rollAgentParam.getTitleContainer().setLayout(new MigLayout(null, "[grow, fill]"));
@@ -486,7 +485,7 @@ public class CrowdBuilderState extends BaseAppState {
 
     }
     
-    //Explains the agent parameters.
+    //Explains the Crowd parameters.
     private void showHelp() {
                 
         String[] msg = { 
@@ -660,7 +659,7 @@ public class CrowdBuilderState extends BaseAppState {
             crowdName = fieldCrowdName.getText();
         }
         
-        //The max agents for the crowd. Uses numeric doc filter to prevent bad data.
+        //The max CrowdAgents for the crowd. Uses numeric doc filter to prevent bad data.
         if (fieldMaxAgents.getText().isEmpty()) {
             displayMessage("[ Max Agents ] requires a valid int value.", 0);
             return;
@@ -673,7 +672,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
         }
         
-        //The max agent radius for an agent in the crowd.
+        //The max CrowdAgent radius for an agent in the crowd.
         if (!getState(GuiUtilState.class).isNumeric(fieldMaxAgentRadius.getText()) 
         ||  fieldMaxAgentRadius.getText().isEmpty()) {
             displayMessage("[ Max Agent Radius ] requires a valid float value.", 0);

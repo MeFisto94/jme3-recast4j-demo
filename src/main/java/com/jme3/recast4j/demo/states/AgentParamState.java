@@ -626,36 +626,23 @@ public class AgentParamState extends BaseAppState {
         
         /**
          * Update an existing CrowdAgent for the crowd. This loop checks 
-         * listGridAgents against the active CrowdAgents group for the selected 
-         * crowd. If they have exactly the same group members, update the 
-         * parameters rather than creating new ones. If we update, we don't 
-         * create a new CrowdAgent. This works only because having a matched 
-         * list means they are all members of this crowd which was created when 
-         * adding them to the crowd. If an individual member were to be removed, 
-         * then this would fall apart.
-         */
-        for (CrowdAgent ca: crowd.getActiveAgents()) {
-            //If the listGridAgents and CrowdAgent groupList are identicle, we update.
-            if (((Group) ca.params.userData).getGroup().containsAll(listGridAgents)) {
-                //We keep the old GridAgent obj;
-                ap.userData = ca.params.userData;
-                //Update the parameters for the userData.
-                crowd.updateAgentParameters(ca.idx, ap);
-                //Check for update of DebugMoveControl.
-                List<GridAgent> group = ((Group) ca.params.userData).getGroup();
-                for (GridAgent groupMember: group) {
-                    if (groupMember.getCrowdAgent().equals(ca)) {
-                        checkDebugMove(groupMember.getSpatialForAgent(), crowd, ca);
-                    }
-                }
-                //We updated userData so no new CrowdAgents will be created.
+         * listGridAgents against the active CrowdAgents for the selected crowd. 
+         * If the crowd contains the GridAgent, update the parameters rather 
+         * than creating new ones. If we update, we don't create a new CrowdAgent. 
+         */        
+        for (GridAgent ga: listGridAgents) {
+            if (crowd.getActiveAgents().contains(ga.getCrowdAgent())) {
+                //Update the parameters for the CrowdAgent.
+                crowd.updateAgentParameters(ga.getCrowdAgent().idx, ap);
+                checkDebugMove(ga.getSpatialForAgent(), crowd, ga.getCrowdAgent());
+                //We updated CrowdAgent so no new CrowdAgents will be created.
                 updatedParams = true;
                 
                 //Verify information was updated in logging. Serves no other 
                 //purpose.
-                CrowdAgentParams cap = crowd.getAgent(ca.idx).params;
-                
-                LOG.info("<========== BEGIN Update CAP Check Agent [{}] ==========>", ca.idx);
+                CrowdAgentParams cap = crowd.getAgent(ga.getCrowdAgent().idx).params;
+
+                LOG.info("<========== BEGIN Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
                 LOG.info("radius                [{}]", cap.radius);
                 LOG.info("height                [{}]", cap.height);
                 LOG.info("maxAcceleration       [{}]", cap.maxAcceleration);
@@ -665,47 +652,44 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("separationWeight      [{}]", cap.separationWeight);
                 LOG.info("obstacleAvoidanceType [{}]", cap.obstacleAvoidanceType);
                 LOG.info("updateFlags           [{}]", cap.updateFlags);
-                LOG.info("Agents Group          [{}]", ((Group) cap.userData).getGroup());
-                LOG.info("<========== END Update CAP Check Agent [{}] ==========>", ca.idx);
+                LOG.info("Agents Group          [{}]", listGridAgents);
+                LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
             }
         }
-        
+
         /**
          * Add a new CrowdAgent to the crowd.
          */
         if (!updatedParams) {
             
-            //New userData, new group.
-            ap.userData = new Group(listGridAgents);
-            
-            for (GridAgent gridAgent: listGridAgents) {
+            for (GridAgent ga: listGridAgents) {
 
-                LOG.info("<========== BEGIN Adding New Agent [{}] ==========>", gridAgent.getSpatialForAgent().getName());
-                LOG.info("Position World        [{}]", gridAgent.getSpatialForAgent().getWorldTranslation());
-                LOG.info("Position Local        [{}]", gridAgent.getSpatialForAgent().getLocalTranslation());
+                LOG.info("<========== BEGIN New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
+                LOG.info("Position World        [{}]", ga.getSpatialForAgent().getWorldTranslation());
+                LOG.info("Position Local        [{}]", ga.getSpatialForAgent().getLocalTranslation());
 
                 //Add CrowdAgents to the crowd.
-                CrowdAgent createAgent = crowd.createAgent(gridAgent.getSpatialForAgent().getWorldTranslation(), ap);
-                crowd.setSpatialForAgent(createAgent, gridAgent.getSpatialForAgent());
+                CrowdAgent createAgent = crowd.createAgent(ga.getSpatialForAgent().getWorldTranslation(), ap);
+                crowd.setSpatialForAgent(createAgent, ga.getSpatialForAgent());
                 
-                //Set the CrowdAgent for the gridAgent.
-                gridAgent.setCrowdAgent(createAgent);
+                //Set the CrowdAgent for the ga.
+                ga.setCrowdAgent(createAgent);
                 
                 //No CrowdChangecontrol then add one.
-                if (gridAgent.getSpatialForAgent().getControl(CrowdChangeControl.class) == null) {
-                    LOG.info("Adding CrowdChangeControl agent [{}].", gridAgent.getSpatialForAgent().getName());
-                    gridAgent.getSpatialForAgent().addControl(new CrowdChangeControl(crowd, createAgent));
+                if (ga.getSpatialForAgent().getControl(CrowdChangeControl.class) == null) {
+                    LOG.info("Adding CrowdChangeControl agent [{}].", ga.getSpatialForAgent().getName());
+                    ga.getSpatialForAgent().addControl(new CrowdChangeControl(crowd, createAgent));
                 } else {
                     //Existing control so update.
-                    LOG.info("Updating CrowdChangeControl agent [{}].", gridAgent.getSpatialForAgent().getName());
-                    gridAgent.getSpatialForAgent().getControl(CrowdChangeControl.class).setCrowd(crowd, createAgent);
+                    LOG.info("Updating CrowdChangeControl agent [{}].", ga.getSpatialForAgent().getName());
+                    ga.getSpatialForAgent().getControl(CrowdChangeControl.class).setCrowd(crowd, createAgent);
                 }
                 
                 //Check for DebugMoveControl.
-                checkDebugMove(gridAgent.getSpatialForAgent(), crowd, createAgent);
+                checkDebugMove(ga.getSpatialForAgent(), crowd, createAgent);
 
-                LOG.info("Agents Group           {]", ((Group) ap.userData).getGroup());
-                LOG.info("<========== END Adding New Agent [{}] ==========>", gridAgent.getSpatialForAgent().getName());
+                LOG.info("Agents Group          [{}]", listGridAgents);
+                LOG.info("<========== END Adding New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
             }
         } 
         LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
@@ -847,23 +831,5 @@ public class AgentParamState extends BaseAppState {
         this.fieldTargetX.setText(x);
         this.fieldTargetY.setText(y);
         this.fieldTargetZ.setText(z);
-    }
-    
-    private class Group {
-        
-        private List<GridAgent> group;
-
-        public Group(List<GridAgent> group) {
-            this.group = group;
-        }
-
-        /**
-         * @return the group
-         */
-        public List<GridAgent> getGroup() {
-            return group;
-        }
-
-    }
-    
+    }    
 }
