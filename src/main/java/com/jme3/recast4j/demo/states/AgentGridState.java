@@ -62,7 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Holds the crowdUserData grid panel components.
+ * Holds the GridAgent panel components.
  * 
  * @author Robert
  */
@@ -104,7 +104,7 @@ public class AgentGridState extends BaseAppState {
         contAgentGrid.setName("AgentGridState contBuildGridGui");
         contAgentGrid.setAlpha(0, false);
 
-        //The container that holds crowdUserData stat selections.
+        //The container that holds GridAgent stat selections.
         Container contStats = new Container(new MigLayout("wrap", "[grow, fill]"));
         contStats.setName("AgentGridState contStats");
         contStats.setAlpha(0, false);
@@ -163,7 +163,7 @@ public class AgentGridState extends BaseAppState {
         
         //Container for the grid size listbox.
         Container contGridSize = new Container(new MigLayout("wrap"));
-        contGridSize.setName("AgentGridState contSize");
+        contGridSize.setName("AgentGridState contGridSize");
         contGridSize.setAlpha(0, false);
         contAgentGrid.addChild(contGridSize, "split 2, growy");        
         
@@ -235,36 +235,37 @@ public class AgentGridState extends BaseAppState {
     }
 
     /**
-     * Removing this state from StateManager will clear all agents from the 
+     * Removing this state from StateManager will clear all gridAgents from the 
      * physics space and gui node. The removal of the gui components is a by
      * product of the removal of CrowdBuilderState where this gui lives.
+     * @param app
      */
     @Override
     protected void cleanup(Application app) {
         Iterator<Map.Entry<String, Grid>> iterator = mapGrids.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<String, Grid> entry = iterator.next();
-            List<CrowdUserData> userData = entry.getValue().getListAgents();
-            for (CrowdUserData crowdUserData: userData) {
+            List<GridAgent> listGridAgent = entry.getValue().getListGridAgent();
+            for (GridAgent gridAgent: listGridAgent) {
                 //Convolouted crap just to get a PhysicsRigidBody from BCC.
-                if (crowdUserData.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
-                    PhysicsRigidBody prb = crowdUserData.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
+                if (gridAgent.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
+                    PhysicsRigidBody prb = gridAgent.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
                     if (getStateManager().getState(BulletAppState.class).getPhysicsSpace().getRigidBodyList().contains(prb)) {
-                        LOG.info("Removing BCC from [{}]", crowdUserData.getSpatialForAgent().getName());
-                        getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(crowdUserData.getSpatialForAgent());
+                        LOG.info("Removing BCC from [{}]", gridAgent.getSpatialForAgent().getName());
+                        getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(gridAgent.getSpatialForAgent());
                     }
                 }
                 
-                if (crowdUserData.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
-                    LOG.info("Removing DebugMoveControl from [{}]", crowdUserData.getSpatialForAgent().getName());
-                    crowdUserData.getSpatialForAgent().removeControl(DebugMoveControl.class);
+                if (gridAgent.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
+                    LOG.info("Removing DebugMoveControl from [{}]", gridAgent.getSpatialForAgent().getName());
+                    gridAgent.getSpatialForAgent().removeControl(DebugMoveControl.class);
                 }
                 
-                if (crowdUserData.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
-                    LOG.info("Removing CrowdChangeControl from [{}]", crowdUserData.getSpatialForAgent().getName());
-                    crowdUserData.getSpatialForAgent().removeControl(CrowdChangeControl.class);
+                if (gridAgent.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
+                    LOG.info("Removing CrowdChangeControl from [{}]", gridAgent.getSpatialForAgent().getName());
+                    gridAgent.getSpatialForAgent().removeControl(CrowdChangeControl.class);
                 }
-                ((SimpleApplication) getApplication()).getRootNode().detachChild(crowdUserData.getSpatialForAgent());
+                ((SimpleApplication) getApplication()).getRootNode().detachChild(gridAgent.getSpatialForAgent());
             }
             iterator.remove();
         }
@@ -296,18 +297,18 @@ public class AgentGridState extends BaseAppState {
     @Override
     public void update(float tpf) {
                     
-        //Look for incactive grid to activate. Loads the agents into the physics
+        //Look for incactive grid to activate. Loads the gridAgents into the physics
         //space and attaches them to the rootNode.
         if (newGrid) {
             mapGrids.forEach((key, value)-> {
                 if (!value.isActiveGrid()) {
-                    List<CrowdUserData> userData = value.getListAgents();
-                    for (CrowdUserData crowdUserData: userData) {
-                        //Physics crowdUserData so add to physics space.
-                        if (crowdUserData.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
-                            getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(crowdUserData.getSpatialForAgent());
+                    List<GridAgent> listGridAgent = value.getListGridAgent();
+                    for (GridAgent gridAgent: listGridAgent) {
+                        //Physics GridAgent so add to physics space.
+                        if (gridAgent.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
+                            getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(gridAgent.getSpatialForAgent());
                         }
-                        ((SimpleApplication) getApplication()).getRootNode().attachChild(crowdUserData.getSpatialForAgent());
+                        ((SimpleApplication) getApplication()).getRootNode().attachChild(gridAgent.getSpatialForAgent());
                     }
                     //Stop the the newGrid check from adding this again.
                     value.setActiveGrid(true);
@@ -318,42 +319,44 @@ public class AgentGridState extends BaseAppState {
             newGrid = false;
         }
         
-        //Look for grids to remove. Removes the agents from the root node and 
+        //Look for grids to remove. Removes the gridAgents from the root node and 
         //physics space. Use iterator to avoid ConcurrentModificationException.
         if (checkGrids) {
             Iterator<Map.Entry<String, Grid>> iterator = mapGrids.entrySet().iterator();
             while (iterator.hasNext()) {
                 Map.Entry<String, Grid> entry = iterator.next();
                 if (entry.getValue().isRemoveGrid()) {
-                    List<CrowdUserData> userData = entry.getValue().getListAgents();
-                    for (CrowdUserData crowdUserData: userData) {
+                    List<GridAgent> listGridAgent = entry.getValue().getListGridAgent();
+                    for (GridAgent gridAgent: listGridAgent) {
                         //Convolouted crap just to get a PhysicsRigidBody from BCC.
-                        if (crowdUserData.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
-                            //Look for the physicsRigidBody for this crowdUserData.
-                            PhysicsRigidBody prb = crowdUserData.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
+                        if (gridAgent.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
+                            //Look for the physicsRigidBody for this listGridAgent.
+                            PhysicsRigidBody prb = gridAgent.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
                             
                             if (getStateManager().getState(BulletAppState.class).getPhysicsSpace().getRigidBodyList().contains(prb)) {
-                                LOG.info("Removing BCC from [{}]", crowdUserData.getSpatialForAgent().getName());
-                                getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(crowdUserData.getSpatialForAgent());
+                                LOG.info("Removing BCC from [{}]", gridAgent.getSpatialForAgent().getName());
+                                getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(gridAgent.getSpatialForAgent());
                             }                            
                         }
                         
-                        if (crowdUserData.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
-                            LOG.info("Removing DebugMoveControl from [{}]", crowdUserData.getSpatialForAgent().getName());
-                            crowdUserData.getSpatialForAgent().removeControl(DebugMoveControl.class);
+                        if (gridAgent.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
+                            LOG.info("Removing DebugMoveControl from [{}]", gridAgent.getSpatialForAgent().getName());
+                            gridAgent.getSpatialForAgent().removeControl(DebugMoveControl.class);
                         }                        
                         
-                        if (crowdUserData.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
-                            LOG.info("Removing CrowdChangeControl from [{}]", crowdUserData.getSpatialForAgent().getName());
-                            crowdUserData.getSpatialForAgent().removeControl(CrowdChangeControl.class);
+                        if (gridAgent.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
+                            LOG.info("Removing CrowdChangeControl from [{}]", gridAgent.getSpatialForAgent().getName());
+                            gridAgent.getSpatialForAgent().removeControl(CrowdChangeControl.class);
                         }
-                        ((SimpleApplication) getApplication()).getRootNode().detachChild(crowdUserData.getSpatialForAgent());
-                    }
+                        ((SimpleApplication) getApplication()).getRootNode().detachChild(gridAgent.getSpatialForAgent());
+                    }                    
                     iterator.remove();
+                    //This is checked for null prior to setting checkGrids so 
+                    //shouldn't have to check for null.
                     Integer selection = listBoxGrid.getSelectionModel().getSelection();
-                    if (selection != null) {
-                        listBoxGrid.getModel().remove((int) selection);
-                    }
+                    listBoxGrid.getModel().remove((int) selection);
+                    listBoxGrid.getSelectionModel().setSelection(-1);
+                    break;
                 }
             }
             checkGrids = false;
@@ -423,7 +426,7 @@ public class AgentGridState extends BaseAppState {
     }
     
     /**
-     * Adds an crowdUserData grid to the world.
+     * Adds an GridAgent grid to the world.
      */
     private void addGrid() {
         String gridName;
@@ -433,7 +436,7 @@ public class AgentGridState extends BaseAppState {
 
         //Radius
         if (checkRadius.isChecked()) {
-            //The crowdUserData radius. 
+            //The GridAgent radius. 
             if (fieldRadius.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
                 displayMessage("[ Agent Radius ] requires a valid float value.", 0);
@@ -443,7 +446,7 @@ public class AgentGridState extends BaseAppState {
             
         //Height
         if (checkHeight.isChecked()) {
-            //The crowdUserData height. 
+            //The GridAgent height. 
             if (fieldHeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
                 displayMessage("[ Agent Height ] requires a valid float value.", 0);
@@ -454,7 +457,7 @@ public class AgentGridState extends BaseAppState {
         //Weight
         if (checkPhysics.isChecked() 
         &&  checkWeight.isChecked()) {
-            //The crowdUserData weight. 
+            //The GridAgent weight. 
             if (fieldWeight.getText().isEmpty()
             || !getState(GuiUtilState.class).isNumeric(fieldWeight.getText())) {
                 displayMessage("[ Agent Weight ] requires a valid float value.", 0);
@@ -486,7 +489,7 @@ public class AgentGridState extends BaseAppState {
             default: agentPath = null;
         }
 
-        //Number of agents to place into the grid in rows and columns.
+        //Number of gridAgents to place into the grid in rows and columns.
         //Selection is set when creating the listBoxSize so shouldn't need to 
         //check for null.
         int size = listBoxSize.getSelectionModel().getSelection() + 1;
@@ -541,10 +544,10 @@ public class AgentGridState extends BaseAppState {
      * and height of the spatial is determined as noted above except weight is 
      * ignored.
      * 
-     * @param agentPath The Path of the crowdUserData to be used for this grid.
+     * @param agentPath The Path of the GridAgent to be used for this grid.
      * @param size The size of the grid to be created.
      * @param distance The spacing between agents in the grid.
-     * @param startPos The start position of the crowdUserData. This has no 
+     * @param startPos The start position of the GridAgent. This has no 
      * other use outside of initial grid generation. 
      * @param gridName The name for this grid. This will also used when applying 
      * Obstacle Avoidance Parameters to the crowd.
@@ -553,14 +556,14 @@ public class AgentGridState extends BaseAppState {
 
         //Anything over 2 arguments creates a new object so split this up.
         LOG.info("<===== Begin AgentGridState addAgentGrid =====>");
-        LOG.info("agentPath         [{}]", agentPath);
-        LOG.info("size              [{}]", size);
-        LOG.info("separation        [{}]", distance);
-        LOG.info("startPos          [{}]", startPos);
-        LOG.info("gridName          [{}]", gridName);
+        LOG.info("agentPath          [{}]", agentPath);
+        LOG.info("size               [{}]", size);
+        LOG.info("separation         [{}]", distance);
+        LOG.info("startPos           [{}]", startPos);
+        LOG.info("gridName           [{}]", gridName);
 
 
-        List<CrowdUserData> listAgents = new ArrayList<>(size*size);
+        List<GridAgent> listGridAgent = new ArrayList<>(size*size);
         
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
@@ -572,7 +575,7 @@ public class AgentGridState extends BaseAppState {
                 //Agent name.
                 agent.setName(gridName + "_r" + i + "_c"+ j);
                 LOG.info("Agent Name        [{}]", agent.getName());
-                //The crowdUserData radius, height.
+                //The GridAgent radius, height.
                 float radius;
                 float height;
                 
@@ -582,7 +585,7 @@ public class AgentGridState extends BaseAppState {
                     //Stop negative radius input.
                     if (radius < 0.0f) {
                         displayMessage("[ Agent Radius ] requires a float value >= 0.", 0);
-                        listAgents = null;
+                        listGridAgent = null;
                         return;
                     }
                 } else {
@@ -601,7 +604,7 @@ public class AgentGridState extends BaseAppState {
                     //Stop negative height input.
                     if (height <= 0.0f) {
                         displayMessage("[ Agent Height ] requires a float value > 0.", 0);
-                        listAgents = null;
+                        listGridAgent = null;
                         return;
                     }
                 } else {
@@ -629,36 +632,36 @@ public class AgentGridState extends BaseAppState {
                         //Stop negative weight input.
                         if (weight <= 0.0f) {
                             displayMessage("[ Agent Weight ] requires a float value > 0.", 0);
-                            listAgents = null;
+                            listGridAgent = null;
                             return;
                         }
                     } else {
                         weight = 1.0f;
                     }
-                    //Give the crowdUserData physics controls controls. Will be added to
+                    //Give the GridAgent physics controls controls. Will be added to
                     //physics space from update loop.
                     //PhysicsRigidBody from CrowdBCC is detectable for cleanup
                     //so had to extend it just to add the getter.
-//                    agent.addControl(new BetterCharacterControl(radius, height, weight));
+//                    spatial.addControl(new BetterCharacterControl(radius, height, weight));
                     agent.addControl(new CrowdBCC(radius, height, weight));
                     agent.addControl(new PhysicsAgentControl());
 
-                    LOG.info("weight            [{}]", weight);
+                    LOG.info("weight             [{}]", weight);
                 } 
                 
-                LOG.info("radius            [{}]", radius);
-                LOG.info("height            [{}]", height);
-                LOG.info("Position World    [{}]", agent.getWorldTranslation());
-                LOG.info("Position Local    [{}]", agent.getLocalTranslation());
+                LOG.info("radius             [{}]", radius);
+                LOG.info("height             [{}]", height);
+                LOG.info("Position World     [{}]", agent.getWorldTranslation());
+                LOG.info("Position Local     [{}]", agent.getLocalTranslation());
                 //Add to agents list.
-                CrowdUserData userData = new CrowdUserData(agent);
-                listAgents.add(userData);
+                GridAgent gridAgent = new GridAgent(agent);
+                listGridAgent.add(gridAgent);
             }
         }
         //Create grid and add to the mapGrid. Tell the update loop to check for 
         //new grids to activate.
-        LOG.info("listAgents size   [{}]", listAgents.size());
-        Grid grid = new Grid(gridName, listAgents);
+        LOG.info("listGridAgent size [{}]", listGridAgent.size());
+        Grid grid = new Grid(gridName, listGridAgent);
         addMapGrid(gridName, grid);
         newGrid = true;
         LOG.info("<===== End AgentGridState addAgentGrid =====>");
@@ -724,13 +727,13 @@ public class AgentGridState extends BaseAppState {
     }
 
     /**
-     * Grabs the crowdUserData list for the requested grid.
+     * Grabs the GridAgent list for the requested grid.
      * 
      * @param gridName The name of the grid to look for.
-     * @return The list of agents for the supplied grid name.
+     * @return The list of gridAgents for the supplied grid name.
      */
-    public List<CrowdUserData> getAgentList(String gridName) {
-        return mapGrids.get(gridName).listAgents;
+    public List<GridAgent> getSelectedGrid(String gridName) {
+        return mapGrids.get(gridName).listGridAgent;
     }
     
     /**
@@ -748,19 +751,20 @@ public class AgentGridState extends BaseAppState {
     }
 
     /**
-     * The grid object for storing the grids. The grid name and listAgents are 
-     * used to guarantee this is a unique grid for the value used for the hashmap.
+     * The grid object for storing the spatial grids. The grid name and 
+     * listGridAgent are used to guarantee this is a unique grid for the value 
+     * used for the hashmap.
      */
     private class Grid {
 
         private final String gridName;
-        private final List<CrowdUserData> listAgents;
+        private final List<GridAgent> listGridAgent;
         private boolean activeGrid;
         private boolean removeGrid;
         
-        public Grid(String gridName, List<CrowdUserData> listAgents) {
+        public Grid(String gridName, List<GridAgent> listGridAgent) {
             this.gridName = gridName;
-            this.listAgents = listAgents;
+            this.listGridAgent = listGridAgent;
         }
         
         /**
@@ -773,7 +777,7 @@ public class AgentGridState extends BaseAppState {
         }
 
         /**
-         * A setting of true will trigger the removal of the grid. All agents 
+         * A setting of true will trigger the removal of the grid. All gridAgents 
          * associated with the grid will be removed from the physics space and
          * rootNode. Removal takes place in the next pass of the update loop.
          * 
@@ -785,7 +789,7 @@ public class AgentGridState extends BaseAppState {
         
         /**
          * If grid is inactive it will be activated on the next update and all 
-         * agents loaded into the rootNode and physics space from the update loop.
+         * gridAgents loaded into the rootNode and physics space from the update loop.
          * 
          * @return the activeGrid
          */
@@ -813,19 +817,19 @@ public class AgentGridState extends BaseAppState {
         }
 
         /**
-         * The list of agents to be used for this crowd grid.
+         * The spatial list used for this crowd grid.
          * 
-         * @return the listAgents
+         * @return The list of Grid Agents
          */
-        public List<CrowdUserData> getListAgents() {
-            return listAgents;
+        public List<GridAgent> getListGridAgent() {
+            return listGridAgent;
         }
 
         @Override
         public int hashCode() {
             int hash = 3;
             hash = 11 * hash + Objects.hashCode(this.gridName);
-            hash = 11 * hash + Objects.hashCode(this.listAgents);
+            hash = 11 * hash + Objects.hashCode(this.listGridAgent);
             return hash;
         }
 
@@ -844,7 +848,7 @@ public class AgentGridState extends BaseAppState {
             if (!Objects.equals(this.gridName, other.gridName)) {
                 return false;
             }
-            if (!Objects.equals(this.listAgents, other.listAgents)) {
+            if (!Objects.equals(this.listGridAgent, other.listGridAgent)) {
                 return false;
             }
             return true;
@@ -852,7 +856,7 @@ public class AgentGridState extends BaseAppState {
         
         @Override
         public String toString() {
-            return "Grid [name = "+ gridName + "] " + "AGENTS " + getListAgents(); 
+            return "Grid [name = "+ gridName + "] " + "AGENTS " + getListGridAgent(); 
         }
 
     }
@@ -860,39 +864,40 @@ public class AgentGridState extends BaseAppState {
     /**
      * 
      */
-    public class CrowdUserData {
+    public class GridAgent {
 
         private CrowdAgent crowdAgent;
-        private final Node agent;
+        private final Node spatial;
         
-        public CrowdUserData(Node agent) {
-            this.agent = agent;
+        public GridAgent(Node spatial) {
+            this.spatial = spatial;
         }
 
         /**
-         * @return the crowdAgent
+         * @return The CrowdAgent for this spatial.
          */
         public CrowdAgent getCrowdAgent() {
             return crowdAgent;
         }
 
         /**
-         * @param crowdAgent the crowdAgent to set
+         * @param crowdAgent the CrowdAgent to set for this spatial.
          */
         public void setCrowdAgent(CrowdAgent crowdAgent) {
             this.crowdAgent = crowdAgent;
         }
 
         /**
-         * @return the crowdUserData
+         *
+         * @return The spatial for this CrowdAgent.
          */
         public Node getSpatialForAgent() {
-            return agent;
+            return spatial;
         }
         
         @Override
         public String toString() {
-            return agent.getName();
+            return spatial.getName();
         }
 
     } 
