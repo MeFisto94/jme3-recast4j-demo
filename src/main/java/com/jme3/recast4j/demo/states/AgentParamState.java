@@ -388,7 +388,6 @@ public class AgentParamState extends BaseAppState {
         float separationWeight;
         int updateFlags;
         int obstacleAvoidanceType;
-        boolean updatedParams = false;
 
         //Get the selected crowd from the CrowdBuilderState where all crowds live.
         Crowd crowd = getState(CrowdBuilderState.class).getSelectedCrowd();
@@ -635,8 +634,6 @@ public class AgentParamState extends BaseAppState {
                 //Update the parameters for the CrowdAgent.
                 crowd.updateAgentParameters(ga.getCrowdAgent().idx, ap);
                 checkDebugMove(ga.getSpatialForAgent(), crowd, ga.getCrowdAgent());
-                //We updated CrowdAgent so no new CrowdAgents will be created.
-                updatedParams = true;
                 
                 //Verify information was updated in logging. Serves no other 
                 //purpose.
@@ -654,16 +651,7 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("updateFlags           [{}]", cap.updateFlags);
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-            }
-        }
-
-        /**
-         * Add a new CrowdAgent to the crowd.
-         */
-        if (!updatedParams) {
-            
-            for (GridAgent ga: listGridAgents) {
-
+            } else {
                 LOG.info("<========== BEGIN New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
                 LOG.info("Position World        [{}]", ga.getSpatialForAgent().getWorldTranslation());
                 LOG.info("Position Local        [{}]", ga.getSpatialForAgent().getLocalTranslation());
@@ -691,7 +679,8 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Adding New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
             }
-        } 
+        }
+
         LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
         LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
         LOG.info("<===== END AgentParamState addAgentCrowd =====>");
