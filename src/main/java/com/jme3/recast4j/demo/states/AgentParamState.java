@@ -624,15 +624,18 @@ public class AgentParamState extends BaseAppState {
         LOG.info("updateFlags           [{}]", ap.updateFlags);
         
         /**
-         * Update an existing CrowdAgent for the crowd. This loop checks 
-         * listGridAgents against the active CrowdAgents for the selected crowd. 
-         * If the crowd contains the GridAgent, update the parameters rather 
-         * than creating new ones. If we update, we don't create a new CrowdAgent. 
+         * Update an existing CrowdAgent or add a new CrowdAgent to the crowd. 
+         * This loop checks listGridAgents against the active CrowdAgents for 
+         * the selected crowd. If the crowd contains the CrowdAgent, update the 
+         * parameters rather than creating new ones. If we update, we don't 
+         * create a new CrowdAgent. 
          */        
         for (GridAgent ga: listGridAgents) {
             if (crowd.getActiveAgents().contains(ga.getCrowdAgent())) {
                 //Update the parameters for the CrowdAgent.
                 crowd.updateAgentParameters(ga.getCrowdAgent().idx, ap);
+                
+                //check the DebugMoveControl if it exists.
                 checkDebugMove(ga.getSpatialForAgent(), crowd, ga.getCrowdAgent());
                 
                 //Verify information was updated in logging. Serves no other 
@@ -652,6 +655,7 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
             } else {
+                
                 LOG.info("<========== BEGIN New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
                 LOG.info("Position World        [{}]", ga.getSpatialForAgent().getWorldTranslation());
                 LOG.info("Position Local        [{}]", ga.getSpatialForAgent().getLocalTranslation());
@@ -660,10 +664,10 @@ public class AgentParamState extends BaseAppState {
                 CrowdAgent createAgent = crowd.createAgent(ga.getSpatialForAgent().getWorldTranslation(), ap);
                 crowd.setSpatialForAgent(createAgent, ga.getSpatialForAgent());
                 
-                //Set the CrowdAgent for the ga.
+                //Set the CrowdAgent for the GridAgent.
                 ga.setCrowdAgent(createAgent);
                 
-                //No CrowdChangecontrol then add one.
+                //No CrowdChangeControl then add one.
                 if (ga.getSpatialForAgent().getControl(CrowdChangeControl.class) == null) {
                     LOG.info("Adding CrowdChangeControl agent [{}].", ga.getSpatialForAgent().getName());
                     ga.getSpatialForAgent().addControl(new CrowdChangeControl(crowd, createAgent));
