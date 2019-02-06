@@ -36,6 +36,8 @@ import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
+import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
+import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.DebugMoveControl;
@@ -550,7 +552,7 @@ public class AgentParamState extends BaseAppState {
         
         //Everything checks out so far so grab the selected list of agents for 
         //the grid.
-        List<GridAgent> listGridAgents = getState(AgentGridState.class).getSelectedGrid(gridName);
+        List<GridAgent> listGridAgents = getState(AgentGridState.class).getListGridAgent(gridName);
                 
         //If checked, we use the fieldRadius for the radius.
         if (checkRadius.isChecked()) {
@@ -584,18 +586,7 @@ public class AgentParamState extends BaseAppState {
             BoundingBox bounds = (BoundingBox) listGridAgents.get(0).getSpatialForAgent().getWorldBound();
             float y = bounds.getYExtent();
             height = y*2;
-        }
-        
-        if (listGridAgents.size() > crowd.getAgentCount()) {
-            displayMessage("Agent grid size of [" + listGridAgents.size() + "] excedes the crowd size ["
-                    + crowd.getAgentCount() + "].", 0);
-            return;
-        } else if ((listGridAgents.size() + crowd.getActiveAgents().size()) > crowd.getAgentCount()) {
-            displayMessage("Agent grid size of [" + listGridAgents.size() + "] plus active agents of [" 
-                    + crowd.getActiveAgents().size() + "] excedes the crowd size ["
-                    + crowd.getAgentCount() + "].", 0);
-            return;
-        }        
+        }     
         
         LOG.info("<===== BEGIN AgentParamState addAgentCrowd =====>");        
         LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
@@ -631,6 +622,7 @@ public class AgentParamState extends BaseAppState {
          * create a new CrowdAgent. 
          */        
         for (GridAgent ga: listGridAgents) {
+            
             if (crowd.getActiveAgents().contains(ga.getCrowdAgent())) {
                 //Update the parameters for the CrowdAgent.
                 crowd.updateAgentParameters(ga.getCrowdAgent().idx, ap);
@@ -655,6 +647,17 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
             } else {
+                if (listGridAgents.size() > crowd.getAgentCount()) {
+                    displayMessage("Agent grid size of [" + listGridAgents.size() + "] excedes the crowd size ["
+                            + crowd.getAgentCount() + "].", 0);
+                    return;
+                //Grid size to small if active agents + current GridSize - current GridAgent to small.
+                } else if ((listGridAgents.size() + crowd.getActiveAgents().size() - listGridAgents.lastIndexOf(ga)) > crowd.getAgentCount()) {
+                    displayMessage("Agent grid size of [" + listGridAgents.size() + "] plus active agents of [" 
+                            + crowd.getActiveAgents().size() + "] excedes the crowd size ["
+                            + crowd.getAgentCount() + "].", 0);
+                    return;
+                }   
                 
                 LOG.info("<========== BEGIN New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
                 LOG.info("Position World        [{}]", ga.getSpatialForAgent().getWorldTranslation());
@@ -692,15 +695,13 @@ public class AgentParamState extends BaseAppState {
     
     /**
      * Adds a debug control if checkDebugVisual, checkDebugVerbose, or both are 
-     * checked and no existing control is found when adding the Agent to the 
-     * crowd. 
+     * checked and no existing control is found.
      * 
-     * Removes the control if one exists prior to adding the Agent to the crowd 
-     * and both checkDebugVisual and checkDebugVerbose are not checked. 
+     * Removes the control if one exists and both checkDebugVisual and 
+     * checkDebugVerbose are not checked. 
      * 
      * The control will update the visual or verbose state if either or both 
-     * checkDebugVisual or checkDebugVerbose are selected and the control exists 
-     * when adding the Agent to the crowd.
+     * checkDebugVisual or checkDebugVerbose are selected and the control exists.
      */
     private void checkDebugMove(Node spatialForAgent, Crowd crowd, CrowdAgent crowdAgent) {
         if (checkDebugVisual.isChecked() || checkDebugVerbose.isChecked()) {

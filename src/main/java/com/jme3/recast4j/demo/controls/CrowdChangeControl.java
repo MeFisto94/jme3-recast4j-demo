@@ -58,7 +58,6 @@ public class CrowdChangeControl extends AbstractControl {
                 curCrowd = crowd;
                 curCrowdAgent = crowdAgent;
             } else {
-                curCrowd.resetMoveTarget(curCrowdAgent.idx);
                 curCrowd.removeAgent(curCrowdAgent);
                 curCrowd = crowd;
                 curCrowdAgent = crowdAgent;

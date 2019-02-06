@@ -30,12 +30,18 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
+import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
+import com.jme3.recast4j.demo.controls.CrowdChangeControl;
+import com.jme3.recast4j.demo.controls.DebugMoveControl;
+import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.recast4j.demo.states.AgentGridState.Grid;
+import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
 import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.Button;
@@ -607,10 +613,57 @@ public class CrowdBuilderState extends BaseAppState {
         
         //We have a valid crowdName so remove it from the map, the CrowdManager 
         //and the listActiveCrowds listbox.
-        Iterator<Map.Entry<String, CrowdNQuery>> iterator = mapCrowds.entrySet().iterator();
+        Iterator<Map.Entry<String, CrowdNQuery>> iterator = mapCrowds.entrySet().iterator();        
         while (iterator.hasNext()) {
             Map.Entry<String, CrowdNQuery> entry = iterator.next();
             if (entry.getKey().equals(crowdName)) {
+                List<CrowdAgent> activeAgents = entry.getValue().getCrowd().getActiveAgents();
+                List<Grid> listGrids = getState(AgentGridState.class).getMapGrids();
+                boolean found = false;
+                for (CrowdAgent ca: activeAgents) {
+                    for (Grid grid: listGrids) {
+                        List<GridAgent> listGridAgent = grid.getListGridAgent();
+                        for (GridAgent ga: listGridAgent) {
+                            if (ga.getCrowdAgent().equals(ca)) {
+                                //We have a CrowdAgent and a GridAgent so check 
+                                //for Crowd specific control to manipulate or 
+                                //remove.
+                                
+                                //Physics agents need to have their BCC reset.
+                                if (ga.getSpatialForAgent().getControl(PhysicsAgentControl.class) != null) {
+                                    LOG.info("Resetting Move [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                    ga.getSpatialForAgent().getControl(PhysicsAgentControl.class).stopFollowing();
+                                }
+                                
+                                //DebugMoveControl is crowd specific so remove 
+                                //if found.
+                                if (ga.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
+                                    LOG.info("Removing DebugMoveControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                    ga.getSpatialForAgent().removeControl(DebugMoveControl.class);
+                                }
+                                
+                                //CrowdChangeControl is crowd specific so remove
+                                //if found.
+                                LOG.info("Removing CrowdChangeControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                ga.getSpatialForAgent().removeControl(CrowdChangeControl.class);
+                                
+                                //We have a GridAgent so notify outter loop it 
+                                //was found and break out.
+                                found = true;
+                                break;
+                            }
+                        }
+                        
+                        //We found a GridAgent so this loop is done.
+                        if (found) {
+                           break; 
+                        }
+                    } 
+                    //Remove CrowdAgent from crowd.
+                    LOG.info("Removing idx [{}] crowd [{}]", ca.idx, entry.getKey());
+                    entry.getValue().getCrowd().removeAgent(ca);
+                }
+                
                 //To fully remove the crowdName we have to remove it from the 
                 //CrowdManager, mapCrowds (removes the query object also), and 
                 //the listActiveCrowds.

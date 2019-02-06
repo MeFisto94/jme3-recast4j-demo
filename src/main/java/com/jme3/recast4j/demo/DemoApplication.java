@@ -69,7 +69,7 @@ public class DemoApplication extends SimpleApplication {
                 new AudioListenerState(),
                 new DebugKeysAppState(),
                 new CrowdManagerAppstate(new CrowdManager()),
-                new CrowdState(),
+                /*new CrowdState(),*/
                 new LemurConfigState(),
                 new GuiUtilState()
         );

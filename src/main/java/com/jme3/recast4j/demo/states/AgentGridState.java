@@ -35,6 +35,7 @@ import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.objects.PhysicsRigidBody;
 import com.jme3.math.Vector3f;
+import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.DebugMoveControl;
@@ -327,28 +328,46 @@ public class AgentGridState extends BaseAppState {
                 Map.Entry<String, Grid> entry = iterator.next();
                 if (entry.getValue().isRemoveGrid()) {
                     List<GridAgent> listGridAgent = entry.getValue().getListGridAgent();
-                    for (GridAgent gridAgent: listGridAgent) {
+                    for (GridAgent ga: listGridAgent) {
                         //Convolouted crap just to get a PhysicsRigidBody from BCC.
-                        if (gridAgent.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
+                        if (ga.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
                             //Look for the physicsRigidBody for this listGridAgent.
-                            PhysicsRigidBody prb = gridAgent.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
+                            PhysicsRigidBody prb = ga.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
                             
                             if (getStateManager().getState(BulletAppState.class).getPhysicsSpace().getRigidBodyList().contains(prb)) {
-                                LOG.info("Removing BCC from [{}]", gridAgent.getSpatialForAgent().getName());
-                                getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(gridAgent.getSpatialForAgent());
+                                LOG.info("Removing BCC from [{}]", ga.getSpatialForAgent().getName());
+                                getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(ga.getSpatialForAgent());
                             }                            
                         }
                         
-                        if (gridAgent.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
-                            LOG.info("Removing DebugMoveControl from [{}]", gridAgent.getSpatialForAgent().getName());
-                            gridAgent.getSpatialForAgent().removeControl(DebugMoveControl.class);
+                        //Remove DebugMoveControl if exits.
+                        if (ga.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
+                            LOG.info("Removing DebugMoveControl from [{}]", ga.getSpatialForAgent().getName());
+                            ga.getSpatialForAgent().removeControl(DebugMoveControl.class);
                         }                        
                         
-                        if (gridAgent.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
-                            LOG.info("Removing CrowdChangeControl from [{}]", gridAgent.getSpatialForAgent().getName());
-                            gridAgent.getSpatialForAgent().removeControl(CrowdChangeControl.class);
+                        //Remove CrowdChangeControl if exists.
+                        if (ga.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
+                            LOG.info("Removing CrowdChangeControl from [{}]", ga.getSpatialForAgent().getName());
+                            ga.getSpatialForAgent().removeControl(CrowdChangeControl.class);
                         }
-                        ((SimpleApplication) getApplication()).getRootNode().detachChild(gridAgent.getSpatialForAgent());
+                        
+                        //Remove from crowd if CrowdAgent.
+                        if (ga.getCrowdAgent() != null) {
+                            //Check all crowds.
+                            int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
+                            
+                            for (int i = 0; i < numberOfCrowds; i++) {
+                                //If the crowd has this CrowdAgent remove.
+                                if (getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i).getActiveAgents().contains(ga.getCrowdAgent())) {
+                                    LOG.info("Removing [{}] from crowd [{}].", ga.getSpatialForAgent(), i);
+                                    getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i).removeAgent(ga.crowdAgent);
+                                    break;
+                                }
+                            } 
+                        }
+                        
+                        ((SimpleApplication) getApplication()).getRootNode().detachChild(ga.getSpatialForAgent());
                     }                    
                     iterator.remove();
                     //This is checked for null prior to setting checkGrids so 
@@ -732,8 +751,8 @@ public class AgentGridState extends BaseAppState {
      * @param gridName The name of the grid to look for.
      * @return The list of gridAgents for the supplied grid name.
      */
-    public List<GridAgent> getSelectedGrid(String gridName) {
-        return mapGrids.get(gridName).listGridAgent;
+    public List<GridAgent> getListGridAgent(String gridName) {
+        return mapGrids.get(gridName).getListGridAgent();
     }
     
     /**
@@ -751,11 +770,18 @@ public class AgentGridState extends BaseAppState {
     }
 
     /**
+     * @return the mapGrids
+     */
+    public List<Grid> getMapGrids() {
+        return new ArrayList<>(mapGrids.values());
+    }
+
+    /**
      * The grid object for storing the spatial grids. The grid name and 
      * listGridAgent are used to guarantee this is a unique grid for the value 
      * used for the hashmap.
      */
-    private class Grid {
+    public class Grid {
 
         private final String gridName;
         private final List<GridAgent> listGridAgent;
