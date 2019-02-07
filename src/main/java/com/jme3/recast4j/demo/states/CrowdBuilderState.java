@@ -30,7 +30,6 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
@@ -973,9 +972,8 @@ public class CrowdBuilderState extends BaseAppState {
             displayMessage("You must select a [ Active Crowd ] " 
                     + "from the list before a parameter can be updated.", 0);
         }
+        
     }
-    
-
     
     //Logs crowd info to the console.
     protected void dumpActiveAgents(int i) {

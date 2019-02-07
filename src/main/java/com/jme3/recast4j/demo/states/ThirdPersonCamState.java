@@ -28,6 +28,7 @@
 package com.jme3.recast4j.demo.states;
 
 import com.jme3.app.Application;
+import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.bounding.BoundingBox;
 import com.jme3.input.CameraInput;
@@ -47,15 +48,10 @@ import org.slf4j.LoggerFactory;
 public class ThirdPersonCamState extends BaseAppState {
     
     private static final Logger LOG = LoggerFactory.getLogger(ThirdPersonCamState.class.getName());
-    private final Node player;
 
-    public ThirdPersonCamState(Node player) {
-        this.player = player;
-    }
-    
     @Override
     protected void initialize(Application app) {
-        
+        addHeadNode((Node) ((SimpleApplication) app).getRootNode().getChild("player"));
     }
 
     @Override
@@ -69,7 +65,6 @@ public class ThirdPersonCamState extends BaseAppState {
     //graph attachment or input listener attachment.
     @Override
     protected void onEnable() {
-        addHeadNode(player);
     }
 
     @Override

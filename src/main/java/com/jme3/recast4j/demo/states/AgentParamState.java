@@ -36,8 +36,6 @@ import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
-import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
-import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.DebugMoveControl;

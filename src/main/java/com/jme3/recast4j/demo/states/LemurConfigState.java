@@ -29,12 +29,16 @@ package com.jme3.recast4j.demo.states;
 
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
+import com.jme3.input.KeyInput;
+import com.jme3.input.controls.KeyTrigger;
 import com.jme3.math.ColorRGBA;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.component.QuadBackgroundComponent;
 import com.simsilica.lemur.component.TbtQuadBackgroundComponent;
+import static com.simsilica.lemur.focus.FocusNavigationFunctions.F_X_AXIS;
+import static com.simsilica.lemur.focus.FocusNavigationFunctions.F_Y_AXIS;
 import com.simsilica.lemur.style.Attributes;
 import com.simsilica.lemur.style.BaseStyles;
 import com.simsilica.lemur.style.Styles;
@@ -50,7 +54,9 @@ public class LemurConfigState extends BaseAppState {
         GuiGlobals.initialize(app);
         BaseStyles.loadGlassStyle();
         GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
-        
+        //Block Lemur from mapping input.
+        GuiGlobals.getInstance().getInputMapper().map(F_X_AXIS, KeyInput.KEY_RIGHT );
+        GuiGlobals.getInstance().getInputMapper().map(F_Y_AXIS, KeyInput.KEY_RIGHT );
         //Make container panels solid.
         Styles styles = GuiGlobals.getInstance().getStyles();
         Attributes attrs = styles.getSelector(Container.ELEMENT_ID, "glass");
@@ -58,7 +64,7 @@ public class LemurConfigState extends BaseAppState {
         bg.setColor(new ColorRGBA(0.25f, 0.5f, 0.5f, 1.0f));
         
         //Set the rollup button colors
-        //Default is pink with alphs .85. 
+        //Default is pink with alpha .85. 
         attrs = styles.getSelector("title", "glass");
         attrs.set("highlightColor", new ColorRGBA(ColorRGBA.Pink));
         attrs.set("focusColor", new ColorRGBA(ColorRGBA.Magenta));
@@ -83,9 +89,7 @@ public class LemurConfigState extends BaseAppState {
     //graph attachment or input listener attachment.
     @Override
     protected void onEnable() {
-        //Called when the state is fully enabled, ie: is attached and 
-        //isEnabled() is true or when the setEnabled() status changes after the 
-        //state is attached.
+        
     }
 
     @Override
@@ -97,7 +101,7 @@ public class LemurConfigState extends BaseAppState {
     
     @Override
     public void update(float tpf) {
-        //TODO: implement behavior during runtime
+        
     }
     
 }
