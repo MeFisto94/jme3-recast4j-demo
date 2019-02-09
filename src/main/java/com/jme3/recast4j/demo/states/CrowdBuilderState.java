@@ -114,8 +114,8 @@ public class CrowdBuilderState extends BaseAppState {
     @Override
     protected void initialize(Application app) {
         
-        //Holds a paired Crowd and NavMeshQuery object where Crowd key and Query
-        //is value.
+        //Holds a paired Crowd and NavMeshQuery object with Crowd key and Query
+        //value.
         mapCrowds = new HashMap<>();
         
         //Displays when selectionRef and modelRef has changed and the model or 
