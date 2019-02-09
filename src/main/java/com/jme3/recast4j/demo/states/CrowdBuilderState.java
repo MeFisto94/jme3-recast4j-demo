@@ -30,9 +30,9 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
+import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
@@ -41,9 +41,7 @@ import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.recast4j.demo.states.AgentGridState.Grid;
 import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
-import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
-import com.simsilica.lemur.Button;
 import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
@@ -55,10 +53,10 @@ import com.simsilica.lemur.TabbedPanel;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.core.VersionedReference;
 import com.simsilica.lemur.event.CursorEventControl;
-import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.DragHandler;
-import com.simsilica.lemur.event.MouseEventControl;
 import com.simsilica.lemur.event.PopupState;
+import com.simsilica.lemur.list.DefaultCellRenderer;
+import com.simsilica.lemur.style.ElementId;
 import com.simsilica.lemur.text.DocumentModelFilter;
 import com.simsilica.lemur.text.TextFilters;
 import java.io.FileInputStream;
@@ -67,8 +65,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
@@ -92,7 +88,6 @@ public class CrowdBuilderState extends BaseAppState {
     private TextField fieldNavMesh;
     private TextField fieldMaxAgents;
     private TextField fieldMaxAgentRadius;
-    private TextField fieldCrowdName;
     private TextField fieldVelocityBias;
     private TextField fieldWeightDesVel;
     private TextField fieldWeightCurVel;
@@ -104,20 +99,28 @@ public class CrowdBuilderState extends BaseAppState {
     private TextField fieldAdaptiveDivs;
     private TextField fieldAdaptiveDepth;    
     private ListBox<String> listBoxAvoidance;    
-    private ListBox<String> listMoveType;
-    private ListBox<String> listActiveCrowds;
-    private HashMap<String, CrowdNQuery> mapCrowds;
-    // Keep tracking crowdName selected
+    private ListBox<String> listBoxMoveType;
+    private ListBox<Crowd> listBoxActiveCrowds;
+    private ListBox<String> listBoxActiveGrids;
+    private HashMap<Crowd, NavMeshQuery> mapCrowds;
+    // Keep tracking crowd selected
     private VersionedReference<Set<Integer>> selectionRef; 
-    // Keep tracking crowdName selected
-    private VersionedReference<List<String>> modelRef; 
-    private String defaultOAP;
+    // Keep tracking crowd selected
+    private VersionedReference<List<Crowd>> modelRef;
+    private String defaultOAPText;
+    private String defaultActiveGridText;
 
     
     @Override
     protected void initialize(Application app) {
-        mapCrowds = new HashMap();
-        defaultOAP =                
+        
+        //Holds a paired Crowd and NavMeshQuery object where Crowd key and Query
+        //is value.
+        mapCrowds = new HashMap<>();
+        
+        //Displays when selectionRef and modelRef has changed and the model or 
+        //selection is empty. Used as default for startup of listBoxAvoidance.
+        defaultOAPText =                
                   "velBias              = n\\a\n"
                 + "weightDesVel  = n\\a\n"
                 + "weightCurVel   = n\\a\n"
@@ -128,6 +131,9 @@ public class CrowdBuilderState extends BaseAppState {
                 + "adaptiveDivs    = n\\a\n"               
                 + "adaptiveRings  = n\\a\n"
                 + "adaptiveDepth = n\\a";
+        //Displays when selectionRef and modelRef has changed and the model or 
+        //selection is empty. Used as default for startup of listBoxActiveCrowds.  
+        defaultActiveGridText = "No Active Grids";
     }
 
     @Override
@@ -136,10 +142,9 @@ public class CrowdBuilderState extends BaseAppState {
         //lemur objects.
         ((SimpleApplication) getApplication()).getGuiNode().detachChild(contTabs);
 
-        Iterator<Map.Entry<String, CrowdNQuery>> iterator = mapCrowds.entrySet().iterator();
+        Iterator<Crowd> iterator = mapCrowds.keySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<String, CrowdNQuery> entry = iterator.next();
-            Crowd crowd = entry.getValue().getCrowd();
+            Crowd crowd = iterator.next();
             getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
             iterator.remove();
         }
@@ -174,10 +179,7 @@ public class CrowdBuilderState extends BaseAppState {
         fieldNavMesh = contCrowdParam.addChild(new TextField("test.nm"), "growx");
         fieldNavMesh.setSingleLine(true);
         
-        //The navmesh loader. 
-        contCrowdParam.addChild(new Label("Crowd Name"), "split 2"); 
-        fieldCrowdName = contCrowdParam.addChild(new TextField("Crowd"), "growx");
-        fieldCrowdName.setSingleLine(true);
+
         
         //Max CrowdAgents for the crowd.
         contCrowdParam.addChild(new Label("Max Agents"), "split 2, growx"); 
@@ -197,46 +199,79 @@ public class CrowdBuilderState extends BaseAppState {
         
         
         //Container for list movement.
-        Container contListMoveType = new Container(new MigLayout("wrap"));
+        Container contListMoveType = new Container(new MigLayout("wrap", "[grow]"));
         contListMoveType.setName("CrowdBuilderState contListMoveType");
         contListMoveType.setAlpha(0, false);
-        contCrowd.addChild(contListMoveType, "top");
+        contCrowd.addChild(contListMoveType, "top, growx");
         
         //Movement types for the crowd.
         contListMoveType.addChild(new Label("Movement Type"));
-        //Movement types for crowd
-        listMoveType = contListMoveType.addChild(new ListBox<>());
-        listMoveType.setName("listMoveType");
-        listMoveType.getSelectionModel().setSelection(0);
-        listMoveType.getModel().add("BETTER_CHARACTER_CONTROL");
-        listMoveType.getModel().add("DIRECT");
-        listMoveType.getModel().add("CUSTOM");
-        listMoveType.getModel().add("NONE");
+        listBoxMoveType = contListMoveType.addChild(new ListBox<>(), "growx, growy");
+        listBoxMoveType.setName("listBoxMoveType");
+        listBoxMoveType.getSelectionModel().setSelection(0);
+        listBoxMoveType.getModel().add("BCC");
+        listBoxMoveType.getModel().add("DIRECT");
+        listBoxMoveType.getModel().add("CUSTOM");
+        listBoxMoveType.getModel().add("NONE");
         
         
         
         //Container that holds to Active Crowds.
-        Container contActiveCrowds = new Container(new MigLayout("wrap"));
+        Container contActiveCrowds = new Container(new MigLayout("wrap", "[grow]"));
         contActiveCrowds.setName("CrowdBuilderState contActiveCrowds");
         contActiveCrowds.setAlpha(0, false);
         contCrowd.addChild(contActiveCrowds, "wrap, flowy, growx, growy");
-        
         contActiveCrowds.addChild(new Label("Active Crowds"));
-        listActiveCrowds = contActiveCrowds.addChild(new ListBox<>(), "growx, growy"); 
-        listActiveCrowds.setName("listActiveCrowds");
-        selectionRef = listActiveCrowds.getSelectionModel().createReference();  
-        modelRef = listActiveCrowds.getModel().createReference();
+        listBoxActiveCrowds = contActiveCrowds.addChild(new ListBox<>(), "growx, growy"); 
+        listBoxActiveCrowds.setCellRenderer(new DefaultCellRenderer<Crowd>(new ElementId("list.item"), null) {
+            
+            @Override
+            protected String valueToString( Crowd crowd ) {
+                String txt = "Crowd [ ";
+                CrowdManager crowdManager = getState(CrowdManagerAppstate.class).getCrowdManager();
+                int numberOfCrowds = crowdManager.getNumberOfCrowds();
+                for (int i = 0; i < numberOfCrowds; i++) {
+                    if (crowdManager.getCrowd(i).equals(crowd)) {
+                        txt = txt + i + " ] Size [ ";
+                        break;
+                    }
+                }
+                
+                txt = txt + crowd.getAgentCount() + " ]";
+                
+                return txt;
+            }
+        });
+        
+        listBoxActiveCrowds.setName("listBoxActiveCrowds");
+        selectionRef = listBoxActiveCrowds.getSelectionModel().createReference();  
+        modelRef = listBoxActiveCrowds.getModel().createReference();
+        
         //Button to stop the Crowd.
         contActiveCrowds.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top");
         
         
         
-        //Give this its own row so can can align parameters with the listBox
+        //Label for the Obstacle Avoidance params. Shares same row as 
+        //Active Grids label. Spans fist two columns. Give this its own row so 
+        //can can align parameters with the listBox.
         Container contAvoidLabel = new Container(new MigLayout(null));
         contAvoidLabel.setName("CrowdBuilderState contAvoidLabel");
         contAvoidLabel.setAlpha(0, false);
         contAvoidLabel.addChild(new Label("Obstacle Avoidance Parameters")); 
-        contCrowd.addChild(contAvoidLabel, "wrap");
+        contCrowd.addChild(contAvoidLabel, "span 2");
+        
+        
+        
+        //Label for Active Grids listBox. Shares same row as 
+        //Obstacle Avoidance Parameters label. 
+        Container contActiveAgentsLabel = new Container(new MigLayout(null));
+        contActiveAgentsLabel.setName("CrowdBuilderState contActiveAgentsLabel");
+        contActiveAgentsLabel.setAlpha(0, false);
+        contActiveAgentsLabel.addChild(new Label("Active Grids")); 
+        contCrowd.addChild(contActiveAgentsLabel, "wrap");
+        
+        
         
         //Container that holds the obstacle avoidance parameters for CrowdAgents.
         Container contAvoidance = new Container(new MigLayout("wrap", "[grow]"));
@@ -263,25 +298,25 @@ public class CrowdBuilderState extends BaseAppState {
         fieldWeightCurVel.setPreferredWidth(50);
         
         //Weight side.
-        contAvoidance.addChild(new Label("fieldWeightSide"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("weightSide"), "split 2, growx"); 
         fieldWeightSide = contAvoidance.addChild(new TextField(".75"));
         fieldWeightSide.setSingleLine(true);
         fieldWeightSide.setPreferredWidth(50);        
         
         //Weight to impact.
-        contAvoidance.addChild(new Label("fieldWeightToi"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("weightToi"), "split 2, growx"); 
         fieldWeightToi = contAvoidance.addChild(new TextField("2.5"));
         fieldWeightToi.setSingleLine(true);
         fieldWeightToi.setPreferredWidth(50);  
         
         //Horrizon time.
-        contAvoidance.addChild(new Label("fieldHorizTime"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("horizTime"), "split 2, growx"); 
         fieldHorizTime = contAvoidance.addChild(new TextField("2.5"));
         fieldHorizTime.setSingleLine(true);
         fieldHorizTime.setPreferredWidth(50);                
                 
         //Grid Size.
-        contAvoidance.addChild(new Label("fieldGridSize"), "split 2, growx"); 
+        contAvoidance.addChild(new Label("gridSize"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
         doc.setText("33");
@@ -322,32 +357,39 @@ public class CrowdBuilderState extends BaseAppState {
         Container contListBoxAvoidance = new Container(new MigLayout("wrap", "[grow]"));
         contListBoxAvoidance.setName("CrowdBuilderState contListBoxAvoidance");
         contListBoxAvoidance.setAlpha(0, false);
-        contCrowd.addChild(contListBoxAvoidance, "wrap, growx, top");
+        contCrowd.addChild(contListBoxAvoidance, "growx, top");
         
         //Parameters list.
         listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx"); 
         listBoxAvoidance.setName("listBoxAvoidance");
         listBoxAvoidance.setVisibleItems(1);
         
-        //The ObstacleAvoidanceParams string for the listbox.      
+        //Populate the list with ObstacleAvoidanceParams string. Thereafter the
+        //update loop will take over.
         for (int i = 0; i < 8; i++) {
             String params = "<=====    " + i + "    =====>\n"
-                    + defaultOAP; 
+                    + defaultOAPText; 
                 
             listBoxAvoidance.getModel().add(params);
         }
         listBoxAvoidance.getSelectionModel().setSelection(0);
         
         //Update a parameter button.
-        Button butParam = contListBoxAvoidance.addChild(new Button("Update Parameter"));
+        contListBoxAvoidance.addChild(new ActionButton(new CallMethodAction("Update Parameter", this, "updateParam")));     
         
-        MouseEventControl.addListenersToSpatial(butParam, new DefaultMouseListener() {
-            @Override
-            protected void click( MouseButtonEvent event, Spatial target, Spatial capture ) {                
-                updateParam();
-            }
-        });        
         
+        
+        //Container for Active Grids.
+        Container contActiveGrid = new Container(new MigLayout("wrap", "[grow]"));
+        contActiveGrid.setName("CrowdBuilderState contActiveGrid");
+        contActiveGrid.setAlpha(0, false);
+        contCrowd.addChild(contActiveGrid, "wrap, growx, top");
+        
+        //The Active Grids listBox.
+        listBoxActiveGrids = contActiveGrid.addChild(new ListBox<>(), "growx");
+        listBoxActiveGrids.setName("listBoxActiveGrid");
+        listBoxActiveGrids.getModel().add(defaultActiveGridText);
+
         
         
         //Holds the Legend and Setup buttons.
@@ -356,7 +398,6 @@ public class CrowdBuilderState extends BaseAppState {
         contButton.setName("CrowdBuilderState contButton");
         contButton.setAlpha(1, false);
         contCrowd.addChild(contButton, "growx, span 2"); //cell col row span w h
-        
         //Help
         contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
         //Button to start the Crowd.
@@ -441,15 +482,9 @@ public class CrowdBuilderState extends BaseAppState {
     
     @Override
     public void update(float tpf) {
-//        if (getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds() > 0 ) {
-//            int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
-//            for (int i = 0; i < numberOfCrowds; i++) {
-//                dumpActiveAgents(i);
-//            }
-//        }
 
         //Have to check for both selectionRef(the selections themselves) and 
-        //modelRef(the list of crowd names) updates to fully know whether the 
+        //modelRef(the list of crowds) updates to fully know whether the 
         //reference has been updated.
         if( selectionRef.update() || modelRef.update()) {
             // Selection has changed and the model or selection is empty.
@@ -458,32 +493,60 @@ public class CrowdBuilderState extends BaseAppState {
                 LOG.info("Update Loop empty reference - selectionRef [{}] modelRef [{}]", selectionRef.get().isEmpty(), modelRef.get().isEmpty());
                 //The ObstacleAvoidanceParams string for the listbox.      
                 for (int i = 0; i < 8; i++) {
-                    String params = "<=====    " + i + "    =====>\n" + defaultOAP; 
+                    String params = "<=====    " + i + "    =====>\n" + defaultOAPText; 
                     //Remove selected parameter from listBoxAvoidance. When 
                     //remove or insert is used on a Lemur ListBox, getSelection()
                     //will not be updated to anything other than the last item 
                     //in the ListBox. If the ListBox size is not affected
                     //by removal, such as following it with an insert, this can 
                     //be ignored. Otherwise it's best to setSelection(-1) and
-                    //force the user to make a selection.
+                    //force the user to make a selection. If this changes, this 
+                    //must be reworked to account for changes.
                     listBoxAvoidance.getModel().remove(i);
                     //Insert the new parameters into listBoxAvoidance.
                     listBoxAvoidance.getModel().add(i, params);
                 }
+                
+                listBoxActiveGrids.getModel().clear();
+                listBoxActiveGrids.getModel().add(defaultActiveGridText);
+                
             } else {
                 Crowd crowd = getSelectedCrowd();
-                //Look for the crowd in mapCrowds rather than pulling 
+                //Look for the selectedCrowd in mapCrowds rather than pulling 
                 //directly from CrowdManager in case CrowdState is running
                 //at same time as gui.
                 if (crowd != null) {
                     for (int i = 0; i < 8; i++) {
                         ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
-                        //Remove selected parameter.
+                        //Remove selected parameter. Lemur does not currently 
+                        //update the selection when items are removed or 
+                        //inserted. If this changes, this must be reworked to 
+                        //account for changes.
                         listBoxAvoidance.getModel().remove(i);
                         //Insert the new parameters into the list by converting
                         //the oap to string.
-                        listBoxAvoidance.getModel().add(i, oapToString(oap, i));
+                        listBoxAvoidance.getModel().add(i, formatOAP(oap, i));
                     }
+                    
+                    List<Grid> mapGrids = getState(AgentGridState.class).getMapGrids(); 
+                    listBoxActiveGrids.getModel().clear();
+                    for (Grid grid: mapGrids) {
+                        //We only need one agent to know if the Crowd contains
+                        //this grid, get first.
+                        CrowdAgent gridAgent = grid.getListGridAgent().get(0).getCrowdAgent();
+                        if (crowd.getActiveAgents().contains(gridAgent)) {
+                            String txt = grid.getGridName() 
+                                    + " < " + grid.getListGridAgent().size() 
+                                    + "/" + crowd.getActiveAgents().size() 
+                                    + "/" + crowd.getAgentCount() + " >";
+                            listBoxActiveGrids.getModel().add(txt);
+                        }
+                    }
+                    
+                    if (listBoxActiveGrids.getModel().isEmpty()) {
+                        listBoxActiveGrids.getModel().add(defaultActiveGridText);
+                    }
+                    
                 } 
             }
         }
@@ -496,18 +559,13 @@ public class CrowdBuilderState extends BaseAppState {
         String[] msg = { 
         "NavMesh - The navigation mesh to use for planning.",
         " ",
-        "Crowd Name - The name for this crowd. Each crowd must have a unique name. Spaces",
-        "count in the naming so if there is added space after a crowd name, that crowd will", 
-        "be considered unique.",  
-        " ",
         "Max Agents - The maximum number of agents the crowd can manage. [Limit: >= 1]",
         "  ",
         "Max Agent Radius - The maximum radius of any agent that will be added to the crowd.",
         " ",
         "Movement Type - Each type determines how movement is applied to an agent.",
         " ",
-        "* BETTER_CHARACTER_CONTROL - As the name implies, uses physics and the ",
-        "BetterCharacterControl to set move and view direction. ",
+        "* BCC - Use physics and the BetterCharacterControl to set move and view direction.",
         " ",
         "* DIRECT - Direct setting of the agents translation. No controls are needed for,",
         "movement but you must set the view direction yourself.",
@@ -519,8 +577,9 @@ public class CrowdBuilderState extends BaseAppState {
         "* NONE - No movement is implemented. You can freely interact with the crowd and",
         "implement your own movement soloutions.",
         " ",
-        "Active Crowds - The list of active crowds. A crowd must be selected before any agents", 
-        "can be added to a crowd or targets for agents can be set.", 
+        "Active Crowds - The list of active crowds. The format for a crowd is the crowd number", 
+        "and the active agents limit for the crowd. One crowd must be selected before any", 
+        "agents can be added or targets for agents can be set.", 
         " ",
         "Obstacle Avoidance Parameters - The shared avoidance configuration for an Agent", 
         "inside the crowd. When first instantiating the crowd, you are allotted eight parameter", 
@@ -567,7 +626,10 @@ public class CrowdBuilderState extends BaseAppState {
         " ",
         "* adaptiveRings - Number of rings. [Limit: 1-4]",
         " ",
-        "* adaptiveDepth - Number of iterations at best velocity." 
+        "* adaptiveDepth - Number of iterations at best velocity.",
+        " ",
+        "Active Grids - Displays information about active grids residing in the selected crowd.", 
+        "The format being <Grid Size/Crowd Active Agents Size/Crowd Active Agents Limit>."
         };
         
         Container window = new Container(new MigLayout("wrap"));
@@ -584,39 +646,37 @@ public class CrowdBuilderState extends BaseAppState {
     
     /**
      * Shuts down crowds listed in the Active Crowds list. When CrowdState is
-     * enabled this will not be affected due to using the value of mapCrowds
-     * to remove the Crowd from the CrowdManager. We skip the getters getCrowdName,
-     * getSelectedCrowd because getSelectedCrowd calls getCrowdName internally
-     * also so taking the long way home is more efficient.
+     * enabled this will not be affected due to using the crowd of mapCrowds
+     * to remove the Crowd from the CrowdManager. 
      */
     private void shutdown() {
 
         //Get the Crowd from selectedParam. we need this for accurate removal 
-        //from listActiveCrowds.
-        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
+        //from listBoxActiveCrowds.
+        Integer selection = listBoxActiveCrowds.getSelectionModel().getSelection();
         
         //Check to make sure the crowd has been selected.
-        if (selectedCrowd == null) {
+        if (selection == null) {
             displayMessage("Select a crowd from the [ Active Crowds ] list.", 0);
             return;
         }
         
-        //Get the crowds name from the listActiveCrowds selectedParam.
-        String crowdName = listActiveCrowds.getModel().get(selectedCrowd);
+        //Get the crowds name from the listBoxActiveCrowds selectedParam.
+        Crowd selectedCrowd = listBoxActiveCrowds.getModel().get(selection);
 
         //We check mapCrowds to see if the key exists. If not, go no further.
-        if (!mapCrowds.containsKey(crowdName)) {
+        if (!mapCrowds.containsKey(selectedCrowd)) {
             displayMessage("No crowd found by that name.", 0);
             return;
         }
         
-        //We have a valid crowdName so remove it from the map, the CrowdManager 
-        //and the listActiveCrowds listbox.
-        Iterator<Map.Entry<String, CrowdNQuery>> iterator = mapCrowds.entrySet().iterator();        
+        //We have a valid crowd so remove it from the map, the CrowdManager and 
+        //the listBoxActiveCrowds.
+        Iterator<Crowd> iterator = mapCrowds.keySet().iterator();        
         while (iterator.hasNext()) {
-            Map.Entry<String, CrowdNQuery> entry = iterator.next();
-            if (entry.getKey().equals(crowdName)) {
-                List<CrowdAgent> activeAgents = entry.getValue().getCrowd().getActiveAgents();
+            Crowd crowd = iterator.next();
+            if (crowd.equals(selectedCrowd)) {
+                List<CrowdAgent> activeAgents = crowd.getActiveAgents();
                 List<Grid> listGrids = getState(AgentGridState.class).getMapGrids();
                 boolean found = false;
                 for (CrowdAgent ca: activeAgents) {
@@ -659,19 +719,19 @@ public class CrowdBuilderState extends BaseAppState {
                         }
                     } 
                     //Remove CrowdAgent from crowd.
-                    LOG.info("Removing idx [{}] crowd [{}]", ca.idx, entry.getKey());
-                    entry.getValue().getCrowd().removeAgent(ca);
+                    LOG.info("Removing idx [{}] crowd [{}]", ca.idx, crowd);
+                    crowd.removeAgent(ca);
                 }
                 
-                //To fully remove the crowdName we have to remove it from the 
+                //To fully remove the crowd we have to remove it from the 
                 //CrowdManager, mapCrowds (removes the query object also), and 
-                //the listActiveCrowds.
-                getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(entry.getValue().getCrowd());
-                listActiveCrowds.getModel().remove((int)selectedCrowd);
+                //the listBoxActiveCrowds.
+                getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
+                listBoxActiveCrowds.getModel().remove((int)selection);
                 //Lemur getSelected() does not update if you remove or insert 
                 //into a listBox. Best to set it to -1 (unselected) and force
                 //user to reselect.
-                listActiveCrowds.getSelectionModel().setSelection(-1);
+                listBoxActiveCrowds.getSelectionModel().setSelection(-1);
                 iterator.remove();
                 break;
             }
@@ -686,7 +746,6 @@ public class CrowdBuilderState extends BaseAppState {
         int maxAgents;
         float maxAgentRadius;
         String mesh;
-        String crowdName;
 
         //The name of the mesh to load.                
         if (fieldNavMesh.getText().isEmpty()) {
@@ -694,21 +753,6 @@ public class CrowdBuilderState extends BaseAppState {
             return;
         } else {
             mesh = fieldNavMesh.getText();
-        }
-        
-        
-        //The name of this crowd.                
-        if (fieldCrowdName.getText().isEmpty()) {
-            displayMessage("You must enter a [ Crowd ] name.", 0);
-            return;
-        } else if (mapCrowds.containsKey(fieldCrowdName.getText())) {
-            displayMessage(
-                      "[ " + fieldCrowdName.getText() 
-                    + " ] has already been activated. "
-                    + "Change the crowd name or remove the existing crowd before proceeding.", 0);
-            return;
-        } else {
-            crowdName = fieldCrowdName.getText();
         }
         
         //The max CrowdAgents for the crowd. Uses numeric doc filter to prevent bad data.
@@ -740,7 +784,7 @@ public class CrowdBuilderState extends BaseAppState {
         
         MovementApplicationType applicationType = null;
         
-        switch (listMoveType.getSelectionModel().getSelection()) {
+        switch (listBoxMoveType.getSelectionModel().getSelection()) {
             case 0:
                 applicationType = MovementApplicationType.BETTER_CHARACTER_CONTROL;
                 break;
@@ -761,17 +805,16 @@ public class CrowdBuilderState extends BaseAppState {
             //fieldCrowdName.
             NavMesh navMesh = msr.read(new FileInputStream(mesh), 3);
             //Create the query object for pathfinding in this Crowd. Will be 
-            //added to the mapCrowds as a value so each crowd query object is
-            //referenced.  
+            //added to the mapCrowds as a crowd so each query object is referenced.  
             NavMeshQuery query = new NavMeshQuery(navMesh);
             
             //Create the crowd.
             Crowd crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
             
-            //Add to CrowdManager, mapCrowds, and listActiveCrowds.
+            //Add to CrowdManager, mapCrowds, and listBoxActiveCrowds.
             getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
-            mapCrowds.put(crowdName, new CrowdNQuery(crowd, query));
-            listActiveCrowds.getModel().add(crowdName); 
+            mapCrowds.put(crowd, query);
+            listBoxActiveCrowds.getModel().add(crowd); 
         } catch (IOException | NoSuchFieldException | IllegalAccessException ex) {
             LOG.error("{} {}", CrowdBuilderState.class.getName(), ex);
         }
@@ -959,35 +1002,22 @@ public class CrowdBuilderState extends BaseAppState {
 
         //Inject the new parameter into the crowd. Check for the crowd in 
         //mapcrowds and if exists, update OAP params. Pulls the crowd reference 
-        //from the CrowdNQuery obj rather than the CrowdManager in case 
-        //CrowdState is running. This will keep our crowd lookups in sync.
+        //from mapCrowds rather than the CrowdManager in case CrowdState is 
+        //running. This will keep our crowd lookups in sync.
         if (getSelectedCrowd() != null) {
             getSelectedCrowd().setObstacleAvoidanceParams(selectedParam, params);
-            //Remove selected parameter from listBoxAvoidance.
+            //Remove selected parameter from listBoxAvoidance. Lemur does not 
+            //currently update the selection when items are removed or inserted.
+            //If this changes, this must be reworked to account for changes.
             listBoxAvoidance.getModel().remove((int)selectedParam);
             //Insert the new parameters into listBoxAvoidance.
-            listBoxAvoidance.getModel().add(selectedParam, oapToString(params, selectedParam));
+            listBoxAvoidance.getModel().add(selectedParam, formatOAP(params, selectedParam));
         } else {
-            LOG.error("Failed to find the selected crowd in mapCrowds [{}]", getCrowdName());
+            LOG.error("Failed to find the selected crowd in mapCrowds [{}]", getSelectedCrowd());
             displayMessage("You must select a [ Active Crowd ] " 
                     + "from the list before a parameter can be updated.", 0);
         }
         
-    }
-    
-    //Logs crowd info to the console.
-    protected void dumpActiveAgents(int i) {
-        Crowd crowd = getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i);
-        
-        for (CrowdAgent ag : crowd.getActiveAgents()) {
-            if (ag.isActive()) {
-                LOG.info("Crowd         [{}] Active Agents [{}]", i, crowd.getActiveAgents().size());
-                LOG.info("State         [{}]", ag.state);
-                LOG.info("Pos           [{},{},{}]",ag.npos[0], ag.npos[1], ag.npos[2]);
-                LOG.info("Target Pos    [{},{},{}]",ag.targetPos[0], ag.targetPos[1], ag.targetPos[2]);
-                LOG.info("Target Ref    [{}]",ag.targetRef);
-            }
-        }
     }
     
     /**
@@ -1009,7 +1039,7 @@ public class CrowdBuilderState extends BaseAppState {
      * @param idx The index of the listboxAvoidance parameter.
      * @return The formated string.
      */
-    private String oapToString(ObstacleAvoidanceParams oap, int idx) {
+    private String formatOAP(ObstacleAvoidanceParams oap, int idx) {
         //If run into threading problems use StringBuffer.
         StringBuilder buf               = new StringBuilder();
         String i                        = null;
@@ -1096,131 +1126,65 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
-     * Gets the query object for any selected crowd.
+     * Gets the query object for any selected Crowd.
      * 
-     * @return The query object for a selected crowd or null if the 
-     * crowd has not been selected in the Active Crowds list or if the query 
-     * object doesn't exist in the mapCrowds list.
+     * @return The query object for a selected Crowd or null if the Crowd has 
+     * not been selected in the Active Crowds list or if the query object 
+     * doesn't exist in the mapCrowds list.
      */
     public NavMeshQuery getQuery() {
         
-        String crowdName = getCrowdName();
+        Crowd crowd = getSelectedCrowd();
         
-        //Check to make sure a crowdName has been selected.
-        if (crowdName == null || !mapCrowds.containsKey(crowdName)) {
+        //Check to make sure a crowd has been selected.
+        if (crowd == null || !mapCrowds.containsKey(crowd)) {
             return null;
         } 
         
-        return mapCrowds.get(crowdName).getQuery();
+        return mapCrowds.get(crowd);
     }    
     
     /**
-     * Gets the currently selected crowdName from the Active Crowds list as a 
-     * crowd object.
+     * Gets the currently selected crowd from the Active Crowds list as a Crowd 
+     * object.
      * 
-     * @return The string name of the selection.
-     */
+     * @return The Crowd for the selection.
+     */    
     public Crowd getSelectedCrowd() {
-        String crowdName = getCrowdName();
-        
-        if (crowdName == null || !mapCrowds.containsKey(crowdName)) {
-            return null;
-        }
-        
-        return mapCrowds.get(crowdName).getCrowd();
-    }    
-    
-    /**
-     * Takes a selection from the Active Crowds list and converts it to string.
-     * 
-     * @return The selection as a string or null. 
-     */
-    public String getCrowdName() {
-        //Get the crowdName from listActiveCrowds.
-        Integer selectedCrowd = listActiveCrowds.getSelectionModel().getSelection();
+        //Get the crowd from listBoxActiveCrowds.
+        Integer selectedCrowd = listBoxActiveCrowds.getSelectionModel().getSelection();
 
         //Check to make sure a crowd has been selected.
         if (selectedCrowd == null) {
             return null;
         }
         
-        //Convert seltion to string.
-        return listActiveCrowds.getModel().get(selectedCrowd);
+        return listBoxActiveCrowds.getModel().get(selectedCrowd);
     }
     
     /**
-     * Gets a crowd number from the CrowdManager by checking the CrowdManager 
-     * for the crowd object. Not really useful for anything other than logging.
+     * Gets a crowd number from the CrowdManager by checking for the crowd 
+     * object. Not really useful for anything other than logging.
      * 
      * @param crowd The crowd to lookup.
      * @return The crowd number for the given crowd.
      */
     public int getCrowdNumber(Crowd crowd) {
-        int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
+        CrowdManager crowdManager = getState(CrowdManagerAppstate.class).getCrowdManager();
+        int numberOfCrowds = crowdManager.getNumberOfCrowds();
         for (int i = 0; i < numberOfCrowds; i++) {
-            if (getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i).equals(crowd)) {
+            if (crowdManager.getCrowd(i).equals(crowd)) {
                 return i;
             }
         }
         return -1;
     }
-    
-    private class CrowdNQuery {
-        private Crowd crowd;
-        private NavMeshQuery query;
 
-        public CrowdNQuery(Crowd crowd, NavMeshQuery query) {
-            this.crowd = crowd;
-            this.query = query;
-        }
-
-        /**
-         * @return the crowd
-         */
-        public Crowd getCrowd() {
-            return crowd;
-        }
-
-        /**
-         * @return the query
-         */
-        public NavMeshQuery getQuery() {
-            return query;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 5;
-            hash = 47 * hash + Objects.hashCode(this.crowd);
-            hash = 47 * hash + Objects.hashCode(this.query);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final CrowdNQuery other = (CrowdNQuery) obj;
-            if (!Objects.equals(this.crowd, other.crowd)) {
-                return false;
-            }
-            if (!Objects.equals(this.query, other.query)) {
-                return false;
-            }
-            return true;
-        }
-
-        @Override
-        public String toString() {
-            return "CrowdQueryObj{" + "crowd=" + crowd + ", query=" + query + '}';
-        }
-        
+    /**
+     * @return the listBoxActiveCrowds
+     */
+    public ListBox<Crowd> getListBoxActiveCrowds() {
+        return listBoxActiveCrowds;
     }
+    
 }

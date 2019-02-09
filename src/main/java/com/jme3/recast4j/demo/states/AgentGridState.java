@@ -189,7 +189,7 @@ public class AgentGridState extends BaseAppState {
         contAgentGrid.addChild(contGrid, "wrap, growx, growy");
         
         //The active grids listbox.
-        contGrid.addChild(new Label("Active Grids"));
+        contGrid.addChild(new Label("Grids"));
         listBoxGrid = contGrid.addChild(new ListBox<>(), "growx");
         //Use the method call to set the checkGrids boolean to true.
         contGrid.addChild(new ActionButton(new CallMethodAction("Remove Grid", this, "removeGrid")));
@@ -421,10 +421,10 @@ public class AgentGridState extends BaseAppState {
         " ",
         "Example: 2 = 2 rows, 2 columns = a grid of 4 agents.",
         " ",
-        "Active Grids - The list of all the currently active grids. Select any grid from the list and",
-        "press the [Remove Grid] button to remove the grid and all active agents related to that", 
-        "grid. Each grid must have a unique name. Spaces count in the naming so if there is", 
-        "added space after a grid name, that grid will be considered unique.",
+        "Grids - The list of all the current grids. Select any grid from the list and press the", 
+        "[Remove Grid] button to remove the grid and all active agents related to that grid. Each", 
+        "grid must have a unique name. Spaces count in the naming so if there is added space", 
+        "after a grid name, that grid will be considered unique.",
         " ",
         "Start Position - Starting position the agents will spread out evenly from to form the grid.", 
         "This is only used to generate the agents for the grid so you can drop your agents from", 

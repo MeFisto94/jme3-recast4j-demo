@@ -34,7 +34,10 @@ import com.jme3.scene.control.AbstractControl;
 import org.recast4j.detour.crowd.CrowdAgent;
 
 /**
- *
+ * Changes crowds automatically. Firstly removes the CrowdAgent from the 
+ * curCrowd, then updates the curCrowd variable with the new crowd and 
+ * crowdAgent settings.
+ * 
  * @author Robert
  */
 public class CrowdChangeControl extends AbstractControl {

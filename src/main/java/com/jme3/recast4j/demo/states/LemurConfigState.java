@@ -30,7 +30,6 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.input.KeyInput;
-import com.jme3.input.controls.KeyTrigger;
 import com.jme3.math.ColorRGBA;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
@@ -54,9 +53,11 @@ public class LemurConfigState extends BaseAppState {
         GuiGlobals.initialize(app);
         BaseStyles.loadGlassStyle();
         GuiGlobals.getInstance().getStyles().setDefaultStyle("glass");
+        
         //Block Lemur from mapping input.
         GuiGlobals.getInstance().getInputMapper().map(F_X_AXIS, KeyInput.KEY_RIGHT );
         GuiGlobals.getInstance().getInputMapper().map(F_Y_AXIS, KeyInput.KEY_RIGHT );
+        
         //Make container panels solid.
         Styles styles = GuiGlobals.getInstance().getStyles();
         Attributes attrs = styles.getSelector(Container.ELEMENT_ID, "glass");

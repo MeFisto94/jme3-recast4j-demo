@@ -140,8 +140,6 @@ public class NavState extends BaseAppState {
         
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
         
-        System.out.println(worldMap);
-        
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
             protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
@@ -174,7 +172,7 @@ public class NavState extends BaseAppState {
         });
     }
     
-        private void findPathImmediately(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
+    private void findPathImmediately(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         Result<List<Long>> fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
         if (fpr.succeeded()) {
             // Get the proper path from the rough polygon listing

@@ -32,7 +32,10 @@ import com.jme3.bullet.objects.PhysicsRigidBody;
 import java.util.logging.Level;
 
 /**
- *
+ * Used to allow access to the BCC rigidBody and turns off logging info. 
+ * 
+ * Serves no other uses.
+ * 
  * @author Robert
  */
 public class CrowdBCC extends BetterCharacterControl  { 

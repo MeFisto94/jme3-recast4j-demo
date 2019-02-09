@@ -53,6 +53,7 @@ import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.event.PopupState;
+import com.simsilica.lemur.list.SelectionModel;
 import java.util.Arrays;
 import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
@@ -645,6 +646,7 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
             } else {
+                
                 if (listGridAgents.size() > crowd.getAgentCount()) {
                     displayMessage("Agent grid size of [" + listGridAgents.size() + "] excedes the crowd size ["
                             + crowd.getAgentCount() + "].", 0);
@@ -681,6 +683,14 @@ public class AgentParamState extends BaseAppState {
                 //Check for DebugMoveControl.
                 checkDebugMove(ga.getSpatialForAgent(), crowd, createAgent);
 
+                //Force versionedRef update so the Active Grid list will populate.
+                SelectionModel selectionModel = getState(CrowdBuilderState.class).getListBoxActiveCrowds().getSelectionModel();
+                Integer selection = selectionModel.getSelection();
+                if (selection != null) {
+                    selectionModel.setSelection(-1);
+                    selectionModel.setSelection(selection);
+                }
+                
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Adding New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
             }
