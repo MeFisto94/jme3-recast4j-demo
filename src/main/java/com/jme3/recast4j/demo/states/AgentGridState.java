@@ -375,6 +375,12 @@ public class AgentGridState extends BaseAppState {
                     Integer selection = listBoxGrid.getSelectionModel().getSelection();
                     listBoxGrid.getModel().remove((int) selection);
                     listBoxGrid.getSelectionModel().setSelection(-1);
+                    
+                    //Force versioned reference update to update the Active 
+                    //Grids window of the Crowd panel.
+                    selection = getState(CrowdBuilderState.class).getCrowdSelection();
+                    getState(CrowdBuilderState.class).setCrowdSelection(-1);
+                    getState(CrowdBuilderState.class).setCrowdSelection(selection);
                     break;
                 }
             }

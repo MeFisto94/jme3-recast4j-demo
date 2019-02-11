@@ -159,6 +159,7 @@ public class DemoApplication extends SimpleApplication {
 
     private void loadDoors() {
         Spatial doors = getAssetManager().loadModel("Models/Level/recast_door.j3o");
+        doors.setName("doors");
         doors.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(doors);
         getRootNode().attachChild(doors);

@@ -98,16 +98,14 @@ public class CrowdBuilderState extends BaseAppState {
     private TextField fieldAdaptiveRings;
     private TextField fieldAdaptiveDivs;
     private TextField fieldAdaptiveDepth;    
-    private ListBox<String> listBoxAvoidance;    
+    private ListBox<ObstacleAvoidanceParams> listBoxAvoidance;  
     private ListBox<String> listBoxMoveType;
     private ListBox<Crowd> listBoxActiveCrowds;
     private ListBox<String> listBoxActiveGrids;
+    // Keep track crowd selection changes
+    private VersionedReference<Set<Integer>> crowdSelectRef; 
+    private VersionedReference<List<Crowd>> crowdModelRef;
     private HashMap<Crowd, NavMeshQuery> mapCrowds;
-    // Keep tracking crowd selected
-    private VersionedReference<Set<Integer>> selectionRef; 
-    // Keep tracking crowd selected
-    private VersionedReference<List<Crowd>> modelRef;
-    private String defaultOAPText;
     private String defaultActiveGridText;
 
     
@@ -118,20 +116,7 @@ public class CrowdBuilderState extends BaseAppState {
         //value.
         mapCrowds = new HashMap<>();
         
-        //Displays when selectionRef and modelRef has changed and the model or 
-        //selection is empty. Used as default for startup of listBoxAvoidance.
-        defaultOAPText =                
-                  "velBias              = n\\a\n"
-                + "weightDesVel  = n\\a\n"
-                + "weightCurVel   = n\\a\n"
-                + "weightSide       = n\\a\n"
-                + "weightToi         = n\\a\n"
-                + "horizTime         = n\\a\n"
-                + "gridSize            = n\\a\n"
-                + "adaptiveDivs    = n\\a\n"               
-                + "adaptiveRings  = n\\a\n"
-                + "adaptiveDepth = n\\a";
-        //Displays when selectionRef and modelRef has changed and the model or 
+        //Displays when crowdSelectRef and crowdModelRef has changed and the model or 
         //selection is empty. Used as default for startup of listBoxActiveCrowds.  
         defaultActiveGridText = "No Active Grids";
     }
@@ -223,8 +208,10 @@ public class CrowdBuilderState extends BaseAppState {
         contCrowd.addChild(contActiveCrowds, "wrap, flowy, growx, growy");
         contActiveCrowds.addChild(new Label("Active Crowds"));
         listBoxActiveCrowds = contActiveCrowds.addChild(new ListBox<>(), "growx, growy"); 
+        listBoxActiveCrowds.setName("listBoxActiveCrowds");
+        crowdSelectRef = listBoxActiveCrowds.getSelectionModel().createReference();  
+        crowdModelRef = listBoxActiveCrowds.getModel().createReference();
         listBoxActiveCrowds.setCellRenderer(new DefaultCellRenderer<Crowd>(new ElementId("list.item"), null) {
-            
             @Override
             protected String valueToString( Crowd crowd ) {
                 String txt = "Crowd [ ";
@@ -242,11 +229,7 @@ public class CrowdBuilderState extends BaseAppState {
                 return txt;
             }
         });
-        
-        listBoxActiveCrowds.setName("listBoxActiveCrowds");
-        selectionRef = listBoxActiveCrowds.getSelectionModel().createReference();  
-        modelRef = listBoxActiveCrowds.getModel().createReference();
-        
+
         //Button to stop the Crowd.
         contActiveCrowds.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top");
         
@@ -281,37 +264,37 @@ public class CrowdBuilderState extends BaseAppState {
                 
         //Velocity Bias.
         contAvoidance.addChild(new Label("velBias"), "split 2, growx"); 
-        fieldVelocityBias = contAvoidance.addChild(new TextField("0.4"));
+        fieldVelocityBias = contAvoidance.addChild(new TextField(""));
         fieldVelocityBias.setSingleLine(true);
         fieldVelocityBias.setPreferredWidth(50);
         
         //Weight desired velocity.
         contAvoidance.addChild(new Label("weightDesVel"), "split 2, growx"); 
-        fieldWeightDesVel = contAvoidance.addChild(new TextField("2.0"));
+        fieldWeightDesVel = contAvoidance.addChild(new TextField(""));
         fieldWeightDesVel.setSingleLine(true);
         fieldWeightDesVel.setPreferredWidth(50);
         
         //Weight current velocity.
         contAvoidance.addChild(new Label("weightCurVel"), "split 2, growx"); 
-        fieldWeightCurVel = contAvoidance.addChild(new TextField(".75"));
+        fieldWeightCurVel = contAvoidance.addChild(new TextField(""));
         fieldWeightCurVel.setSingleLine(true);
         fieldWeightCurVel.setPreferredWidth(50);
         
         //Weight side.
         contAvoidance.addChild(new Label("weightSide"), "split 2, growx"); 
-        fieldWeightSide = contAvoidance.addChild(new TextField(".75"));
+        fieldWeightSide = contAvoidance.addChild(new TextField(""));
         fieldWeightSide.setSingleLine(true);
         fieldWeightSide.setPreferredWidth(50);        
         
         //Weight to impact.
         contAvoidance.addChild(new Label("weightToi"), "split 2, growx"); 
-        fieldWeightToi = contAvoidance.addChild(new TextField("2.5"));
+        fieldWeightToi = contAvoidance.addChild(new TextField(""));
         fieldWeightToi.setSingleLine(true);
         fieldWeightToi.setPreferredWidth(50);  
         
         //Horrizon time.
         contAvoidance.addChild(new Label("horizTime"), "split 2, growx"); 
-        fieldHorizTime = contAvoidance.addChild(new TextField("2.5"));
+        fieldHorizTime = contAvoidance.addChild(new TextField(""));
         fieldHorizTime.setSingleLine(true);
         fieldHorizTime.setPreferredWidth(50);                
                 
@@ -319,7 +302,7 @@ public class CrowdBuilderState extends BaseAppState {
         contAvoidance.addChild(new Label("gridSize"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
-        doc.setText("33");
+        doc.setText("");
         fieldGridSize = contAvoidance.addChild(new TextField(doc));
         fieldGridSize.setSingleLine(true);
         fieldGridSize.setPreferredWidth(50);
@@ -328,7 +311,7 @@ public class CrowdBuilderState extends BaseAppState {
         contAvoidance.addChild(new Label("adaptiveDivs"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
-        doc.setText("7");
+        doc.setText("");
         fieldAdaptiveDivs = contAvoidance.addChild(new TextField(doc));
         fieldAdaptiveDivs.setSingleLine(true);
         fieldAdaptiveDivs.setPreferredWidth(50);
@@ -337,7 +320,7 @@ public class CrowdBuilderState extends BaseAppState {
         contAvoidance.addChild(new Label("adaptiveRings"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
-        doc.setText("2");
+        doc.setText("");
         fieldAdaptiveRings = contAvoidance.addChild(new TextField(doc));
         fieldAdaptiveRings.setSingleLine(true);
         fieldAdaptiveRings.setPreferredWidth(50);
@@ -346,7 +329,7 @@ public class CrowdBuilderState extends BaseAppState {
         contAvoidance.addChild(new Label("adaptiveDepth"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
-        doc.setText("5");
+        doc.setText("");
         fieldAdaptiveDepth = contAvoidance.addChild(new TextField(doc));
         fieldAdaptiveDepth.setSingleLine(true);
         fieldAdaptiveDepth.setPreferredWidth(50);        
@@ -360,20 +343,16 @@ public class CrowdBuilderState extends BaseAppState {
         contCrowd.addChild(contListBoxAvoidance, "growx, top");
         
         //Parameters list.
-        listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx"); 
+        listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx");
         listBoxAvoidance.setName("listBoxAvoidance");
         listBoxAvoidance.setVisibleItems(1);
-        
-        //Populate the list with ObstacleAvoidanceParams string. Thereafter the
-        //update loop will take over.
-        for (int i = 0; i < 8; i++) {
-            String params = "<=====    " + i + "    =====>\n"
-                    + defaultOAPText; 
-                
-            listBoxAvoidance.getModel().add(params);
-        }
-        listBoxAvoidance.getSelectionModel().setSelection(0);
-        
+        listBoxAvoidance.setCellRenderer(new DefaultCellRenderer<ObstacleAvoidanceParams>(new ElementId("list.item"), null) {
+            @Override
+            protected String valueToString(ObstacleAvoidanceParams param ) {
+                return formatOAP(param);
+            }
+        });
+
         //Update a parameter button.
         contListBoxAvoidance.addChild(new ActionButton(new CallMethodAction("Update Parameter", this, "updateParam")));     
         
@@ -483,53 +462,52 @@ public class CrowdBuilderState extends BaseAppState {
     @Override
     public void update(float tpf) {
 
-        //Have to check for both selectionRef(the selections themselves) and 
+        //Have to check for both crowdSelectRef(the selections themselves) and 
         //modelRef(the list of crowds) updates to fully know whether the 
         //reference has been updated.
-        if( selectionRef.update() || modelRef.update()) {
-            // Selection has changed and the model or selection is empty.
-            if ( selectionRef.get().isEmpty() ||  modelRef.get().isEmpty()) {
-                //Load defaults since there is no data to update.
-                LOG.info("Update Loop empty reference - selectionRef [{}] modelRef [{}]", selectionRef.get().isEmpty(), modelRef.get().isEmpty());
-                //The ObstacleAvoidanceParams string for the listbox.      
-                for (int i = 0; i < 8; i++) {
-                    String params = "<=====    " + i + "    =====>\n" + defaultOAPText; 
-                    //Remove selected parameter from listBoxAvoidance. When 
-                    //remove or insert is used on a Lemur ListBox, getSelection()
-                    //will not be updated to anything other than the last item 
-                    //in the ListBox. If the ListBox size is not affected
-                    //by removal, such as following it with an insert, this can 
-                    //be ignored. Otherwise it's best to setSelection(-1) and
-                    //force the user to make a selection. If this changes, this 
-                    //must be reworked to account for changes.
-                    listBoxAvoidance.getModel().remove(i);
-                    //Insert the new parameters into listBoxAvoidance.
-                    listBoxAvoidance.getModel().add(i, params);
-                }
+        if( crowdSelectRef.update() || crowdModelRef.update()) {
+            // Selection has changed and the model or selection is empty so set 
+            //defaults.
+            if ( crowdSelectRef.get().isEmpty() ||  crowdModelRef.get().isEmpty()) {
+                LOG.info("Update Loop empty reference - selectionRef [{}] modelRef [{}]", crowdSelectRef.get().isEmpty(), crowdModelRef.get().isEmpty());
+                                
+                //Clear the Avoidance Param window.
+                listBoxAvoidance.getModel().clear();
                 
+                //Clear all OAP fields.
+                clearOAPFields();
+
+                //Clear the Active Grids window.
                 listBoxActiveGrids.getModel().clear();
                 listBoxActiveGrids.getModel().add(defaultActiveGridText);
                 
             } else {
+                //Look for the selectedCrowd in listBoxCrowds rather than pulling 
+                //directly from CrowdManager in case CrowdState is running at 
+                //the same time as gui.
                 Crowd crowd = getSelectedCrowd();
-                //Look for the selectedCrowd in mapCrowds rather than pulling 
-                //directly from CrowdManager in case CrowdState is running
-                //at same time as gui.
+
                 if (crowd != null) {
-                    for (int i = 0; i < 8; i++) {
-                        ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
-                        //Remove selected parameter. Lemur does not currently 
-                        //update the selection when items are removed or 
-                        //inserted. If this changes, this must be reworked to 
-                        //account for changes.
-                        listBoxAvoidance.getModel().remove(i);
-                        //Insert the new parameters into the list by converting
-                        //the oap to string.
-                        listBoxAvoidance.getModel().add(i, formatOAP(oap, i));
+                    
+                    //If listBoxAvoidance has objects, clear them to get ready 
+                    //for update.
+                    if (listBoxAvoidance.getModel().size() > 0) {
+                        listBoxAvoidance.getModel().clear();
                     }
                     
+                    //Populate listBoxAvoidance for the selected crowd.
+                    for (int i = 0; i < 8; i++) {
+                        ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
+                        listBoxAvoidance.getModel().add(oap);
+                    }
+                    
+                    //Look for the gridAgents CrowdAgent in the selected crowd.
                     List<Grid> mapGrids = getState(AgentGridState.class).getMapGrids(); 
+                    
+                    //Remove any existing text from listBoxActiveGrids to prepare 
+                    //for update.
                     listBoxActiveGrids.getModel().clear();
+                    
                     for (Grid grid: mapGrids) {
                         //We only need one agent to know if the Crowd contains
                         //this grid, get first.
@@ -543,6 +521,7 @@ public class CrowdBuilderState extends BaseAppState {
                         }
                     }
                     
+                    //Empty so set default text.
                     if (listBoxActiveGrids.getModel().isEmpty()) {
                         listBoxActiveGrids.getModel().add(defaultActiveGridText);
                     }
@@ -550,7 +529,6 @@ public class CrowdBuilderState extends BaseAppState {
                 } 
             }
         }
-
     }
     
     //Explains the Crowd parameters.
@@ -651,21 +629,13 @@ public class CrowdBuilderState extends BaseAppState {
      */
     private void shutdown() {
 
-        //Get the Crowd from selectedParam. we need this for accurate removal 
-        //from listBoxActiveCrowds.
-        Integer selection = listBoxActiveCrowds.getSelectionModel().getSelection();
-        
-        //Check to make sure the crowd has been selected.
-        if (selection == null) {
-            displayMessage("Select a crowd from the [ Active Crowds ] list.", 0);
-            return;
-        }
-        
-        //Get the crowds name from the listBoxActiveCrowds selectedParam.
-        Crowd selectedCrowd = listBoxActiveCrowds.getModel().get(selection);
+        //Get the crowds name from the listBoxActiveCrowds selectedParam. Could 
+        //use the getter for this but would need to check for null again and we 
+        //went thorugh the trouble of creating selection variable so use it.
+        Crowd selectedCrowd = getSelectedCrowd();
 
         //We check mapCrowds to see if the key exists. If not, go no further.
-        if (!mapCrowds.containsKey(selectedCrowd)) {
+        if (selectedCrowd == null) {
             displayMessage("No crowd found by that name.", 0);
             return;
         }
@@ -727,11 +697,11 @@ public class CrowdBuilderState extends BaseAppState {
                 //CrowdManager, mapCrowds (removes the query object also), and 
                 //the listBoxActiveCrowds.
                 getState(CrowdManagerAppstate.class).getCrowdManager().removeCrowd(crowd);
-                listBoxActiveCrowds.getModel().remove((int)selection);
+                listBoxActiveCrowds.getModel().remove(crowd);
                 //Lemur getSelected() does not update if you remove or insert 
                 //into a listBox. Best to set it to -1 (unselected) and force
                 //user to reselect.
-                listBoxActiveCrowds.getSelectionModel().setSelection(-1);
+                setCrowdSelection(-1);
                 iterator.remove();
                 break;
             }
@@ -1002,20 +972,23 @@ public class CrowdBuilderState extends BaseAppState {
 
         //Inject the new parameter into the crowd. Check for the crowd in 
         //mapcrowds and if exists, update OAP params. Pulls the crowd reference 
-        //from mapCrowds rather than the CrowdManager in case CrowdState is 
+        //from listBoxCrowds rather than the CrowdManager in case CrowdState is 
         //running. This will keep our crowd lookups in sync.
         if (getSelectedCrowd() != null) {
             getSelectedCrowd().setObstacleAvoidanceParams(selectedParam, params);
             //Remove selected parameter from listBoxAvoidance. Lemur does not 
             //currently update the selection when items are removed or inserted.
             //If this changes, this must be reworked to account for changes.
-            listBoxAvoidance.getModel().remove((int)selectedParam);
-            //Insert the new parameters into listBoxAvoidance.
-            listBoxAvoidance.getModel().add(selectedParam, formatOAP(params, selectedParam));
+            listBoxAvoidance.getModel().clear();
+            //Force a selctor reference update.
+            Integer crowdSelection = getCrowdSelection();
+            if (crowdSelection != null) {
+                setCrowdSelection(-1);
+                setCrowdSelection(crowdSelection);
+            }
         } else {
-            LOG.error("Failed to find the selected crowd in mapCrowds [{}]", getSelectedCrowd());
-            displayMessage("You must select a [ Active Crowd ] " 
-                    + "from the list before a parameter can be updated.", 0);
+            LOG.error("Failed to find the selected crowd in listBoxCrowds [{}]", getSelectedCrowd());
+            displayMessage("You must select a [ Active Crowd ] before a parameter can be updated.", 0);
         }
         
     }
@@ -1039,10 +1012,21 @@ public class CrowdBuilderState extends BaseAppState {
      * @param idx The index of the listboxAvoidance parameter.
      * @return The formated string.
      */
-    private String formatOAP(ObstacleAvoidanceParams oap, int idx) {
+    private String formatOAP(ObstacleAvoidanceParams oap) {
         //If run into threading problems use StringBuffer.
         StringBuilder buf               = new StringBuilder();
         String i                        = null;
+        Integer idx = null;
+        Crowd selectedCrowd = getSelectedCrowd();
+        if (selectedCrowd != null) {
+            for (int k = 0; k < 8; k++) {
+                if (selectedCrowd.getObstacleAvoidanceParams(k).equals(oap)) {
+                    idx = k;
+                    break;
+                }
+            }
+        }
+
         String str = 
           "<=====    " + idx + "    =====>\n"  
         + "velBias              = $b\n"
@@ -1055,7 +1039,8 @@ public class CrowdBuilderState extends BaseAppState {
         + "adaptiveDivs    = $d\n"               
         + "adaptiveRings  = $r\n"
         + "adaptiveDepth = $D";
-        LOG.info("<========== BEGIN CrowdBuilderState oapToString [{}]==========>", idx);
+        
+        LOG.info("<========== BEGIN CrowdBuilderState formatOAP [{}]==========>", idx);
         for ( int j = 0; j < str.length(); j++ ) {
             if ( str.charAt(j) != '$' ) {
                 buf.append(str.charAt(j));
@@ -1063,52 +1048,62 @@ public class CrowdBuilderState extends BaseAppState {
             }
             
             char charAt = str.charAt(++j);
-            
+
             switch (charAt) {
                 case 'b': //Velocity Bias
                     i = "" + oap.velBias;
+                    fieldVelocityBias.setText(i);
                     LOG.info("velBias       [{}]", oap.velBias);
                     break;
                 case 'd': //Adaptive Divisions
                     i = "" + oap.adaptiveDivs;
+                    fieldAdaptiveDivs.setText(i);
                     LOG.info("adaptiveDivs  [{}]", oap.adaptiveDivs);
                     break;
                 case 'D': //Adaptive Depth
                     i = "" + oap.adaptiveDepth;
+                    fieldAdaptiveDepth.setText(i);
                     LOG.info("adaptiveDepth [{}]", oap.adaptiveDepth);
                     break;
                 case 'g': //Grid Size
                     i = "" + oap.gridSize;
+                    fieldGridSize.setText(i);
                     LOG.info("gridSize      [{}]", oap.gridSize);
                     break;
                 case 'h': //Horizon Time
                     i = "" + oap.horizTime;
+                    fieldHorizTime.setText(i);
                     LOG.info("horizTime     [{}]", oap.horizTime);
                     break;
                 case 'i': //Weight To Impact
                     i = "" + oap.weightToi;
+                    fieldWeightToi.setText(i);
                     LOG.info("weightToi     [{}]", oap.weightToi);
                     break;
                 case 'r': //Adaptive Rings
                     i = "" + oap.adaptiveRings;
+                    fieldAdaptiveRings.setText(i);
                     LOG.info("adaptiveRings [{}]", oap.adaptiveRings);
                     break;
                 case 's': //Weight Side
                     i = "" + oap.weightSide;
+                    fieldWeightSide.setText(i);
                     LOG.info("weightSide    [{}]", oap.weightSide);
                     break;
                 case 'v': //Weight Desired Velocity
                     i = "" + oap.weightDesVel;
+                    fieldWeightDesVel.setText(i);
                     LOG.info("weightDesVel  [{}]", oap.weightDesVel);
                     break;
                 case 'V': //Weight Current Velocity
                     i = "" + oap.weightCurVel;
+                    fieldWeightCurVel.setText(i);
                     LOG.info("weightCurVel  [{}]", oap.weightCurVel);
                     break;
             }
             buf.append(i);
         } 
-        LOG.info("<========== END CrowdBuilderState oapToString [{}] ==========>", idx);
+        LOG.info("<========== END CrowdBuilderState formatOAP [{}] ==========>", idx);
         return buf.toString();
         
     }
@@ -1123,6 +1118,22 @@ public class CrowdBuilderState extends BaseAppState {
         GuiGlobals.getInstance().getPopupState()
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup(txt, width));
+    }
+    
+    /**
+     * Clears all OAP fields.
+     */
+    private void clearOAPFields() {
+        fieldVelocityBias.setText("");
+        fieldWeightDesVel.setText("");
+        fieldWeightCurVel.setText("");
+        fieldWeightSide.setText("");
+        fieldWeightToi.setText("");
+        fieldHorizTime.setText("");
+        fieldGridSize.setText("");
+        fieldAdaptiveRings.setText("");
+        fieldAdaptiveDivs.setText("");
+        fieldAdaptiveDepth.setText("");    
     }
     
     /**
@@ -1163,6 +1174,26 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
+     * Gets the selection index for the currently selected crowd from the Active 
+     * Crowds list.
+     * 
+     * @return The index of the currently selected crowd from the Active Crowds 
+     * list or null.
+     */
+    public Integer getCrowdSelection() {
+        return listBoxActiveCrowds.getSelectionModel().getSelection();
+    }
+    
+    /**
+     * Sets the current selection index for the Active Crowds list.
+     * 
+     * @param index The index to set.
+     */
+    public void setCrowdSelection(int index) {
+        listBoxActiveCrowds.getSelectionModel().setSelection(index);
+    }
+    
+    /**
      * Gets a crowd number from the CrowdManager by checking for the crowd 
      * object. Not really useful for anything other than logging.
      * 
@@ -1180,11 +1211,5 @@ public class CrowdBuilderState extends BaseAppState {
         return -1;
     }
 
-    /**
-     * @return the listBoxActiveCrowds
-     */
-    public ListBox<Crowd> getListBoxActiveCrowds() {
-        return listBoxActiveCrowds;
-    }
     
 }

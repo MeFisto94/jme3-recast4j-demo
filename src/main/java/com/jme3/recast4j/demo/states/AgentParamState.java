@@ -53,7 +53,6 @@ import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.event.PopupState;
-import com.simsilica.lemur.list.SelectionModel;
 import java.util.Arrays;
 import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
@@ -684,11 +683,10 @@ public class AgentParamState extends BaseAppState {
                 checkDebugMove(ga.getSpatialForAgent(), crowd, createAgent);
 
                 //Force versionedRef update so the Active Grid list will populate.
-                SelectionModel selectionModel = getState(CrowdBuilderState.class).getListBoxActiveCrowds().getSelectionModel();
-                Integer selection = selectionModel.getSelection();
+                Integer selection = getState(CrowdBuilderState.class).getCrowdSelection();
                 if (selection != null) {
-                    selectionModel.setSelection(-1);
-                    selectionModel.setSelection(selection);
+                    getState(CrowdBuilderState.class).setCrowdSelection(-1);
+                    getState(CrowdBuilderState.class).setCrowdSelection(selection);
                 }
                 
                 LOG.info("Agents Group          [{}]", listGridAgents);
