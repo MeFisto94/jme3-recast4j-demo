@@ -218,13 +218,13 @@ public class CrowdBuilderState extends BaseAppState {
                 int numberOfCrowds = crowdManager.getNumberOfCrowds();
                 for (int i = 0; i < numberOfCrowds; i++) {
                     if (crowdManager.getCrowd(i).equals(crowd)) {
-                        txt = txt + i + " ] Size [ ";
+                        txt += i + " ] Size [ ";
                         break;
                     }
                 }
                 
-                txt = txt + crowd.getAgentCount() + " ] ";
-                txt = txt + crowd.getApplicationType();
+                txt += crowd.getAgentCount() + " ] ";
+                txt += crowd.getApplicationType();
                 return txt;
             }
         });
@@ -1015,10 +1015,11 @@ public class CrowdBuilderState extends BaseAppState {
      */
     private String formatOAP(ObstacleAvoidanceParams oap) {
         //If run into threading problems use StringBuffer.
-        StringBuilder buf               = new StringBuilder();
-        String i                        = null;
-        Integer idx = null;
+        StringBuilder buf   = new StringBuilder();
+        String i            = null;
+        Integer idx         = null;
         Crowd selectedCrowd = getSelectedCrowd();
+        
         if (selectedCrowd != null) {
             for (int k = 0; k < 8; k++) {
                 if (selectedCrowd.getObstacleAvoidanceParams(k).equals(oap)) {
@@ -1029,7 +1030,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
 
         String str = 
-          "<=====    " + idx + "    =====>\n"  
+          "<==========    " + idx + "    ==========>\n"  
         + "velBias              = $b\n"
         + "weightDesVel  = $v\n"
         + "weightCurVel   = $V\n"

@@ -185,8 +185,8 @@ public class AgentGridState extends BaseAppState {
         contGrid.setAlpha(0, false);
         contAgentGrid.addChild(contGrid, "wrap, growx, growy");
         
-        //The active grids listbox. Displays the grid name and grid size when
-        //a grid is selected.
+        //The active grids listbox. Displays the grid name, grid size, grid type
+        //when a grid is selected.
         contGrid.addChild(new Label("Grids"));
         listBoxGrid = contGrid.addChild(new ListBox<>(), "growx");
         listBoxGrid.setCellRenderer(new DefaultCellRenderer<Grid>(new ElementId("list.item"), null) {
