@@ -38,7 +38,7 @@ import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
-import com.jme3.recast4j.demo.controls.DebugMoveControl;
+import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.scene.Node;
@@ -51,12 +51,12 @@ import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.event.PopupState;
+import com.simsilica.lemur.list.DefaultCellRenderer;
+import com.simsilica.lemur.style.ElementId;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.slf4j.Logger;
@@ -77,7 +77,7 @@ public class AgentGridState extends BaseAppState {
     private Checkbox checkRadius;
     private Checkbox checkWeight;
     private ListBox<String> listBoxAgent;
-    private ListBox<String> listBoxGrid;
+    private ListBox<Grid> listBoxGrid;
     private ListBox<Integer> listBoxSize;
     private TextField fieldDistance;
     private TextField fieldGridName;
@@ -87,16 +87,13 @@ public class AgentGridState extends BaseAppState {
     private TextField fieldPosY;
     private TextField fieldPosZ;
     private TextField fieldRadius;
-    private Map<String, Grid> mapGrids;
     private boolean newGrid;
     private boolean checkGrids;
     private float maxPopupSize;
     
-    @SuppressWarnings("unchecked")
     @Override
     protected void initialize(Application app) {
-        // Holds all active grids.
-        mapGrids = new HashMap<>();
+        
         //Set the maximum size a popup can be.
         maxPopupSize = 500.0f;
         
@@ -188,9 +185,18 @@ public class AgentGridState extends BaseAppState {
         contGrid.setAlpha(0, false);
         contAgentGrid.addChild(contGrid, "wrap, growx, growy");
         
-        //The active grids listbox.
+        //The active grids listbox. Displays the grid name and grid size when
+        //a grid is selected.
         contGrid.addChild(new Label("Grids"));
         listBoxGrid = contGrid.addChild(new ListBox<>(), "growx");
+        listBoxGrid.setCellRenderer(new DefaultCellRenderer<Grid>(new ElementId("list.item"), null) {
+            @Override
+            protected String valueToString(Grid grid ) {
+                String txt = grid.getGridName() + " [ " + grid.getListGridAgent().size() + " ] ";
+                txt += grid.getListGridAgent().get(0).getSpatialForAgent().getControl(BetterCharacterControl.class) != null ? "[ PHYSICS ]": "[ DIRECT ]";
+                return txt;
+            }
+        });
         //Use the method call to set the checkGrids boolean to true.
         contGrid.addChild(new ActionButton(new CallMethodAction("Remove Grid", this, "removeGrid")));
                         
@@ -238,15 +244,17 @@ public class AgentGridState extends BaseAppState {
     /**
      * Removing this state from StateManager will clear all gridAgents from the 
      * physics space and gui node. The removal of the gui components is a by
-     * product of the removal of CrowdBuilderState where this gui lives.
+     * product of the removal of CrowdBuilderState where this gui lives. 
+     * CrowdBuilderState will have already removed crowds so only need Grid 
+     * related removal.
      * @param app
      */
     @Override
     protected void cleanup(Application app) {
-        Iterator<Map.Entry<String, Grid>> iterator = mapGrids.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, Grid> entry = iterator.next();
-            List<GridAgent> listGridAgent = entry.getValue().getListGridAgent();
+        Iterator<Grid> it = getGrids().iterator(); 
+        while (it.hasNext()) {
+            Grid grid = it.next();
+            List<GridAgent> listGridAgent = grid.getListGridAgent();
             for (GridAgent gridAgent: listGridAgent) {
                 //Convolouted crap just to get a PhysicsRigidBody from BCC.
                 if (gridAgent.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
@@ -256,20 +264,23 @@ public class AgentGridState extends BaseAppState {
                         getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(gridAgent.getSpatialForAgent());
                     }
                 }
-                
-                if (gridAgent.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
-                    LOG.info("Removing DebugMoveControl from [{}]", gridAgent.getSpatialForAgent().getName());
-                    gridAgent.getSpatialForAgent().removeControl(DebugMoveControl.class);
+
+                //Crowd specific control so remove.
+                if (gridAgent.getSpatialForAgent().getControl(CrowdDebugControl.class) != null) {
+                    LOG.info("Removing CrowdDebugControl from [{}]", gridAgent.getSpatialForAgent().getName());
+                    gridAgent.getSpatialForAgent().removeControl(CrowdDebugControl.class);
                 }
-                
+
+                //Crowd specific control so remove.
                 if (gridAgent.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
                     LOG.info("Removing CrowdChangeControl from [{}]", gridAgent.getSpatialForAgent().getName());
                     gridAgent.getSpatialForAgent().removeControl(CrowdChangeControl.class);
                 }
                 ((SimpleApplication) getApplication()).getRootNode().detachChild(gridAgent.getSpatialForAgent());
             }
-            iterator.remove();
+            it.remove();
         }
+
     }
 
     /**
@@ -294,16 +305,17 @@ public class AgentGridState extends BaseAppState {
         getStateManager().detach(this);
     }
     
-    @SuppressWarnings("unchecked")
     @Override
     public void update(float tpf) {
-                    
+
         //Look for incactive grid to activate. Loads the gridAgents into the physics
         //space and attaches them to the rootNode.
         if (newGrid) {
-            mapGrids.forEach((key, value)-> {
-                if (!value.isActiveGrid()) {
-                    List<GridAgent> listGridAgent = value.getListGridAgent();
+            List<Grid> grids = getGrids();
+            for (Grid grid: grids) {
+                //All inactive grids need activation.
+                if (!grid.isActiveGrid()) {
+                    List<GridAgent> listGridAgent = grid.getListGridAgent();
                     for (GridAgent gridAgent: listGridAgent) {
                         //Physics GridAgent so add to physics space.
                         if (gridAgent.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
@@ -312,51 +324,51 @@ public class AgentGridState extends BaseAppState {
                         ((SimpleApplication) getApplication()).getRootNode().attachChild(gridAgent.getSpatialForAgent());
                     }
                     //Stop the the newGrid check from adding this again.
-                    value.setActiveGrid(true);
-                    listBoxGrid.getModel().add(key);
+                    grid.setActiveGrid(true);
                 }
-            });
+            }
             //All grids are activated so stop looking.
             newGrid = false;
         }
-        
+
         //Look for grids to remove. Removes the gridAgents from the root node and 
         //physics space. Use iterator to avoid ConcurrentModificationException.
         if (checkGrids) {
-            Iterator<Map.Entry<String, Grid>> iterator = mapGrids.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<String, Grid> entry = iterator.next();
-                if (entry.getValue().isRemoveGrid()) {
-                    List<GridAgent> listGridAgent = entry.getValue().getListGridAgent();
+            Iterator<Grid> it = getGrids().iterator(); 
+            while (it.hasNext()) {
+                Grid grid = it.next();
+                //Flaged for removal.
+                if (grid.isRemoveGrid()) {
+                    List<GridAgent> listGridAgent = grid.getListGridAgent();
                     for (GridAgent ga: listGridAgent) {
                         //Convolouted crap just to get a PhysicsRigidBody from BCC.
                         if (ga.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
                             //Look for the physicsRigidBody for this listGridAgent.
                             PhysicsRigidBody prb = ga.getSpatialForAgent().getControl(CrowdBCC.class).getPhysicsRigidBody();
-                            
+
                             if (getStateManager().getState(BulletAppState.class).getPhysicsSpace().getRigidBodyList().contains(prb)) {
                                 LOG.info("Removing BCC from [{}]", ga.getSpatialForAgent().getName());
                                 getStateManager().getState(BulletAppState.class).getPhysicsSpace().remove(ga.getSpatialForAgent());
                             }                            
                         }
-                        
-                        //Remove DebugMoveControl if exits.
-                        if (ga.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
-                            LOG.info("Removing DebugMoveControl from [{}]", ga.getSpatialForAgent().getName());
-                            ga.getSpatialForAgent().removeControl(DebugMoveControl.class);
-                        }                        
-                        
+
+                        //Remove CrowdDebugControl if exits.
+                        if (ga.getSpatialForAgent().getControl(CrowdDebugControl.class) != null) {
+                            LOG.info("Removing CrowdDebugControl from [{}]", ga.getSpatialForAgent().getName());
+                            ga.getSpatialForAgent().removeControl(CrowdDebugControl.class);
+                        }
+
                         //Remove CrowdChangeControl if exists.
                         if (ga.getSpatialForAgent().getControl(CrowdChangeControl.class) != null) {
                             LOG.info("Removing CrowdChangeControl from [{}]", ga.getSpatialForAgent().getName());
                             ga.getSpatialForAgent().removeControl(CrowdChangeControl.class);
                         }
-                        
+
                         //Remove from crowd if CrowdAgent.
                         if (ga.getCrowdAgent() != null) {
                             //Check all crowds.
                             int numberOfCrowds = getState(CrowdManagerAppstate.class).getCrowdManager().getNumberOfCrowds();
-                            
+
                             for (int i = 0; i < numberOfCrowds; i++) {
                                 //If the crowd has this CrowdAgent remove.
                                 if (getState(CrowdManagerAppstate.class).getCrowdManager().getCrowd(i).getActiveAgents().contains(ga.getCrowdAgent())) {
@@ -366,27 +378,25 @@ public class AgentGridState extends BaseAppState {
                                 }
                             } 
                         }
-                        
+
                         ((SimpleApplication) getApplication()).getRootNode().detachChild(ga.getSpatialForAgent());
-                    }                    
-                    iterator.remove();
-                    //This is checked for null prior to setting checkGrids so 
-                    //shouldn't have to check for null.
-                    Integer selection = listBoxGrid.getSelectionModel().getSelection();
-                    listBoxGrid.getModel().remove((int) selection);
+                    }
+                    //Remove the grid.
+                    it.remove();
+                    //Clear the selection so user hase to make a new one.
                     listBoxGrid.getSelectionModel().setSelection(-1);
-                    
+
                     //Force versioned reference update to update the Active 
                     //Grids window of the Crowd panel.
-                    selection = getState(CrowdBuilderState.class).getCrowdSelection();
-                    getState(CrowdBuilderState.class).setCrowdSelection(-1);
-                    getState(CrowdBuilderState.class).setCrowdSelection(selection);
-                    break;
+                    Integer selection = getState(CrowdBuilderState.class).getCrowdSelection();
+                    if (selection != null) {
+                        getState(CrowdBuilderState.class).setCrowdSelection(-1);
+                        getState(CrowdBuilderState.class).setCrowdSelection(selection);
+                    }
                 }
             }
             checkGrids = false;
         }
-        
     }
     
     /**
@@ -431,6 +441,8 @@ public class AgentGridState extends BaseAppState {
         "[Remove Grid] button to remove the grid and all active agents related to that grid. Each", 
         "grid must have a unique name. Spaces count in the naming so if there is added space", 
         "after a grid name, that grid will be considered unique.",
+        " ",
+        "* Format: Name [Grid Size] [Grid Type]",
         " ",
         "Start Position - Starting position the agents will spread out evenly from to form the grid.", 
         "This is only used to generate the agents for the grid so you can drop your agents from", 
@@ -536,13 +548,17 @@ public class AgentGridState extends BaseAppState {
         if (fieldGridName.getText().isEmpty()) {
             displayMessage("You must enter a grid name.", 0);
             return;
-        } else if (mapGrids.containsKey(fieldGridName.getText())) {
-            displayMessage(
+        } else {
+            List<Grid> grids = getGrids();
+            for (Grid grid: grids) {
+                if (grid.getGridName().equals(fieldGridName.getText())) {
+                    displayMessage(
                       "[ " + fieldGridName.getText() 
                     + " ] has already been activated. "
                     + "Change the grid name or remove the existing grid before proceeding.", maxPopupSize);
-            return;
-        } else {
+                    return;
+                }
+            }
             gridName = fieldGridName.getText();
         }
                  
@@ -580,7 +596,7 @@ public class AgentGridState extends BaseAppState {
     private void addAgentGrid(String agentPath, int size, float distance, Vector3f startPos, String gridName) {
 
         //Anything over 2 arguments creates a new object so split this up.
-        LOG.info("<===== Begin AgentGridState addAgentGrid =====>");
+        LOG.info("<===== BEGIN AgentGridState addAgentGrid =====>");
         LOG.info("agentPath          [{}]", agentPath);
         LOG.info("size               [{}]", size);
         LOG.info("separation         [{}]", distance);
@@ -687,21 +703,12 @@ public class AgentGridState extends BaseAppState {
         //new grids to activate.
         LOG.info("listGridAgent size [{}]", listGridAgent.size());
         Grid grid = new Grid(gridName, listGridAgent);
-        addMapGrid(gridName, grid);
+//        addMapGrid(gridName, grid);
+        listBoxGrid.getModel().add(grid);
         newGrid = true;
-        LOG.info("<===== End AgentGridState addAgentGrid =====>");
+        LOG.info("<===== END AgentGridState addAgentGrid =====>");
     }
 
-    /**
-     * Add a new grid to the mapGrid.
-     * 
-     * @param key The key for the grid which is the name of the grid.
-     * @param value The grid to be added to the mapGrid.
-     */
-    private void addMapGrid(String key, Grid value) {
-        mapGrids.put(key, value);
-    }
-    
     /**
      * Displays a modal popup message.
      * 
@@ -713,22 +720,12 @@ public class AgentGridState extends BaseAppState {
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup(txt, width));
     }
-
-    /**
-     * Returns true if mapGrids map contains the specified key.
-     * 
-     * @param key The key to look for in the mapGrids map.
-     * @return The mapGrids
-     */
-    public boolean hasMapGrid(String key) {
-        return mapGrids.containsKey(key);
-    }
     
     //Removes a grid from mapGrids.
     private void removeGrid() {
         
         //Get the selectedGrid from listBoxGrid.
-        Integer selectedGrid = listBoxGrid.getSelectionModel().getSelection();
+        Integer selectedGrid = getGridSelection();
         
         //Check to make sure a grid has been selected.
         if (selectedGrid == null) {
@@ -736,52 +733,50 @@ public class AgentGridState extends BaseAppState {
             return;
         }
         
-        //Get the grids name from the listBoxGrid selectedGrid.
-        String gridName = listBoxGrid.getModel().get(selectedGrid);
-        
-        //We check mapGrids to see if the key exists. If not, go no further.
-        if (!mapGrids.containsKey(gridName)) {
-            displayMessage("No grid found by that name.", 0);
-            return;
-        }
+        //Get the grids from the listBoxGrid selectedGrid.
+        Grid grid = getGrid(selectedGrid);
         
         //We have a valid grid so set the grid to be removed and tell the update
         //loop to look for grids to be removed.
-        mapGrids.get(gridName).setRemoveGrid(true);
+        grid.setRemoveGrid(true);
         checkGrids = true;
     }
 
-    /**
-     * Grabs the GridAgent list for the requested grid.
-     * 
-     * @param gridName The name of the grid to look for.
-     * @return The list of gridAgents for the supplied grid name.
-     */
-    public List<GridAgent> getListGridAgent(String gridName) {
-        return mapGrids.get(gridName).getListGridAgent();
-    }
-    
     /**
      * @return the contAgentGrid.
      */
     public Container getContAgentGrid() {
         return contAgentGrid;
     }
-
+    
     /**
-     * @return the listBoxGrid.
+     * Gets the selected grid from the active grids list.
+     * 
+     * @return The selected grid or null. 
      */
-    public ListBox getListBoxGrid() {
-        return listBoxGrid;
+    public Integer getGridSelection() {
+        return listBoxGrid.getSelectionModel().getSelection();
     }
-
+    
     /**
-     * @return the mapGrids
+     * Gets the Grid from the active grids list.
+     * 
+     * @param index The index of the Grid to retrieve.
+     * @return The Grid for the given index.
      */
-    public List<Grid> getMapGrids() {
-        return new ArrayList<>(mapGrids.values());
+    public Grid getGrid(int index) {
+        return listBoxGrid.getModel().get(index);
     }
-
+    
+    /**
+     * Gets the list of active grids.
+     * 
+     * @return The list of active grids.
+     */
+    public List<Grid> getGrids() {
+        return listBoxGrid.getModel().getObject();
+    }
+    
     /**
      * The grid object for storing the spatial grids. The grid name and 
      * listGridAgent are used to guarantee this is a unique grid for the value 

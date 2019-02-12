@@ -36,7 +36,7 @@ import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
-import com.jme3.recast4j.demo.controls.DebugMoveControl;
+import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.recast4j.demo.states.AgentGridState.Grid;
@@ -78,7 +78,6 @@ import org.slf4j.LoggerFactory;
  *
  * @author Robert
  */
-@SuppressWarnings("unchecked")
 public class CrowdBuilderState extends BaseAppState {
 
     private static final Logger LOG = LoggerFactory.getLogger(CrowdBuilderState.class.getName());
@@ -194,7 +193,7 @@ public class CrowdBuilderState extends BaseAppState {
         listBoxMoveType = contListMoveType.addChild(new ListBox<>(), "growx, growy");
         listBoxMoveType.setName("listBoxMoveType");
         listBoxMoveType.getSelectionModel().setSelection(0);
-        listBoxMoveType.getModel().add("BCC");
+        listBoxMoveType.getModel().add("BETTER_CHARACTER_CONTROL");
         listBoxMoveType.getModel().add("DIRECT");
         listBoxMoveType.getModel().add("CUSTOM");
         listBoxMoveType.getModel().add("NONE");
@@ -224,8 +223,8 @@ public class CrowdBuilderState extends BaseAppState {
                     }
                 }
                 
-                txt = txt + crowd.getAgentCount() + " ]";
-                
+                txt = txt + crowd.getAgentCount() + " ] ";
+                txt = txt + crowd.getApplicationType();
                 return txt;
             }
         });
@@ -502,13 +501,13 @@ public class CrowdBuilderState extends BaseAppState {
                     }
                     
                     //Look for the gridAgents CrowdAgent in the selected crowd.
-                    List<Grid> mapGrids = getState(AgentGridState.class).getMapGrids(); 
-                    
+                    List<Grid> listGrids = getState(AgentGridState.class).getGrids(); 
+
                     //Remove any existing text from listBoxActiveGrids to prepare 
                     //for update.
                     listBoxActiveGrids.getModel().clear();
                     
-                    for (Grid grid: mapGrids) {
+                    for (Grid grid: listGrids) {
                         //We only need one agent to know if the Crowd contains
                         //this grid, get first.
                         CrowdAgent gridAgent = grid.getListGridAgent().get(0).getCrowdAgent();
@@ -543,21 +542,24 @@ public class CrowdBuilderState extends BaseAppState {
         " ",
         "Movement Type - Each type determines how movement is applied to an agent.",
         " ",
-        "* BCC - Use physics and the BetterCharacterControl to set move and view direction.",
+        "* BETTER_CHARACTER_CONTROL - Use physics and the BetterCharacterControl to set", 
+        "move and view direction. Grids containing Physics agents are the only type allowed for", 
+        "this Crowd.",
         " ",
-        "* DIRECT - Direct setting of the agents translation. No controls are needed for,",
-        "movement but you must set the view direction yourself.",
+        "* DIRECT - Direct setting of the agents translation and view direction. No controls are", 
+        "needed for movement.",
         " ",
         "* CUSTOM - With custom, you implement the applyMovement() method from the",
         "ApplyFunction interface. This will give you access to the agents CrowdAgent object, the",
-        "new position and the velocity of the agent.",
+        "new position and the velocity of the agent. It's use is not supported by this demo.",
         " ",
         "* NONE - No movement is implemented. You can freely interact with the crowd and",
-        "implement your own movement soloutions.",
+        "implement your own movement soloutions. It's use is not supported by this demo.",
         " ",
-        "Active Crowds - The list of active crowds. The format for a crowd is the crowd number", 
-        "and the active agents limit for the crowd. One crowd must be selected before any", 
-        "agents can be added or targets for agents can be set.", 
+        "Active Crowds - The list of active crowds. One crowd must be selected before any", 
+        "agents can be added or targets for agents can be set.",
+        " ",
+        "* Format: Name [Crowd Number] [Active Agents Limit] Movement Type",  
         " ",
         "Obstacle Avoidance Parameters - The shared avoidance configuration for an Agent", 
         "inside the crowd. When first instantiating the crowd, you are allotted eight parameter", 
@@ -570,11 +572,9 @@ public class CrowdBuilderState extends BaseAppState {
         "weightSide      = 0.75f \t adaptiveRings   = 2",
         "weightToi         = 2.5f \t   adaptiveDepth  = 5",
         " ",
-        "You may not remove any default parameter from the Crowd, however, you can",
-        "overwrite them. To change any parameter, select the crowd to be updated from the",
-        "Active Crowds window, set the parameters you desire in the Obstacle Avoidance", 
-        "Parameters section, then select any parameter from the list and click the",
-        "[ Update Parameter ] button.",
+        "To change any parameter, select the crowd to be updated from the Active Crowds", 
+        "window, select any parameter from the list, set the parameters you desire in the", 
+        "Obstacle Avoidance Parameters section, click the [ Update Parameter ] button.",
         " ",
         "* velBias - The velocity bias describes how the sampling patterns is offset from the (0,0)", 
         "based on the desired velocity. This allows to tighten the sampling area and cull a lot of", 
@@ -606,8 +606,9 @@ public class CrowdBuilderState extends BaseAppState {
         " ",
         "* adaptiveDepth - Number of iterations at best velocity.",
         " ",
-        "Active Grids - Displays information about active grids residing in the selected crowd.", 
-        "The format being <Grid Size/Crowd Active Agents Size/Crowd Active Agents Limit>."
+        "Active Grids - Displays information about active grids residing in the selected crowd.",
+        " ",
+        "* Format: Name <Grid Size/Crowd Active Agents Size/Crowd Active Agents Limit>."
         };
         
         Container window = new Container(new MigLayout("wrap"));
@@ -636,7 +637,7 @@ public class CrowdBuilderState extends BaseAppState {
 
         //We check mapCrowds to see if the key exists. If not, go no further.
         if (selectedCrowd == null) {
-            displayMessage("No crowd found by that name.", 0);
+            displayMessage("No crowd found.", 0);
             return;
         }
         
@@ -647,7 +648,8 @@ public class CrowdBuilderState extends BaseAppState {
             Crowd crowd = iterator.next();
             if (crowd.equals(selectedCrowd)) {
                 List<CrowdAgent> activeAgents = crowd.getActiveAgents();
-                List<Grid> listGrids = getState(AgentGridState.class).getMapGrids();
+                List<Grid> listGrids = getState(AgentGridState.class).getGrids();
+                
                 boolean found = false;
                 for (CrowdAgent ca: activeAgents) {
                     for (Grid grid: listGrids) {
@@ -657,42 +659,41 @@ public class CrowdBuilderState extends BaseAppState {
                                 //We have a CrowdAgent and a GridAgent so check 
                                 //for Crowd specific control to manipulate or 
                                 //remove.
-                                
+
                                 //Physics agents need to have their BCC reset.
                                 if (ga.getSpatialForAgent().getControl(PhysicsAgentControl.class) != null) {
                                     LOG.info("Resetting Move [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
                                     ga.getSpatialForAgent().getControl(PhysicsAgentControl.class).stopFollowing();
                                 }
-                                
-                                //DebugMoveControl is crowd specific so remove 
+
+                                //CrowdDebugControl is crowd specific so remove 
                                 //if found.
-                                if (ga.getSpatialForAgent().getControl(DebugMoveControl.class) != null) {
-                                    LOG.info("Removing DebugMoveControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-                                    ga.getSpatialForAgent().removeControl(DebugMoveControl.class);
+                                if (ga.getSpatialForAgent().getControl(CrowdDebugControl.class) != null) {
+                                    LOG.info("Removing CrowdDebugControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                    ga.getSpatialForAgent().removeControl(CrowdDebugControl.class);
                                 }
-                                
+
                                 //CrowdChangeControl is crowd specific so remove
                                 //if found.
                                 LOG.info("Removing CrowdChangeControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
                                 ga.getSpatialForAgent().removeControl(CrowdChangeControl.class);
-                                
+
                                 //We have a GridAgent so notify outter loop it 
                                 //was found and break out.
                                 found = true;
                                 break;
                             }
                         }
-                        
+
                         //We found a GridAgent so this loop is done.
                         if (found) {
                            break; 
                         }
-                    } 
+                    }
                     //Remove CrowdAgent from crowd.
                     LOG.info("Removing idx [{}] crowd [{}]", ca.idx, crowd);
                     crowd.removeAgent(ca);
                 }
-                
                 //To fully remove the crowd we have to remove it from the 
                 //CrowdManager, mapCrowds (removes the query object also), and 
                 //the listBoxActiveCrowds.
@@ -971,9 +972,9 @@ public class CrowdBuilderState extends BaseAppState {
         params.adaptiveRings    = adaptiveRings;
 
         //Inject the new parameter into the crowd. Check for the crowd in 
-        //mapcrowds and if exists, update OAP params. Pulls the crowd reference 
-        //from listBoxCrowds rather than the CrowdManager in case CrowdState is 
-        //running. This will keep our crowd lookups in sync.
+        //the crowds list and if exists, update OAP params. Pulls the crowd 
+        //reference from listBoxCrowds rather than the CrowdManager in case 
+        //CrowdState is running. This will keep our crowd lookups in sync.
         if (getSelectedCrowd() != null) {
             getSelectedCrowd().setObstacleAvoidanceParams(selectedParam, params);
             //Remove selected parameter from listBoxAvoidance. Lemur does not 
@@ -1140,7 +1141,7 @@ public class CrowdBuilderState extends BaseAppState {
      * Gets the query object for any selected Crowd.
      * 
      * @return The query object for a selected Crowd or null if the Crowd has 
-     * not been selected in the Active Crowds list or if the query object 
+     * not been selected in the Active Crowds list or if the Crowd object 
      * doesn't exist in the mapCrowds list.
      */
     public NavMeshQuery getQuery() {

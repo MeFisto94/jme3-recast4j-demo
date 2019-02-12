@@ -41,7 +41,7 @@ import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
-import com.jme3.recast4j.demo.controls.DebugMoveControl;
+import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -210,7 +210,7 @@ public class CrowdState extends BaseAppState {
         //Set the spatial for the agent.
         crowd.setSpatialForAgent(createAgent, agent);        
         //Add the debug control and set its visual and verbose state.
-        DebugMoveControl dmc = new DebugMoveControl(crowd, createAgent, haloGeom.clone());
+        CrowdDebugControl dmc = new CrowdDebugControl(crowd, createAgent, haloGeom.clone());
         dmc.setVisual(true); 
         dmc.setVerbose(false);                    
         agent.addControl(dmc);

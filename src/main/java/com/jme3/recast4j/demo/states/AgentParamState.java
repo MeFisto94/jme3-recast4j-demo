@@ -30,16 +30,20 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.bounding.BoundingBox;
+import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.material.Material;
 import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
+import com.jme3.recast4j.Detour.Crowd.ApplyFunction;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
+import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
-import com.jme3.recast4j.demo.controls.DebugMoveControl;
+import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.recast4j.demo.states.AgentGridState.Grid;
 import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -92,9 +96,8 @@ public class AgentParamState extends BaseAppState {
     private Checkbox checkHeight;
     private Checkbox checkDebugVisual;
     private Checkbox checkDebugVerbose;
+    private ApplyFunction applyFunction;
 
-    
-    @SuppressWarnings("unchecked")
     @Override
     protected void initialize(Application app) {
         
@@ -397,28 +400,20 @@ public class AgentParamState extends BaseAppState {
             displayMessage("You must select a [ Active Crowd ] from the [ Crowd ] tab.", 0); 
             return;
         }        
-        
+
         //Must select a agent grid.
-        //Get the selectedAgentGrid from listBoxGrid.
-        Integer selectedAgentGrid = getState(AgentGridState.class)
-                .getListBoxGrid().getSelectionModel().getSelection();
+        Integer gridSelection = getState(AgentGridState.class).getGridSelection();
 
         //Check to make sure a grid has been selected.
-        if (selectedAgentGrid == null) {
+        if (gridSelection == null) {
             displayMessage("You must select a [ Active Grid ] from the [ Agent Grid ] tab.", 0);
             return;
         }
 
-        //Get the grids name from the listBoxGrid selectedAgentGrid.
-        String gridName = getState(AgentGridState.class)
-                .getListBoxGrid().getModel().get(selectedAgentGrid).toString();
-
-        //We check mapGrids to see if the key exists. If not, go no further.
-        if (!getState(AgentGridState.class).hasMapGrid(gridName)) {
-            displayMessage("No grid found by that name.", 0);
-            return;
-        }
-
+        //Get the grid name from the listBoxGrid gridSelection. gridSelection
+        //returning non null guarentees success so no checks needed for null.
+        Grid grid = getState(AgentGridState.class).getGrid(gridSelection);
+        
         //The CrowdAgent radius. 
         if (checkRadius.isChecked()) {
             if (fieldRadius.getText().isEmpty()
@@ -550,7 +545,7 @@ public class AgentParamState extends BaseAppState {
         
         //Everything checks out so far so grab the selected list of agents for 
         //the grid.
-        List<GridAgent> listGridAgents = getState(AgentGridState.class).getListGridAgent(gridName);
+        List<GridAgent> listGridAgents = grid.getListGridAgent();
                 
         //If checked, we use the fieldRadius for the radius.
         if (checkRadius.isChecked()) {
@@ -625,7 +620,7 @@ public class AgentParamState extends BaseAppState {
                 //Update the parameters for the CrowdAgent.
                 crowd.updateAgentParameters(ga.getCrowdAgent().idx, ap);
                 
-                //check the DebugMoveControl if it exists.
+                //check the CrowdDebugControl if it exists.
                 checkDebugMove(ga.getSpatialForAgent(), crowd, ga.getCrowdAgent());
                 
                 //Verify information was updated in logging. Serves no other 
@@ -644,8 +639,26 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("updateFlags           [{}]", cap.updateFlags);
                 LOG.info("Agents Group          [{}]", listGridAgents);
                 LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-            } else {
+            } else {   
                 
+                //Sanity check intentions of crowd use.
+                if (crowd.getApplicationType() == MovementApplicationType.BETTER_CHARACTER_CONTROL
+                &&  ga.getSpatialForAgent().getControl(BetterCharacterControl.class) == null) {
+                    displayMessage("Selected crowd uses PHYSICS movement. Select a different crowd or grid type and try again.", 0);
+                    return;
+                } else if (crowd.getApplicationType() == MovementApplicationType.DIRECT
+                        && ga.getSpatialForAgent().getControl(BetterCharacterControl.class) != null) {
+                    displayMessage("Selected crowd uses DIRECT movement. Select a different crowd or grid type and try again.", 0);
+                    return;
+                } else if (crowd.getApplicationType() == MovementApplicationType.CUSTOM) {
+                    displayMessage("Selected crowd uses CUSTOM movement and is beyond the scope of this demo.", 0);
+                    return;
+                } else if (crowd.getApplicationType() == MovementApplicationType.NONE) {
+                    displayMessage("Selected crowd uses NONE movement and is beyond the scope of this demo.", 0);
+                    return;
+                }
+                
+                //Stop overcrowding of the selected crowd.
                 if (listGridAgents.size() > crowd.getAgentCount()) {
                     displayMessage("Agent grid size of [" + listGridAgents.size() + "] excedes the crowd size ["
                             + crowd.getAgentCount() + "].", 0);
@@ -656,7 +669,7 @@ public class AgentParamState extends BaseAppState {
                             + crowd.getActiveAgents().size() + "] excedes the crowd size ["
                             + crowd.getAgentCount() + "].", 0);
                     return;
-                }   
+                }
                 
                 LOG.info("<========== BEGIN New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
                 LOG.info("Position World        [{}]", ga.getSpatialForAgent().getWorldTranslation());
@@ -679,7 +692,7 @@ public class AgentParamState extends BaseAppState {
                     ga.getSpatialForAgent().getControl(CrowdChangeControl.class).setCrowd(crowd, createAgent);
                 }
                 
-                //Check for DebugMoveControl.
+                //Check for CrowdDebugControl.
                 checkDebugMove(ga.getSpatialForAgent(), crowd, createAgent);
 
                 //Force versionedRef update so the Active Grid list will populate.
@@ -690,7 +703,7 @@ public class AgentParamState extends BaseAppState {
                 }
                 
                 LOG.info("Agents Group          [{}]", listGridAgents);
-                LOG.info("<========== END Adding New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
+                LOG.info("<========== END New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
             }
         }
 
@@ -711,7 +724,7 @@ public class AgentParamState extends BaseAppState {
      */
     private void checkDebugMove(Node spatialForAgent, Crowd crowd, CrowdAgent crowdAgent) {
         if (checkDebugVisual.isChecked() || checkDebugVerbose.isChecked()) {
-            if (spatialForAgent.getControl(DebugMoveControl.class) == null) {
+            if (spatialForAgent.getControl(CrowdDebugControl.class) == null) {
                 //Create the geometry for the halo
                 Torus halo = new Torus(16, 16, 0.1f, 0.3f);
                 Geometry haloGeom = new Geometry("halo", halo);
@@ -722,24 +735,24 @@ public class AgentParamState extends BaseAppState {
                 pitch90.fromAngleAxis(FastMath.PI/2, new Vector3f(1,0,0));
                 haloGeom.setLocalRotation(pitch90);
                 //Add the control and set its visual and verbose state.
-                DebugMoveControl dmc = new DebugMoveControl(crowd, crowdAgent, haloGeom);
+                CrowdDebugControl dmc = new CrowdDebugControl(crowd, crowdAgent, haloGeom);
                 dmc.setVisual(checkDebugVisual.isChecked()); 
                 dmc.setVerbose(checkDebugVerbose.isChecked());                    
                 spatialForAgent.addControl(dmc);
-                LOG.info("Adding DebugMoveControl to spatialForAgent [{}].", spatialForAgent.getName());
+                LOG.info("Adding CrowdDebugControl to spatialForAgent [{}].", spatialForAgent.getName());
             } else {
                 //Set the control to display selected option.
-                spatialForAgent.getControl(DebugMoveControl.class).setVisual(checkDebugVisual.isChecked()); 
-                spatialForAgent.getControl(DebugMoveControl.class).setVerbose(checkDebugVerbose.isChecked());
-                spatialForAgent.getControl(DebugMoveControl.class).setCrowd(crowd);
-                spatialForAgent.getControl(DebugMoveControl.class).setAgent(crowdAgent);
-                LOG.info("Updating DebugMoveControl spatialForAgent [{}].", spatialForAgent.getName());
+                spatialForAgent.getControl(CrowdDebugControl.class).setVisual(checkDebugVisual.isChecked()); 
+                spatialForAgent.getControl(CrowdDebugControl.class).setVerbose(checkDebugVerbose.isChecked());
+                spatialForAgent.getControl(CrowdDebugControl.class).setCrowd(crowd);
+                spatialForAgent.getControl(CrowdDebugControl.class).setAgent(crowdAgent);
+                LOG.info("Updating CrowdDebugControl spatialForAgent [{}].", spatialForAgent.getName());
             }
         } else {
             //Nothing checked for debug, remove control if exists.
-            if (spatialForAgent.getControl(DebugMoveControl.class) != null) {
-                spatialForAgent.removeControl(DebugMoveControl.class);
-                LOG.info("Removing DebugMoveControl [{}].", spatialForAgent.getName());
+            if (spatialForAgent.getControl(CrowdDebugControl.class) != null) {
+                spatialForAgent.removeControl(CrowdDebugControl.class);
+                LOG.info("Removing CrowdDebugControl [{}].", spatialForAgent.getName());
             } 
         }
     }

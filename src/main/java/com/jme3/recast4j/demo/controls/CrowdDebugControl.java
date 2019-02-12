@@ -45,9 +45,9 @@ import org.slf4j.LoggerFactory;
  * 
  * @author Robert
  */
-public class DebugMoveControl extends AbstractControl {
+public class CrowdDebugControl extends AbstractControl {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DebugMoveControl.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(CrowdDebugControl.class.getName());
     
     private CrowdAgent agent;
     private Crowd crowd;
@@ -70,7 +70,7 @@ public class DebugMoveControl extends AbstractControl {
      * @param halo A Geometry that will be used as the visual representation for
      * the agents MoveRequestState.
      */
-    public DebugMoveControl(Crowd crowd, CrowdAgent agent, Geometry halo) {
+    public CrowdDebugControl(Crowd crowd, CrowdAgent agent, Geometry halo) {
         this.crowd = crowd;
         this.agent = agent;
         this.halo = halo;
@@ -106,9 +106,9 @@ public class DebugMoveControl extends AbstractControl {
             }
             
             if (verbose) {
-                LOG.info("<========== BEGIN DebugMoveControl [{}] ==========>", spatial.getName());
+                LOG.info("<========== BEGIN CrowdDebugControl [{}] ==========>", spatial.getName());
                 LOG.info("isActive [{}] targetState [{}]", agent.active, agent.targetState);
-                LOG.info("<========== END DebugMoveControl   [{}] ==========>", spatial.getName());
+                LOG.info("<========== END CrowdDebugControl   [{}] ==========>", spatial.getName());
             }
             
             timer = 0;
