@@ -56,7 +56,19 @@ public class CrowdBCC extends BetterCharacterControl  {
     }
     
     public PhysicsRigidBody getPhysicsRigidBody() {
-        return super.rigidBody;
+        return rigidBody;
+    }
+    
+    public float getHeight() {
+        return this.height;
+    }
+    
+    public float getRadius() {
+        return this.radius;
+    }
+    
+    public float getMass() {
+        return this.mass;
     }
 }
 

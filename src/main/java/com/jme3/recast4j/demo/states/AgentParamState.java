@@ -40,6 +40,7 @@ import com.jme3.recast4j.Detour.Crowd.ApplyFunction;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
+import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
@@ -117,43 +118,43 @@ public class AgentParamState extends BaseAppState {
         
         //The auto-generate radius checkbox.
         checkRadius = contParams.addChild(new Checkbox("Agent Radius"), "split 2, growx");
-        fieldRadius = contParams.addChild(new TextField("0.6"));
+        fieldRadius = contParams.addChild(new TextField(""));
         fieldRadius.setSingleLine(true);
         fieldRadius.setPreferredWidth(50);
         
         //The auto-generate height checkbox.
         checkHeight = contParams.addChild(new Checkbox("Agent Height"), "split 2, growx");
-        fieldHeight = contParams.addChild(new TextField("2.0"));
+        fieldHeight = contParams.addChild(new TextField(""));
         fieldHeight.setSingleLine(true);
         fieldHeight.setPreferredWidth(50);
         
         //The max acceleration field.
         contParams.addChild(new Label("Max Acceleration"), "split 2, growx");
-        fieldMaxAccel = contParams.addChild(new TextField("8.0"));
+        fieldMaxAccel = contParams.addChild(new TextField(""));
         fieldMaxAccel.setSingleLine(true);
         fieldMaxAccel.setPreferredWidth(50);
         
         //The max speed field.
         contParams.addChild(new Label("Max Speed"), "split 2, growx");
-        fieldMaxSpeed = contParams.addChild(new TextField("3.5"));
+        fieldMaxSpeed = contParams.addChild(new TextField(""));
         fieldMaxSpeed.setSingleLine(true);
         fieldMaxSpeed.setPreferredWidth(50);
         
         //The collision query range.
         contParams.addChild(new Label("Collision Query Range"), "split 2, growx");
-        fieldColQueryRange = contParams.addChild(new TextField("12.0"));
+        fieldColQueryRange = contParams.addChild(new TextField(""));
         fieldColQueryRange.setSingleLine(true);
         fieldColQueryRange.setPreferredWidth(50);
         
         //The path optimization range.
         contParams.addChild(new Label("Path Optimize Range"), "split 2, growx");
-        fieldPathOptimizeRange = contParams.addChild(new TextField("30.0"));
+        fieldPathOptimizeRange = contParams.addChild(new TextField(""));
         fieldPathOptimizeRange.setSingleLine(true);
         fieldPathOptimizeRange.setPreferredWidth(50);
         
         //The separation weight.
         contParams.addChild(new Label("Separation Weight"), "split 2, growx");
-        fieldSeparationWeight = contParams.addChild(new TextField("2.0"));
+        fieldSeparationWeight = contParams.addChild(new TextField(""));
         fieldSeparationWeight.setSingleLine(true);
         fieldSeparationWeight.setPreferredWidth(50);
         
@@ -226,7 +227,7 @@ public class AgentParamState extends BaseAppState {
         
         //Buttons.
         contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
-        contButton.addChild(new ActionButton(new CallMethodAction("Add Agents Crowd", this, "addAgentCrowd")));  
+        contButton.addChild(new ActionButton(new CallMethodAction("Add Grid Crowd", this, "addGridCrowd")));  
         
         //Update flags.
         Container contUpdateFlags = new Container(new MigLayout("wrap"));
@@ -286,21 +287,26 @@ public class AgentParamState extends BaseAppState {
     private void showHelp() {
 
         String[] msg = {
-        "Agent Parameters - These are crowd specific parameters for the agents you select in",
-        "the [ Agent Grid ] [ Active Grids ] window. To add or update any active grid setting in this", 
-        "panel, simply make your chages and [Add Agents Crowd] and the selected  grid will be", 
-        "updated.",
+        "Agent Parameters - These are crowd specific parameters for the Grid you select in",
+        "the [ Agent Grid ] [ Active Grids ] window. If a Grid is selected but has not yet been", 
+        "added to a Crowd, the settings will populate with defaults but have no affect. After the",
+        "Grid has been added to the crowd, they will populate with the settings of the currently", 
+        "selected Grid. To add or update any selected [ Active Grid ] simply make your chages", 
+        "and [Add Grid Crowd].",
         " ",
         "Agent Radius - The radius of the agent. When presented with an opening  they are to", 
         "large to enter, pathFinding will try to navigate around it. If checked, the given value will", 
         "be used for the radius of Crowd navigation. Left unchecked, and the radius assigned to", 
-        "the agent during the grid creation process will be used instead. [Limit: >= 0]",
+        "the agent during the grid creation process will be used instead if this is a Physics agent.", 
+        "For Direct agents, the value will be taken from the world bounds of the spatial and is the", 
+        "smallest value in the x or z direction / 2. [Limit: >= 0]",
         " ",
         "Agent Height - The height of the agent. Obstacles with a height less than this ",
         "(value - radius) will cause pathFinding to try and find a navigable path around the", 
         "obstacle. If checked, the given value will be used for the height of Crowd navigation. Left", 
         "unchecked, and the height assigned to the agent during the grid creation process will be",
-        "used instead. [Limit: > 0]",
+        "used instead if this is a Physiscs agent. For Direct agents, the value will be taken from", 
+        "the world bounds of the spatial and is the Y value * 2. [Limit: > 0]",
         " ",
         "Max Acceleration - When an agent lags behind in the path, this is the maximum burst of", 
         "speed the agent will move at when trying to catch up to their expected position.",
@@ -380,7 +386,7 @@ public class AgentParamState extends BaseAppState {
      * Adds an CrowdAgent to the specified crowd but does not set the target. 
      * Updates CrowdAgents if they already exist in the crowd.
      */
-    private void addAgentCrowd() {
+    private void addGridCrowd() {
 
         float radius;
         float height;
@@ -507,35 +513,25 @@ public class AgentParamState extends BaseAppState {
             }
         }
 
-        //The update flags settings.
-        if (!checkTurns.isChecked() 
-        &&  !checkAvoid.isChecked() 
-        &&  !checkTopo.isChecked() 
-        &&  !checkVis.isChecked() 
-        &&  !checkSep.isChecked()) {
-            displayMessage("Select at least one [ Update Flag ].", 0);
-            return;
-        } else {
-            updateFlags = 0;
-            if (checkTurns.isChecked()) {
-                updateFlags += CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS;
-            }
+        updateFlags = 0;
+        if (checkTurns.isChecked()) {
+            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS;
+        }
 
-            if (checkAvoid.isChecked()) {
-                updateFlags += CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE;
-            }
+        if (checkAvoid.isChecked()) {
+            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE;
+        }
 
-            if (checkTopo.isChecked()) {
-                updateFlags += CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO;
-            }
+        if (checkTopo.isChecked()) {
+            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO;
+        }
 
-            if (checkVis.isChecked()) {
-                updateFlags += CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS;
-            }
+        if (checkVis.isChecked()) {
+            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS;
+        }
 
-            if (checkSep.isChecked()) {
-                updateFlags += CrowdAgentParams.DT_CROWD_SEPARATION;
-            }
+        if (checkSep.isChecked()) {
+            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_SEPARATION;
         }
 
         //Obstacle Avoidance Type. Selection is set to 0 when creating 
@@ -556,13 +552,22 @@ public class AgentParamState extends BaseAppState {
                 return;
             }
         } else {
-            //Auto calculate based on bounds.
-            BoundingBox bounds = (BoundingBox) listGridAgents.get(0).getSpatialForAgent().getWorldBound();
-            float x = bounds.getXExtent();
-            float z = bounds.getZExtent();
+            // All gridAgents are the same so grab first one.
+            Node spatialForAgent = listGridAgents.get(0).getSpatialForAgent();
+            //Calculate based off BCC.
+            if (spatialForAgent.getControl(CrowdBCC.class) != null) {
+                CrowdBCC control = spatialForAgent.getControl(CrowdBCC.class);
+                radius = control.getRadius();
+            } else {
+                //Auto calculate based on bounds.
+                BoundingBox bounds = (BoundingBox) spatialForAgent.getChild("spatial").getWorldBound();
+                float x = bounds.getXExtent();
+                float z = bounds.getZExtent();
 
-            float xz = x < z ? x:z;
-            radius = xz/2;
+                float xz = x < z ? x:z;
+                radius = xz/2;
+            }
+            
         }
 
         //If checked, we use the fieldHeight for height.
@@ -574,11 +579,19 @@ public class AgentParamState extends BaseAppState {
                 return;
             }
         } else {
-            //Auto calculate based on bounds. All gridAgents are the same so grab 
-            //first one.
-            BoundingBox bounds = (BoundingBox) listGridAgents.get(0).getSpatialForAgent().getWorldBound();
-            float y = bounds.getYExtent();
-            height = y*2;
+            // All gridAgents are the same so grab first one.
+            Node spatialForAgent = listGridAgents.get(0).getSpatialForAgent();
+            //Calculates based off BCC.
+            if (spatialForAgent.getControl(CrowdBCC.class) != null) {
+                CrowdBCC control = spatialForAgent.getControl(CrowdBCC.class);
+                height = control.getHeight();
+            } else {
+                //Auto calculate based on bounds. All gridAgents are the same so 
+                //grab first one.
+                BoundingBox bounds = (BoundingBox) spatialForAgent.getChild("spatial").getWorldBound();
+                float y = bounds.getYExtent();
+                height = y*2;
+            }
         }     
         
         LOG.info("<===== BEGIN AgentParamState addAgentCrowd =====>");        
@@ -586,7 +599,7 @@ public class AgentParamState extends BaseAppState {
         LOG.info("Active Agents         [{}]", crowd.getActiveAgents().size());
 
         //Build the params object.
-        CrowdAgentParams ap = new CrowdAgentParams();
+        CrowdAgentParams ap         = new CrowdAgentParams();
         ap.radius                   = radius;
         ap.height                   = height;
         ap.maxAcceleration          = maxAccel;
@@ -606,6 +619,7 @@ public class AgentParamState extends BaseAppState {
         LOG.info("separationWeight      [{}]", ap.separationWeight);
         LOG.info("obstacleAvoidanceType [{}]", ap.obstacleAvoidanceType);
         LOG.info("updateFlags           [{}]", ap.updateFlags);
+        LOG.info("Agents Grid           [{}]", listGridAgents);
         
         /**
          * Update an existing CrowdAgent or add a new CrowdAgent to the crowd. 
@@ -623,22 +637,8 @@ public class AgentParamState extends BaseAppState {
                 //check the CrowdDebugControl if it exists.
                 checkDebugMove(ga.getSpatialForAgent(), crowd, ga.getCrowdAgent());
                 
-                //Verify information was updated in logging. Serves no other 
-                //purpose.
-                CrowdAgentParams cap = crowd.getAgent(ga.getCrowdAgent().idx).params;
-
-                LOG.info("<========== BEGIN Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-                LOG.info("radius                [{}]", cap.radius);
-                LOG.info("height                [{}]", cap.height);
-                LOG.info("maxAcceleration       [{}]", cap.maxAcceleration);
-                LOG.info("maxSpeed              [{}]", cap.maxSpeed);
-                LOG.info("colQueryRange         [{}]", cap.collisionQueryRange);
-                LOG.info("pathOptimizationRange [{}]", cap.pathOptimizationRange);
-                LOG.info("separationWeight      [{}]", cap.separationWeight);
-                LOG.info("obstacleAvoidanceType [{}]", cap.obstacleAvoidanceType);
-                LOG.info("updateFlags           [{}]", cap.updateFlags);
-                LOG.info("Agents Group          [{}]", listGridAgents);
-                LOG.info("<========== END Update CAP GridAgent [{}] idx [{}] ==========>", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                LOG.info("<========== Update CAP CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
+                
             } else {   
                 
                 //Sanity check intentions of crowd use.
@@ -660,21 +660,19 @@ public class AgentParamState extends BaseAppState {
                 
                 //Stop overcrowding of the selected crowd.
                 if (listGridAgents.size() > crowd.getAgentCount()) {
-                    displayMessage("Agent grid size of [" + listGridAgents.size() + "] excedes the crowd size ["
+                    displayMessage("Agent grid size of [" + listGridAgents.size() 
+                            + "] excedes the crowd size ["
                             + crowd.getAgentCount() + "].", 0);
                     return;
                 //Grid size to small if active agents + current GridSize - current GridAgent to small.
                 } else if ((listGridAgents.size() + crowd.getActiveAgents().size() - listGridAgents.lastIndexOf(ga)) > crowd.getAgentCount()) {
-                    displayMessage("Agent grid size of [" + listGridAgents.size() + "] plus active agents of [" 
-                            + crowd.getActiveAgents().size() + "] excedes the crowd size ["
+                    displayMessage("Agent grid size of [" + listGridAgents.size() 
+                            + "] plus active agents of [" 
+                            + crowd.getActiveAgents().size() 
+                            + "] excedes the crowd size ["
                             + crowd.getAgentCount() + "].", 0);
                     return;
                 }
-                
-                LOG.info("<========== BEGIN New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
-                LOG.info("Position World        [{}]", ga.getSpatialForAgent().getWorldTranslation());
-                LOG.info("Position Local        [{}]", ga.getSpatialForAgent().getLocalTranslation());
-
                 //Add CrowdAgents to the crowd.
                 CrowdAgent createAgent = crowd.createAgent(ga.getSpatialForAgent().getWorldTranslation(), ap);
                 crowd.setSpatialForAgent(createAgent, ga.getSpatialForAgent());
@@ -684,11 +682,11 @@ public class AgentParamState extends BaseAppState {
                 
                 //No CrowdChangeControl then add one.
                 if (ga.getSpatialForAgent().getControl(CrowdChangeControl.class) == null) {
-                    LOG.info("Adding CrowdChangeControl agent [{}].", ga.getSpatialForAgent().getName());
                     ga.getSpatialForAgent().addControl(new CrowdChangeControl(crowd, createAgent));
+                    LOG.info("Adding CrowdChangeControl to [{}].", ga.getSpatialForAgent().getName());
                 } else {
                     //Existing control so update.
-                    LOG.info("Updating CrowdChangeControl agent [{}].", ga.getSpatialForAgent().getName());
+                    LOG.info("Updating CrowdChangeControl to [{}].", ga.getSpatialForAgent().getName());
                     ga.getSpatialForAgent().getControl(CrowdChangeControl.class).setCrowd(crowd, createAgent);
                 }
                 
@@ -696,15 +694,13 @@ public class AgentParamState extends BaseAppState {
                 checkDebugMove(ga.getSpatialForAgent(), crowd, createAgent);
 
                 //Force versionedRef update so the Active Grid list will populate.
-                Integer selection = getState(CrowdBuilderState.class).getCrowdSelection();
-                if (selection != null) {
-                    getState(CrowdBuilderState.class).setCrowdSelection(-1);
-                    getState(CrowdBuilderState.class).setCrowdSelection(selection);
-                }
+                getState(CrowdBuilderState.class).updateVersRef();
                 
-                LOG.info("Agents Group          [{}]", listGridAgents);
-                LOG.info("<========== END New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
+                LOG.info("<========== New CrowdAgent [{}] ==========>", ga.getSpatialForAgent().getName());
             }
+            
+            //Refresh Agent Parameters panel.
+            this.updateParams();
         }
 
         LOG.info("Crowd                 [{}]", getState(CrowdBuilderState.class).getCrowdNumber(crowd));
@@ -725,6 +721,7 @@ public class AgentParamState extends BaseAppState {
     private void checkDebugMove(Node spatialForAgent, Crowd crowd, CrowdAgent crowdAgent) {
         if (checkDebugVisual.isChecked() || checkDebugVerbose.isChecked()) {
             if (spatialForAgent.getControl(CrowdDebugControl.class) == null) {
+                LOG.info("Adding CrowdDebugControl to [{}].", spatialForAgent.getName());
                 //Create the geometry for the halo
                 Torus halo = new Torus(16, 16, 0.1f, 0.3f);
                 Geometry haloGeom = new Geometry("halo", halo);
@@ -739,20 +736,19 @@ public class AgentParamState extends BaseAppState {
                 dmc.setVisual(checkDebugVisual.isChecked()); 
                 dmc.setVerbose(checkDebugVerbose.isChecked());                    
                 spatialForAgent.addControl(dmc);
-                LOG.info("Adding CrowdDebugControl to spatialForAgent [{}].", spatialForAgent.getName());
             } else {
                 //Set the control to display selected option.
+                LOG.info("Updating CrowdDebugControl [{}].", spatialForAgent.getName());
                 spatialForAgent.getControl(CrowdDebugControl.class).setVisual(checkDebugVisual.isChecked()); 
                 spatialForAgent.getControl(CrowdDebugControl.class).setVerbose(checkDebugVerbose.isChecked());
                 spatialForAgent.getControl(CrowdDebugControl.class).setCrowd(crowd);
                 spatialForAgent.getControl(CrowdDebugControl.class).setAgent(crowdAgent);
-                LOG.info("Updating CrowdDebugControl spatialForAgent [{}].", spatialForAgent.getName());
             }
         } else {
             //Nothing checked for debug, remove control if exists.
+            LOG.info("Removing CrowdDebugControl [{}].", spatialForAgent.getName());
             if (spatialForAgent.getControl(CrowdDebugControl.class) != null) {
                 spatialForAgent.removeControl(CrowdDebugControl.class);
-                LOG.info("Removing CrowdDebugControl [{}].", spatialForAgent.getName());
             } 
         }
     }
@@ -824,6 +820,107 @@ public class AgentParamState extends BaseAppState {
                     .showModalPopup(getState(GuiUtilState.class)
                             .buildPopup(txt, width));
     }    
+            
+    /**
+     * Checks whether a bit flag is set.
+     * 
+     * @param flag The flag to check for.
+     * @param flags The flags to check for the supplied flag.
+     * @return True if the supplied flag is set for the given flags.
+     */
+    private boolean isBitSet(int flag, int flags) {
+        return (flags & flag) == flag;
+    }
+    
+    /**
+     * Toggles the checkBoxes on/off for crowd agent parameters. 
+     * 
+     * @param updateFlags The update flags for the CrowdAgentParameter object.
+     */
+    private void checkUpdateFlags(int updateFlags) {
+        this.checkTurns.setChecked(isBitSet(CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS, updateFlags));
+        
+        this.checkAvoid.setChecked(isBitSet(CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE, updateFlags));
+
+        this.checkTopo.setChecked(isBitSet(CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO, updateFlags));
+
+        this.checkVis.setChecked(isBitSet(CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS, updateFlags));
+
+        this.checkSep.setChecked(isBitSet(CrowdAgentParams.DT_CROWD_SEPARATION, updateFlags));
+    }
+    
+    /**
+     * Sets or clears the default parameters. 
+     * 
+     * @param reset True will clear all fields, false will set default settings.
+     */
+    private void loadDefaultParams(boolean reset) {
+        this.checkRadius.setChecked(false);
+        this.fieldRadius.setText(reset ? "" : "0.6");
+        this.checkHeight.setChecked(false);
+        this.fieldHeight.setText(reset ? "" : "2.0");
+        this.fieldMaxAccel.setText(reset ? "" : "8.0");
+        this.fieldMaxSpeed.setText(reset ? "" : "3.5");
+        this.fieldColQueryRange.setText(reset ? "" : "12.0");
+        this.fieldPathOptimizeRange.setText(reset ? "" : "30.0");
+        this.fieldSeparationWeight.setText(reset ? "" : "2.0");
+        this.listBoxAvoidance.getSelectionModel().setSelection(0);
+        this.checkDebugVisual.setChecked(true);
+        this.checkTurns.setChecked(false);
+        this.checkAvoid.setChecked(false);
+        this.checkTopo.setChecked(false);
+        this.checkVis.setChecked(false);
+        this.checkSep.setChecked(false);
+    }
+    
+    /**
+     * Updates the Agent Parameters panel fields and selections based off the 
+     * current selected grid or if no grids selected will clear all settings.
+     */
+    public void updateParams() {
+        Integer gridSelection = getState(AgentGridState.class).getGridSelection();
+        
+        //null selection so clear all fields.
+        if (gridSelection == null) {
+            loadDefaultParams(true);
+        } else {
+            //Get the selected grid.
+            Grid grid = getState(AgentGridState.class).getGrid(gridSelection);
+            //We only need to get the first agent of a grid to know all agent 
+            //parameters.
+            CrowdAgent crowdAgent = grid.getListGridAgent().get(0).getCrowdAgent();
+            //null CrowdAgent means the Grid exists but has not been added to a
+            //crowd yet so set default params.
+            if (crowdAgent == null) {
+                loadDefaultParams(false);
+            } else {
+                CrowdAgentParams params = crowdAgent.params;
+                this.checkRadius.setChecked(true);
+                this.fieldRadius.setText("" + params.radius);
+                this.checkHeight.setChecked(true);
+                this.fieldHeight.setText("" + params.height);
+                this.fieldMaxAccel.setText("" + params.maxAcceleration);
+                this.fieldMaxSpeed.setText("" + params.maxSpeed);
+                this.fieldColQueryRange.setText("" + params.collisionQueryRange);
+                this.fieldPathOptimizeRange.setText("" + params.pathOptimizationRange);
+                this.fieldSeparationWeight.setText("" + params.separationWeight);
+                this.listBoxAvoidance.getSelectionModel().setSelection(params.obstacleAvoidanceType);
+                //Clear any selections for debug.
+                this.checkDebugVisual.setChecked(false);
+                this.checkDebugVerbose.setChecked(false);
+                //Look for the CrowdDebugControl and if found set the appropriate
+                //checkBoxes.
+                if (grid.getListGridAgent().get(0).getSpatialForAgent().getControl(CrowdDebugControl.class) != null) {
+                    CrowdDebugControl control = grid.getListGridAgent().get(0).getSpatialForAgent().getControl(CrowdDebugControl.class);
+                    this.checkDebugVisual.setChecked(control.isVisual());
+                    this.checkDebugVerbose.setChecked(control.isVerbose());
+                } 
+
+                //Look for any flags to turn off/on.
+                checkUpdateFlags(params.updateFlags);
+            }
+        }
+    }
     
     /**
      * @return The contAgentParams.
@@ -844,5 +941,6 @@ public class AgentParamState extends BaseAppState {
         this.fieldTargetX.setText(x);
         this.fieldTargetY.setText(y);
         this.fieldTargetZ.setText(z);
-    }    
+    }   
+    
 }

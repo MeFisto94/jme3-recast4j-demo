@@ -42,6 +42,7 @@ import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
@@ -50,6 +51,7 @@ import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.Label;
 import com.simsilica.lemur.ListBox;
 import com.simsilica.lemur.TextField;
+import com.simsilica.lemur.core.VersionedReference;
 import com.simsilica.lemur.event.PopupState;
 import com.simsilica.lemur.list.DefaultCellRenderer;
 import com.simsilica.lemur.style.ElementId;
@@ -58,6 +60,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +93,8 @@ public class AgentGridState extends BaseAppState {
     private boolean newGrid;
     private boolean checkGrids;
     private float maxPopupSize;
+    private VersionedReference<Set<Integer>> gridSelectRef; 
+    private VersionedReference<List<Grid>> gridModelRef;
     
     @Override
     protected void initialize(Application app) {
@@ -174,10 +179,9 @@ public class AgentGridState extends BaseAppState {
             listBoxSize.getModel().add(size);
             size++;
         }
-        listBoxSize.getSelectionModel().setSelection(0);
+        listBoxSize.getSelectionModel().setSelection(0);        
+
         
-
-
         
         //Container that holds the active grid components.
         Container contGrid = new Container(new MigLayout("wrap", "[grow]"));
@@ -189,6 +193,8 @@ public class AgentGridState extends BaseAppState {
         //when a grid is selected.
         contGrid.addChild(new Label("Grids"));
         listBoxGrid = contGrid.addChild(new ListBox<>(), "growx");
+        gridSelectRef = listBoxGrid.getSelectionModel().createReference();
+        gridModelRef = listBoxGrid.getModel().createReference();
         listBoxGrid.setCellRenderer(new DefaultCellRenderer<Grid>(new ElementId("list.item"), null) {
             @Override
             protected String valueToString(Grid grid ) {
@@ -388,14 +394,14 @@ public class AgentGridState extends BaseAppState {
 
                     //Force versioned reference update to update the Active 
                     //Grids window of the Crowd panel.
-                    Integer selection = getState(CrowdBuilderState.class).getCrowdSelection();
-                    if (selection != null) {
-                        getState(CrowdBuilderState.class).setCrowdSelection(-1);
-                        getState(CrowdBuilderState.class).setCrowdSelection(selection);
-                    }
+                    getState(CrowdBuilderState.class).updateVersRef();
                 }
             }
             checkGrids = false;
+        }
+        
+        if (gridSelectRef.update() || gridModelRef.update()) {
+            getState(AgentParamState.class).updateParams();
         }
     }
     
@@ -416,16 +422,17 @@ public class AgentGridState extends BaseAppState {
         " ",
         "Use Physics - If [ Use Physics ] is checked, it's expected that physics is to be used for", 
         "navigation movement and a PhysicsAgentControl and BetterCharacterControl will be", 
-        "added to the Agent of choice.", 
+        "added to the Agent of choice. Radius, height and weight will be set as explained below.", 
         " ",
         "Agent Radius - The radius of the agent. Left unchecked, the value will be taken from the", 
-        "world bounds of the spatial and is the smallest value in the x or z direction / 2.",
+        "world bounds of the spatial and is the smallest value in the x or z direction / 2. Applies", 
+        "to physics agents exclusively.",
         " ",
         "Agent Height - The height of the agent. Left unchecked, the value will be taken from the", 
-        "world bounds of the spatial and is the Y value * 2.",
+        "world bounds of the spatial and is the Y value * 2. Applies to physics agents exclusively.",
         " ",
         "Agent Weight - The weight of the agent. Left unchecked, a default weight of 1.0f will be",
-        "assigned if [ Use Physics ] is checked, otherwise, it is ignored.",
+        "assigned. Applies to physics agents exclusively.",
         " ",
         "Agent Separation - Spacing between agents in the grid. Must be a setting of 0.1f",
         "or larger.",
@@ -571,10 +578,10 @@ public class AgentGridState extends BaseAppState {
      * 
      * If checkPhysics is checked, it's expected that physics is to be used for 
      * navigation movement and a PhysicsAgentControl and BetterCharacterControl 
-     * will be added to the spatial of choice. 
+     * will be added to the node of choice. 
      * 
      * If either checkRadius or checkHeight is left unchecked, the value will be 
-     * taken from the world bounds of the spatial for that attribute. Auto 
+     * taken from the world bounds of the node for that attribute. Auto 
      * generation of radius and height is based off model bounds. For radius, 
      * this is the smallest value in the x or z direction / 2. For height, this 
      * would be the Y value * 2.
@@ -582,7 +589,7 @@ public class AgentGridState extends BaseAppState {
      * If weight is left unchecked, a default weight of 1.0f will be assigned.
      * 
      * If checkPhysics is left unchecked, no control will be used. The Radius 
-     * and height of the spatial is determined as noted above except weight is 
+     * and height of the node is determined as noted above except weight is 
      * ignored.
      * 
      * @param agentPath The Path of the GridAgent to be used for this grid.
@@ -611,61 +618,72 @@ public class AgentGridState extends BaseAppState {
                 
                 LOG.info("<<<<<<<<<<     >>>>>>>>>>");
 
-                Node agent = (Node) getApplication().getAssetManager().loadModel(agentPath);
+                Node agent = new Node();
+                
+                //Add spatial to agent node.
+                Spatial spatial = getApplication().getAssetManager().loadModel(agentPath);
+                spatial.setName("spatial");
+                agent.attachChild(spatial);
                 
                 //Agent name.
                 agent.setName(gridName + "_r" + i + "_c"+ j);
-                LOG.info("Agent Name        [{}]", agent.getName());
-                //The GridAgent radius, height.
-                float radius;
-                float height;
+                LOG.info("Agent Name        [{}]", agent.getName());              
                 
-                //If checked, we use the fieldRadius for the radius.
-                if (checkRadius.isChecked()) {
-                    radius = new Float(fieldRadius.getText());
-                    //Stop negative radius input.
-                    if (radius < 0.0f) {
-                        displayMessage("[ Agent Radius ] requires a float value >= 0.", 0);
-                        listGridAgent = null;
-                        return;
-                    }
-                } else {
-                    //Auto calculate based on bounds.
-                    BoundingBox bounds = (BoundingBox) agent.getWorldBound();
-                    float x = bounds.getXExtent();
-                    float z = bounds.getZExtent();
-
-                    float xz = x < z ? x:z;
-                    radius = xz/2;
-                }
-                
-                //If checked, we use the fieldHeight for height.
-                if (checkHeight.isChecked()) {
-                    height = new Float(fieldHeight.getText());
-                    //Stop negative height input.
-                    if (height <= 0.0f) {
-                        displayMessage("[ Agent Height ] requires a float value > 0.", 0);
-                        listGridAgent = null;
-                        return;
-                    }
-                } else {
-                    //Auto calculate based on bounds.
-                    BoundingBox bounds = (BoundingBox) agent.getWorldBound();
-                    float y = bounds.getYExtent();
-                    height = y*2;
-                }               
-                
-                //Set the start position for each spatial
+                //Set the start position for each node
                 float startX = startPos.getX() + i * distance;
                 float startY = startPos.getY();
                 float startZ = startPos.getZ() + j * distance;
                 Vector3f start = new Vector3f(startX, startY, startZ);
                 agent.setLocalTranslation(start);
+                LOG.info("Position World     [{}]", agent.getWorldTranslation());
+                LOG.info("Position Local     [{}]", agent.getLocalTranslation());
                 
-                //If checkPhysics, we use BCC and PhysicsAgentControl
+                //If checkPhysics, we use BCC, PhysicsAgentControl, radius, 
+                //height, weight.
                 if (checkPhysics.isChecked()) {
-                    
+                    //The GridAgent radius, height, weight.
                     float weight;
+                    float radius;
+                    float height;
+
+                    //If checked, we use the fieldRadius for the radius.
+                    if (checkRadius.isChecked()) {
+                        radius = new Float(fieldRadius.getText());
+                        //Stop negative radius input.
+                        if (radius < 0.0f) {
+                            displayMessage("[ Agent Radius ] requires a float value >= 0.", 0);
+                            listGridAgent = null;
+                            return;
+                        }
+                    } else {
+                        //Auto calculate based on bounds.
+                        BoundingBox bounds = (BoundingBox) spatial.getWorldBound();
+                        float x = bounds.getXExtent();
+                        float z = bounds.getZExtent();
+
+                        float xz = x < z ? x:z;
+                        radius = xz/2;
+                    }
+                    
+                    LOG.info("radius             [{}]", radius);
+                    
+                    //If checked, we use the fieldHeight for height.
+                    if (checkHeight.isChecked()) {
+                        height = new Float(fieldHeight.getText());
+                        //Stop negative height input.
+                        if (height <= 0.0f) {
+                            displayMessage("[ Agent Height ] requires a float value > 0.", 0);
+                            listGridAgent = null;
+                            return;
+                        }
+                    } else {
+                        //Auto calculate based on bounds.
+                        BoundingBox bounds = (BoundingBox) spatial.getWorldBound();
+                        float y = bounds.getYExtent();
+                        height = y*2;
+                    } 
+                    
+                    LOG.info("height             [{}]", height);
                     
                     //If checked, we use the fieldWeight for weight.
                     if (checkWeight.isChecked()) {
@@ -679,31 +697,27 @@ public class AgentGridState extends BaseAppState {
                     } else {
                         weight = 1.0f;
                     }
+                    
+                    LOG.info("weight             [{}]", weight);
+
                     //Give the GridAgent physics controls controls. Will be added to
                     //physics space from update loop.
                     //PhysicsRigidBody from CrowdBCC is detectable for cleanup
                     //so had to extend it just to add the getter.
-//                    spatial.addControl(new BetterCharacterControl(radius, height, weight));
+//                    node.addControl(new BetterCharacterControl(radius, height, weight));
                     agent.addControl(new CrowdBCC(radius, height, weight));
                     agent.addControl(new PhysicsAgentControl());
-
-                    LOG.info("weight             [{}]", weight);
                 } 
                 
-                LOG.info("radius             [{}]", radius);
-                LOG.info("height             [{}]", height);
-                LOG.info("Position World     [{}]", agent.getWorldTranslation());
-                LOG.info("Position Local     [{}]", agent.getLocalTranslation());
                 //Add to agents list.
                 GridAgent gridAgent = new GridAgent(agent);
                 listGridAgent.add(gridAgent);
             }
         }
-        //Create grid and add to the mapGrid. Tell the update loop to check for 
-        //new grids to activate.
+        //Create grid and add to the Grids list. Informs the update loop to 
+        //check for new grids to activate.
         LOG.info("listGridAgent size [{}]", listGridAgent.size());
         Grid grid = new Grid(gridName, listGridAgent);
-//        addMapGrid(gridName, grid);
         listBoxGrid.getModel().add(grid);
         newGrid = true;
         LOG.info("<===== END AgentGridState addAgentGrid =====>");
@@ -778,7 +792,7 @@ public class AgentGridState extends BaseAppState {
     }
     
     /**
-     * The grid object for storing the spatial grids. The grid name and 
+     * The grid object for storing the node grids. The grid name and 
      * listGridAgent are used to guarantee this is a unique grid for the value 
      * used for the hashmap.
      */
@@ -844,7 +858,7 @@ public class AgentGridState extends BaseAppState {
         }
 
         /**
-         * The spatial list used for this crowd grid.
+         * The node list used for this crowd grid.
          * 
          * @return The list of Grid Agents
          */
@@ -889,26 +903,27 @@ public class AgentGridState extends BaseAppState {
     }
     
     /**
-     * 
+     * Represents an agent for a grid. Uses a node for attaching and detaching of 
+     * controls.
      */
     public class GridAgent {
 
         private CrowdAgent crowdAgent;
-        private final Node spatial;
+        private final Node node;
         
-        public GridAgent(Node spatial) {
-            this.spatial = spatial;
+        public GridAgent(Node node) {
+            this.node = node;
         }
 
         /**
-         * @return The CrowdAgent for this spatial.
+         * @return The CrowdAgent for this node.
          */
         public CrowdAgent getCrowdAgent() {
             return crowdAgent;
         }
 
         /**
-         * @param crowdAgent the CrowdAgent to set for this spatial.
+         * @param crowdAgent the CrowdAgent to set for this node.
          */
         public void setCrowdAgent(CrowdAgent crowdAgent) {
             this.crowdAgent = crowdAgent;
@@ -916,15 +931,15 @@ public class AgentGridState extends BaseAppState {
 
         /**
          *
-         * @return The spatial for this CrowdAgent.
+         * @return The node for this CrowdAgent.
          */
         public Node getSpatialForAgent() {
-            return spatial;
+            return node;
         }
         
         @Override
         public String toString() {
-            return spatial.getName();
+            return node.getName();
         }
 
     } 

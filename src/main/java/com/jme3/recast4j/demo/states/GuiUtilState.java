@@ -119,4 +119,5 @@ public class GuiUtilState extends BaseAppState {
         formatter.parse(str, pos);
         return str.length() == pos.getIndex();
     }
+    
 }

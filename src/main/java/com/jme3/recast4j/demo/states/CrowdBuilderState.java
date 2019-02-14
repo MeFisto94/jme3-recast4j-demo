@@ -649,39 +649,46 @@ public class CrowdBuilderState extends BaseAppState {
             if (crowd.equals(selectedCrowd)) {
                 List<CrowdAgent> activeAgents = crowd.getActiveAgents();
                 List<Grid> listGrids = getState(AgentGridState.class).getGrids();
-                
                 boolean found = false;
+                //Check the crowdAgents against the gridAgents corwdAgent so we
+                //csn remove any Crowdspecific controls and reset movement.
                 for (CrowdAgent ca: activeAgents) {
+                    //Grab the grid to check from the list.
                     for (Grid grid: listGrids) {
                         List<GridAgent> listGridAgent = grid.getListGridAgent();
+                        //Check for any CrowdAgents that are in the grid and 
+                        //crowd. 
                         for (GridAgent ga: listGridAgent) {
-                            if (ga.getCrowdAgent().equals(ca)) {
-                                //We have a CrowdAgent and a GridAgent so check 
-                                //for Crowd specific control to manipulate or 
-                                //remove.
+                            if (ga.getCrowdAgent() != null) {
+                                //We have a CrowdAgent and the GridAgents 
+                                //CrowdAgent match so check for Crowd specific 
+                                //control to manipulate or remove.
+                                if (ga.getCrowdAgent().equals(ca)) {
+                                    //Physics agents need to have their BCC reset.
+                                    if (ga.getSpatialForAgent().getControl(PhysicsAgentControl.class) != null) {
+                                        LOG.info("Resetting Move [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                        ga.getSpatialForAgent().getControl(PhysicsAgentControl.class).stopFollowing();
+                                    }
 
-                                //Physics agents need to have their BCC reset.
-                                if (ga.getSpatialForAgent().getControl(PhysicsAgentControl.class) != null) {
-                                    LOG.info("Resetting Move [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-                                    ga.getSpatialForAgent().getControl(PhysicsAgentControl.class).stopFollowing();
+                                    //CrowdDebugControl is crowd specific so remove 
+                                    //if found.
+                                    if (ga.getSpatialForAgent().getControl(CrowdDebugControl.class) != null) {
+                                        LOG.info("Removing CrowdDebugControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                        ga.getSpatialForAgent().removeControl(CrowdDebugControl.class);
+                                    }
+
+                                    //CrowdChangeControl is crowd specific so remove
+                                    //if found.
+                                    LOG.info("Removing CrowdChangeControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
+                                    ga.getSpatialForAgent().removeControl(CrowdChangeControl.class);
+                                    //CrowdAgent is crowd specific so null out 
+                                    //the Crowdagent for this gridAgent.
+                                    ga.setCrowdAgent(null);
+                                    //We have a GridAgent so notify outter loop it 
+                                    //was found and break out.
+                                    found = true;
+                                    break;
                                 }
-
-                                //CrowdDebugControl is crowd specific so remove 
-                                //if found.
-                                if (ga.getSpatialForAgent().getControl(CrowdDebugControl.class) != null) {
-                                    LOG.info("Removing CrowdDebugControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-                                    ga.getSpatialForAgent().removeControl(CrowdDebugControl.class);
-                                }
-
-                                //CrowdChangeControl is crowd specific so remove
-                                //if found.
-                                LOG.info("Removing CrowdChangeControl [{}] idx [{}].", ga.getSpatialForAgent(), ga.getCrowdAgent().idx);
-                                ga.getSpatialForAgent().removeControl(CrowdChangeControl.class);
-
-                                //We have a GridAgent so notify outter loop it 
-                                //was found and break out.
-                                found = true;
-                                break;
                             }
                         }
 
@@ -702,8 +709,10 @@ public class CrowdBuilderState extends BaseAppState {
                 //Lemur getSelected() does not update if you remove or insert 
                 //into a listBox. Best to set it to -1 (unselected) and force
                 //user to reselect.
-                setCrowdSelection(-1);
+                listBoxActiveCrowds.getSelectionModel().setSelection(-1);
                 iterator.remove();
+                //refresh Agent Parameter panel.
+                getState(AgentParamState.class).updateParams();
                 break;
             }
         } 
@@ -981,12 +990,10 @@ public class CrowdBuilderState extends BaseAppState {
             //currently update the selection when items are removed or inserted.
             //If this changes, this must be reworked to account for changes.
             listBoxAvoidance.getModel().clear();
-            //Force a selctor reference update.
-            Integer crowdSelection = getCrowdSelection();
-            if (crowdSelection != null) {
-                setCrowdSelection(-1);
-                setCrowdSelection(crowdSelection);
-            }
+            
+            //Force a selctor reference update to repopulate the params.
+            updateVersRef();
+            
         } else {
             LOG.error("Failed to find the selected crowd in listBoxCrowds [{}]", getSelectedCrowd());
             displayMessage("You must select a [ Active Crowd ] before a parameter can be updated.", 0);
@@ -1176,23 +1183,14 @@ public class CrowdBuilderState extends BaseAppState {
     }
     
     /**
-     * Gets the selection index for the currently selected crowd from the Active 
-     * Crowds list.
-     * 
-     * @return The index of the currently selected crowd from the Active Crowds 
-     * list or null.
+     * Forces a selection update for Crowd Versioned references.
      */
-    public Integer getCrowdSelection() {
-        return listBoxActiveCrowds.getSelectionModel().getSelection();
-    }
-    
-    /**
-     * Sets the current selection index for the Active Crowds list.
-     * 
-     * @param index The index to set.
-     */
-    public void setCrowdSelection(int index) {
-        listBoxActiveCrowds.getSelectionModel().setSelection(index);
+    public void updateVersRef() {
+        Integer crowdSelection = listBoxActiveCrowds.getSelectionModel().getSelection();
+        if (crowdSelection != null) {
+            listBoxActiveCrowds.getSelectionModel().setSelection(-1);
+            listBoxActiveCrowds.getSelectionModel().setSelection(crowdSelection);
+        }
     }
     
     /**
