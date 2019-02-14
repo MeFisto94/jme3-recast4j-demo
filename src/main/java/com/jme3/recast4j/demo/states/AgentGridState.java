@@ -581,7 +581,7 @@ public class AgentGridState extends BaseAppState {
      * will be added to the node of choice. 
      * 
      * If either checkRadius or checkHeight is left unchecked, the value will be 
-     * taken from the world bounds of the node for that attribute. Auto 
+     * taken from the world bounds of the spatial for that attribute. Auto 
      * generation of radius and height is based off model bounds. For radius, 
      * this is the smallest value in the x or z direction / 2. For height, this 
      * would be the Y value * 2.
@@ -589,7 +589,7 @@ public class AgentGridState extends BaseAppState {
      * If weight is left unchecked, a default weight of 1.0f will be assigned.
      * 
      * If checkPhysics is left unchecked, no control will be used. The Radius 
-     * and height of the node is determined as noted above except weight is 
+     * and height of the spatial is determined as noted above except weight is 
      * ignored.
      * 
      * @param agentPath The Path of the GridAgent to be used for this grid.
@@ -792,9 +792,7 @@ public class AgentGridState extends BaseAppState {
     }
     
     /**
-     * The grid object for storing the node grids. The grid name and 
-     * listGridAgent are used to guarantee this is a unique grid for the value 
-     * used for the hashmap.
+     * The grid object for storing grid agents.
      */
     public class Grid {
 
@@ -858,7 +856,7 @@ public class AgentGridState extends BaseAppState {
         }
 
         /**
-         * The node list used for this crowd grid.
+         * The node list used for this agent grid.
          * 
          * @return The list of Grid Agents
          */
