@@ -72,7 +72,7 @@ public class LemurConfigState extends BaseAppState {
         
         //Set the default font size
         attrs = styles.getSelector("glass");
-        attrs.set("fontSize", 13);
+        attrs.set("fontSize", 12);
 
         //Change textfield background from defaults.
         attrs = styles.getSelector(TextField.ELEMENT_ID, "glass");

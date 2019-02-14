@@ -63,9 +63,9 @@ dependencies {
     compile 'org.slf4j:slf4j-simple:1.7.21'
     compile 'org.codehaus.groovy:groovy-all:2.4.7'
     compile 'com.google.guava:guava:19.0'
-    compile "com.simsilica:lemur:1.11.0"
+    compile "com.simsilica:lemur:1.12.0"
     compile "com.simsilica:lemur-proto:1.10.0"
-    compile 'com.simsilica:lemur-props:1.0.1'
+    compile 'com.simsilica:lemur-props:1.1.0'
 
     //miglayout for lemur
     compile 'com.miglayout:miglayout-core:5.2'
