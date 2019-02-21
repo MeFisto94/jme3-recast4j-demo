@@ -53,6 +53,9 @@ import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
@@ -65,6 +68,8 @@ import org.recast4j.detour.QueryFilter;
 import org.recast4j.detour.Result;
 import org.recast4j.detour.Status;
 import org.recast4j.detour.StraightPathItem;
+import org.recast4j.detour.io.MeshDataWriter;
+import org.recast4j.detour.io.MeshSetWriter;
 import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilderConfig;
 import org.slf4j.Logger;
@@ -130,7 +135,10 @@ public class NavState extends BaseAppState {
         query = new NavMeshQuery(navMesh);
         
         try {
-            RecastTest.saveToFile(navMesh);
+            MeshDataWriter mdw = new MeshDataWriter();
+            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
         } catch (Exception ex) {
             LOG.error("[{}]", ex);
         }

@@ -514,23 +514,23 @@ public class AgentParamState extends BaseAppState {
 
         updateFlags = 0;
         if (checkTurns.isChecked()) {
-            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS;
+            updateFlags |= CrowdAgentParams.DT_CROWD_ANTICIPATE_TURNS;
         }
 
         if (checkAvoid.isChecked()) {
-            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE;
+            updateFlags |= CrowdAgentParams.DT_CROWD_OBSTACLE_AVOIDANCE;
         }
 
         if (checkTopo.isChecked()) {
-            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO;
+            updateFlags |= CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO;
         }
 
         if (checkVis.isChecked()) {
-            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS;
+            updateFlags |= CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS;
         }
 
         if (checkSep.isChecked()) {
-            updateFlags = updateFlags | CrowdAgentParams.DT_CROWD_SEPARATION;
+            updateFlags |= CrowdAgentParams.DT_CROWD_SEPARATION;
         }
 
         //Obstacle Avoidance Type. Selection is set to 0 when creating 
