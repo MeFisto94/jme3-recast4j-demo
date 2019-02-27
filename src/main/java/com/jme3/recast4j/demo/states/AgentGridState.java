@@ -39,7 +39,6 @@ import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
-import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
@@ -706,7 +705,6 @@ public class AgentGridState extends BaseAppState {
                     //so had to extend it just to add the getter.
 //                    node.addControl(new BetterCharacterControl(radius, height, weight));
                     agent.addControl(new CrowdBCC(radius, height, weight));
-                    agent.addControl(new PhysicsAgentControl());
                 } 
                 
                 //Add to agents list.

@@ -43,8 +43,8 @@ import com.jme3.recast4j.Recast.GeometryProviderBuilder;
 import com.jme3.recast4j.Recast.NavMeshDataCreateParamsBuilder;
 import com.jme3.recast4j.Recast.RecastBuilderConfigBuilder;
 import com.jme3.recast4j.Recast.RecastConfigBuilder;
-import com.jme3.recast4j.Recast.RecastTest;
 import com.jme3.recast4j.Recast.RecastUtils;
+import com.jme3.recast4j.Recast.SampleAreaModifications;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -54,26 +54,38 @@ import com.jme3.scene.shape.Line;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.MeshData;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshBuilder;
 import org.recast4j.detour.NavMeshDataCreateParams;
+import org.recast4j.detour.NavMeshParams;
 import org.recast4j.detour.NavMeshQuery;
 import org.recast4j.detour.QueryFilter;
 import org.recast4j.detour.Result;
 import org.recast4j.detour.Status;
 import org.recast4j.detour.StraightPathItem;
 import org.recast4j.detour.io.MeshDataWriter;
+import org.recast4j.detour.io.MeshSetReader;
 import org.recast4j.detour.io.MeshSetWriter;
+import org.recast4j.recast.PolyMesh;
+import org.recast4j.recast.PolyMeshDetail;
 import org.recast4j.recast.RecastBuilder;
+import org.recast4j.recast.RecastBuilder.RecastBuilderProgressListener;
+import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
 import org.recast4j.recast.RecastBuilderConfig;
+import org.recast4j.recast.RecastConfig;
+import org.recast4j.recast.geom.InputGeomProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static org.recast4j.recast.RecastVectors.copy;
 
 /**
  *
@@ -110,43 +122,8 @@ public class NavState extends BaseAppState {
     @Override
     protected void onEnable() {
         worldMap = ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
-        System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
-        long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
-        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).
-                build(new RecastConfigBuilder()
-                        .withAgentRadius(.3f)           // r
-                        .withAgentHeight(1.7f)          // h
-                        //cs and ch should probably be .1 at min.
-                        .withCellSize(.1f)              // cs=r/3
-                        .withCellHeight(.1f)            // ch=cs 
-                        .withAgentMaxClimb(.3f)         // > 2*ch
-                        .withAgentMaxSlope(45f)         
-                        .withEdgeMaxLen(2.4f)             // r*8
-                        .withEdgeMaxError(1.3f)         // 1.1 - 1.5
-                        .withDetailSampleDistance(6.0f) // increase if exception
-                        .withDetailSampleMaxError(5.0f) // increase if exception
-                        .withVertsPerPoly(3).build());
-        
-        //Split up for testing.
-        NavMeshDataCreateParams build = new NavMeshDataCreateParamsBuilder(
-                new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg);
-        MeshData meshData = NavMeshBuilder.createNavMeshData(build);
-        navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
-        query = new NavMeshQuery(navMesh);
-        
-        try {
-            MeshDataWriter mdw = new MeshDataWriter();
-            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
-            MeshSetWriter msw = new MeshSetWriter();
-            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
-        } catch (Exception ex) {
-            LOG.error("[{}]", ex);
-        }
-
-        //Show wireframe. Helps with param tweaks. false = solid color.
-        showDebugMeshes(meshData, true);
-        
-        System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
+//        buildSolo();
+        buildTiled();
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -321,6 +298,213 @@ public class NavState extends BaseAppState {
 
         ((SimpleApplication) getApplication()).getRootNode().attachChild(g);
         ((SimpleApplication) getApplication()).getRootNode().attachChild(gDetailed);
+    }
+    
+        private void buildSolo() {
+                System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
+        long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).
+                build(new RecastConfigBuilder()
+                        .withAgentRadius(.3f)           // r
+                        .withAgentHeight(1.7f)          // h
+                        //cs and ch should probably be .1 at min.
+                        .withCellSize(.1f)              // cs=r/3
+                        .withCellHeight(.1f)            // ch=cs 
+                        .withAgentMaxClimb(.3f)         // > 2*ch
+                        .withAgentMaxSlope(45f)         
+                        .withEdgeMaxLen(2.4f)             // r*8
+                        .withEdgeMaxError(1.3f)         // 1.1 - 1.5
+                        .withDetailSampleDistance(6.0f) // increase if exception
+                        .withDetailSampleMaxError(5.0f) // increase if exception
+                        .withVertsPerPoly(3).build());
+        
+        //Split up for testing.
+        NavMeshDataCreateParams build = new NavMeshDataCreateParamsBuilder(
+                new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg);
+        MeshData meshData = NavMeshBuilder.createNavMeshData(build);
+        navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
+        query = new NavMeshQuery(navMesh);
+        
+        try {
+            MeshDataWriter mdw = new MeshDataWriter();
+            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+        } catch (Exception ex) {
+            LOG.error("[{}]", ex);
+        }
+
+        //Show wireframe. Helps with param tweaks. false = solid color.
+        showDebugMeshes(meshData, true);
+        
+        System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
+    }
+    
+    private void buildTiled() {
+        float agentHeight = 1.7f;
+        float agentRadius = .3f;
+        float agentMaxClimb = .3f;
+        
+        //Step 1. Gather our geometry.
+        InputGeomProvider geomProvider = new GeometryProviderBuilder((Node)worldMap).build();
+        //Step 2. Create a Recast configuration object.
+        RecastConfigBuilder builder = new RecastConfigBuilder();
+        //Instantiate the configuration parameters.
+        RecastConfig cfg = builder
+                .withAgentRadius(agentRadius)       // r
+                .withAgentHeight(agentHeight)       // h
+                //cs and ch should be .1 at min.
+                .withCellSize(0.1f)                 // cs=r/2
+                .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
+                .withAgentMaxClimb(agentMaxClimb)   // > 2*ch
+                .withAgentMaxSlope(45f)
+                .withEdgeMaxLen(3.2f)               // r*8
+                .withEdgeMaxError(1.3f)             // 1.1 - 1.5
+                .withDetailSampleDistance(6.0f)     // increase if exception
+                .withDetailSampleMaxError(5.0f)     // increase if exception
+                .withVertsPerPoly(3)
+                .withTileSize(64).build(); 
+        // Build all tiles
+        RecastBuilder rb = new RecastBuilder(new ProgressListen());
+        RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1);
+        // Add tiles to nav mesh
+        int tw = rcResult.length;
+        int th = rcResult[0].length;
+        // Create empty nav mesh
+        NavMeshParams navMeshParams = new NavMeshParams();
+        copy(navMeshParams.orig, geomProvider.getMeshBoundsMin());
+        navMeshParams.tileWidth = cfg.tileSize * cfg.cs;
+        navMeshParams.tileHeight = cfg.tileSize * cfg.cs;
+        navMeshParams.maxTiles = tw * th;
+        navMeshParams.maxPolys = 32768;
+        navMesh = new NavMesh(navMeshParams, 3);
+        
+        for (int y = 0; y < th; y++) {
+            for (int x = 0; x < tw; x++) {
+                PolyMesh pmesh = rcResult[x][y].getMesh();
+                if (pmesh.npolys == 0) {
+                        continue;
+                }
+                
+                // Update poly flags from areas.
+                for (int i = 0; i < pmesh.npolys; ++i) {
+                    if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
+                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
+                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
+                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
+                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
+                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
+                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
+                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
+                                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+                    }
+                    if (pmesh.areas[i] > 0) {
+                        pmesh.areas[i]--;
+                    }
+                }
+                
+                NavMeshDataCreateParams params = new NavMeshDataCreateParams();
+                params.verts = pmesh.verts;
+                params.vertCount = pmesh.nverts;
+                params.polys = pmesh.polys;
+                params.polyAreas = pmesh.areas;
+                params.polyFlags = pmesh.flags;
+                params.polyCount = pmesh.npolys;
+                params.nvp = pmesh.nvp;
+                PolyMeshDetail dmesh = rcResult[x][y].getMeshDetail();
+                params.detailMeshes = dmesh.meshes;
+                params.detailVerts = dmesh.verts;
+                params.detailVertsCount = dmesh.nverts;
+                params.detailTris = dmesh.tris;
+                params.detailTriCount = dmesh.ntris;
+                params.walkableHeight = agentHeight;
+                params.walkableRadius = agentRadius;
+                params.walkableClimb = agentMaxClimb;
+                params.bmin = pmesh.bmin;
+                params.bmax = pmesh.bmax;
+                params.cs = cfg.cs;
+                params.ch = cfg.ch;
+                params.tileX = x;
+                params.tileY = y;
+                params.buildBvTree = true;
+                navMesh.addTile(NavMeshBuilder.createNavMeshData(params), 0, 0);
+            }
+        }
+        
+        query = new NavMeshQuery(navMesh);
+
+        try {
+            //Native format using tiles.
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+            //Read in saved NavMesh.
+            MeshSetReader msr = new MeshSetReader();
+            NavMesh navMeshFromSaved = msr.read(new FileInputStream("test.nm"), 3);
+            int maxTiles = navMeshFromSaved.getMaxTiles();
+            System.out.println("Tile count " + navMeshFromSaved.getTileCount());
+
+            //Tile data can be null since maxTiles is not an exact science.
+            for (int i = 0; i < maxTiles; i++) {
+                MeshData meshdata = navMeshFromSaved.getTile(i).data;
+
+                System.out.println("Tile " + i);
+                if (meshdata != null ) {
+                    showDebugMeshes(meshdata, true);
+                }
+            }
+        }  catch (IOException ex) {
+            LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
+        }
+    }
+    
+    
+    private class ProgressListen implements RecastBuilderProgressListener {
+
+        private long time = System.nanoTime();
+        private long elapsedTime;
+        private long avBuildTime;
+        private long estTotalTime;
+        private long estTimeRemain;
+        private long buildTimeNano;
+        private long elapsedTimeHr;
+        private long elapsedTimeMin;
+        private long elapsedTimeSec;
+        private long totalTimeHr;
+        private long totalTimeMin;
+        private long totalTimeSec;
+        private long timeRemainHr;
+        private long timeRemainMin;
+        private long timeRemainSec;
+
+        @Override
+        public void onProgress(int completed, int total) {
+            elapsedTime += System.nanoTime() - time;
+            avBuildTime = elapsedTime/(long)completed;
+            estTotalTime = avBuildTime * (long)total;
+            estTimeRemain = estTotalTime - elapsedTime;
+
+            buildTimeNano = TimeUnit.MILLISECONDS.convert(avBuildTime, TimeUnit.NANOSECONDS);
+            System.out.printf("Completed %d[%d] Average [%dms] ", completed, total, buildTimeNano);
+
+            elapsedTimeHr = TimeUnit.HOURS.convert(elapsedTime, TimeUnit.NANOSECONDS) % 24;
+            elapsedTimeMin = TimeUnit.MINUTES.convert(elapsedTime, TimeUnit.NANOSECONDS) % 60;
+            elapsedTimeSec = TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS) % 60;
+            System.out.printf("Elapsed Time [%02d:%02d:%02d] ", elapsedTimeHr, elapsedTimeMin, elapsedTimeSec);
+
+            totalTimeHr = TimeUnit.HOURS.convert(estTotalTime, TimeUnit.NANOSECONDS) % 24;
+            totalTimeMin = TimeUnit.MINUTES.convert(estTotalTime, TimeUnit.NANOSECONDS) % 60;
+            totalTimeSec = TimeUnit.SECONDS.convert(estTotalTime, TimeUnit.NANOSECONDS) % 60;
+            System.out.printf("Estimated Total [%02d:%02d:%02d] ", totalTimeHr, totalTimeMin, totalTimeSec);
+
+            timeRemainHr = TimeUnit.HOURS.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 24;
+            timeRemainMin = TimeUnit.MINUTES.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 60;
+            timeRemainSec = TimeUnit.SECONDS.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 60;
+            System.out.printf("Remaining Time [%02d:%02d:%02d]%n", timeRemainHr, timeRemainMin, timeRemainSec);
+
+            //reset time
+            time = System.nanoTime();
+        }
+        
     }
         
     /**

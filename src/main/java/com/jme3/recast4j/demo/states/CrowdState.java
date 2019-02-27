@@ -30,7 +30,6 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
-import com.jme3.bullet.BulletAppState;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
@@ -47,13 +46,9 @@ import com.jme3.recast4j.Recast.RecastBuilderConfigBuilder;
 import com.jme3.recast4j.Recast.RecastConfigBuilder;
 import com.jme3.recast4j.Recast.RecastUtils;
 import com.jme3.recast4j.Recast.SampleAreaModifications;
-import com.jme3.recast4j.demo.controls.CrowdBCC;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
-import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.Geometry;
-import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
-import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Torus;
 import java.io.File;
@@ -61,12 +56,12 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.util.logging.Level;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.MeshData;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshBuilder;
 import org.recast4j.detour.NavMeshDataCreateParams;
+import org.recast4j.detour.NavMeshParams;
 import org.recast4j.detour.NavMeshQuery;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
@@ -76,9 +71,12 @@ import org.recast4j.detour.io.MeshDataWriter;
 import org.recast4j.detour.io.MeshSetReader;
 import org.recast4j.detour.io.MeshSetWriter;
 import org.recast4j.recast.PolyMesh;
+import org.recast4j.recast.PolyMeshDetail;
 import org.recast4j.recast.RecastBuilder;
+import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
 import org.recast4j.recast.RecastBuilderConfig;
 import org.recast4j.recast.RecastConfig;
+import static org.recast4j.recast.RecastVectors.copy;
 import org.recast4j.recast.geom.InputGeomProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,14 +95,19 @@ public class CrowdState extends BaseAppState {
     private Crowd crowd;
     
     @Override
-    protected void initialize(Application app) {
-        
-        Box boxMesh = new Box(10f,.1f,10f); 
+    protected void initialize(Application app) {   
+//        buildSolo();
+        buildTiled();
+//        buildCrowd();
+    }
+    
+    private void buildSolo() {
+        Box boxMesh = new Box(20f,.1f,20f); 
         Geometry boxGeo = new Geometry("Colored Box", boxMesh); 
         Material boxMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Light/Lighting.j3md"); 
         boxMat.setBoolean("UseMaterialColors", true); 
-        boxMat.setColor("Ambient", ColorRGBA.Green); 
-        boxMat.setColor("Diffuse", ColorRGBA.Green); 
+        boxMat.setColor("Ambient", ColorRGBA.LightGray); 
+        boxMat.setColor("Diffuse", ColorRGBA.LightGray); 
         boxGeo.setMaterial(boxMat); 
         ((SimpleApplication) getApplication()).getRootNode().attachChild(boxGeo);
         
@@ -118,8 +121,8 @@ public class CrowdState extends BaseAppState {
                 .withAgentHeight(2.0f)              // h
                 //cs and ch should be .1 at min.
                 .withCellSize(0.2f)                 // cs=r/2
-                .withCellHeight(0.1f)                // ch=cs/2 but not < .1f
-                .withAgentMaxClimb(0.3f)             // > 2*ch
+                .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
+                .withAgentMaxClimb(0.3f)            // > 2*ch
                 .withAgentMaxSlope(45f)
                 .withEdgeMaxLen(3.2f)               // r*8
                 .withEdgeMaxError(1.3f)             // 1.1 - 1.5
@@ -128,15 +131,16 @@ public class CrowdState extends BaseAppState {
                 .withVertsPerPoly(3).build();       
         //Create a RecastBuilderConfig builder with world bounds of our geometry.
         RecastBuilderConfigBuilder rcb = new RecastBuilderConfigBuilder(boxGeo);
-        //Build the configuration object using our cfg. This is where we decide
-        //if this is a solo NavMesh build or tiled. Tiled will be covered later.
-        RecastBuilderConfig bcfg = rcb.build(cfg);        
+        //Build the configuration object using our cfg. 
+        RecastBuilderConfig bcfg = rcb.withDetailMesh(true).build(cfg);        
         //Step 3. Build our Navmesh data using our gathered geometry and configuration.
+        //This is where we decide if this is a solo NavMesh build or tiled. 
+        //Tiled will be covered later.
         RecastBuilder rb = new RecastBuilder();
-        RecastBuilder.RecastBuilderResult rbr = rb.build(geomProvider, bcfg);
+        RecastBuilderResult rbr = rb.build(geomProvider, bcfg);
         //Set the parameters needed to build our MeshData using the RecastBuilder results.
         NavMeshDataCreateParamsBuilder paramBuilder = new NavMeshDataCreateParamsBuilder(rbr);
-        //Update poly flags from areas.
+        //Update poly flags from areas. Set any flags here.
         PolyMesh pmesh = paramBuilder.getPolyMesh();
         for (int i = 0; i < pmesh.npolys; ++i) {
             if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
@@ -153,7 +157,7 @@ public class CrowdState extends BaseAppState {
                 pmesh.areas[i]--;
             }
         }
-        //Build the parameter object. Set any flags here.
+        //Build the parameter object. 
         NavMeshDataCreateParams params = paramBuilder.build(bcfg);
         //Step 4. Generate MeshData using our parameters object.
         MeshData meshData = NavMeshBuilder.createNavMeshData(params);
@@ -167,7 +171,141 @@ public class CrowdState extends BaseAppState {
             //Or the native format using tiles.
             MeshSetWriter msw = new MeshSetWriter();
             msw.write(new FileOutputStream(new File("myNavMesh.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+        }  catch (IOException ex) {
+            LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
+        }
+    }
+    
+    private void buildTiled() {
+        //We need to know these variables for the tile NavMeshDataCreateParams
+        //object. 
+        float agentHeight = 2.0f;
+        float agentRadius = 0.4f;
+        float agentMaxClimb = 0.3f;
+                
+        Box boxMesh = new Box(20f,.1f,20f); 
+        Geometry boxGeo = new Geometry("Colored Box", boxMesh); 
+        Material boxMat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Light/Lighting.j3md"); 
+        boxMat.setBoolean("UseMaterialColors", true); 
+        boxMat.setColor("Ambient", ColorRGBA.LightGray); 
+        boxMat.setColor("Diffuse", ColorRGBA.LightGray); 
+        boxGeo.setMaterial(boxMat); 
+        ((SimpleApplication) getApplication()).getRootNode().attachChild(boxGeo);
+        
+        //Step 1. Gather our geometry.
+        InputGeomProvider geomProvider = new GeometryProviderBuilder(boxGeo).build();
+        //Step 2. Create a Recast configuration object.
+        RecastConfigBuilder builder = new RecastConfigBuilder();
+        //Instantiate the configuration parameters.
+        RecastConfig cfg = builder
+                .withAgentRadius(agentRadius)       // r
+                .withAgentHeight(agentHeight)       // h
+                //cs and ch should be .1 at min.
+                .withCellSize(0.2f)                 // cs=r/2
+                .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
+                .withAgentMaxClimb(agentMaxClimb)   // > 2*ch
+                .withAgentMaxSlope(45f)
+                .withEdgeMaxLen(3.2f)               // r*8
+                .withEdgeMaxError(1.3f)             // 1.1 - 1.5
+                .withDetailSampleDistance(6.0f)     // increase if exception
+                .withDetailSampleMaxError(5.0f)     // increase if exception
+                .withVertsPerPoly(3)
+                .withTileSize(32).build();          // set tile size
+
+        //Build all tiles
+        RecastBuilder rb = new RecastBuilder();
+        RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1);
+        
+        //Set the parameters needed to build our MeshData using the RecastBuilder results.
+        int tw = rcResult.length;
+        int th = rcResult[0].length;
+        
+        //Create empty nav mesh.
+        NavMeshParams navMeshParams = new NavMeshParams();
+        copy(navMeshParams.orig, geomProvider.getMeshBoundsMin());
+        navMeshParams.tileWidth = cfg.tileSize * cfg.cs;
+        navMeshParams.tileHeight = cfg.tileSize * cfg.cs;
+        navMeshParams.maxTiles = tw * th;
+        navMeshParams.maxPolys = 32768;
+        NavMesh navMesh = new NavMesh(navMeshParams, 3);
+        //Add tiles to nav mesh
+        for (int y = 0; y < th; y++) {
+            for (int x = 0; x < tw; x++) {
+                PolyMesh pmesh = rcResult[x][y].getMesh();
+                if (pmesh.npolys == 0) {
+                        continue;
+                }
+
+                //Update poly flags from areas.
+                for (int i = 0; i < pmesh.npolys; ++i) {
+                    if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
+                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
+                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
+                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
+                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
+                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
+                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
+                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
+                                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+                    }
+                    if (pmesh.areas[i] > 0) {
+                        pmesh.areas[i]--;
+                    }
+                }
+                //Create empty parameters object to set params.
+                NavMeshDataCreateParams params = new NavMeshDataCreateParams();
+                params.verts = pmesh.verts;
+                params.vertCount = pmesh.nverts;
+                params.polys = pmesh.polys;
+                params.polyAreas = pmesh.areas;
+                params.polyFlags = pmesh.flags;
+                params.polyCount = pmesh.npolys;
+                params.nvp = pmesh.nvp;
+                //Save detail mesh data.
+                PolyMeshDetail dmesh = rcResult[x][y].getMeshDetail();
+                params.detailMeshes = dmesh.meshes;
+                params.detailVerts = dmesh.verts;
+                params.detailVertsCount = dmesh.nverts;
+                params.detailTris = dmesh.tris;
+                params.detailTriCount = dmesh.ntris;
+                params.walkableHeight = agentHeight;
+                params.walkableRadius = agentRadius;
+                params.walkableClimb = agentMaxClimb;
+                params.bmin = pmesh.bmin;
+                params.bmax = pmesh.bmax;
+                params.cs = cfg.cs;
+                params.ch = cfg.ch;
+                params.tileX = x;
+                params.tileY = y;
+                params.buildBvTree = true;
+                //add tile to navMesh. 
+                navMesh.addTile(NavMeshBuilder.createNavMeshData(params), 0, 0);
+            }
+        }
+        
+        try {
+            //Native format using tiles.
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("myNavMesh.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+            //Or read in saved NavMesh.
+            MeshSetReader msr = new MeshSetReader();
+            NavMesh navMeshFromSaved = msr.read(new FileInputStream("myNavMesh.nm"), 3);
+
+            int maxTiles = navMeshFromSaved.getMaxTiles();
+            for (int i = 0; i < maxTiles; i++) {
+                MeshData meshdata = navMeshFromSaved.getTile(i).data;
+                if (meshdata != null ) {
+                    showDebugMeshes(meshdata, true);
+                }
+            }
             
+        }  catch (IOException ex) {
+            LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
+        }
+    }
+    
+    private void buildCrowd() {
+        try {
             //Read in saved MeshData and build new NavMesh.
             MeshDataReader mdr = new MeshDataReader();       
             MeshData savedMeshData = mdr.read(new FileInputStream("myMeshData.md"), 3);
@@ -177,9 +315,7 @@ public class CrowdState extends BaseAppState {
             MeshSetReader msr = new MeshSetReader();
             NavMesh navMeshFromSaved = msr.read(new FileInputStream("myNavMesh.nm"), 3);
             
-            //Create the query object for pathfinding in this Crowd. Will be 
-            //added to the mapCrowds as a value so each crowd query object is
-            //referenced.  
+            //Create the query object for pathfinding in this Crowd. 
             query = new NavMeshQuery(navMeshFromSaved);
             //Start crowd.
             crowd = new Crowd(MovementApplicationType.DIRECT, 100, .3f, navMeshFromSaved);
@@ -210,7 +346,6 @@ public class CrowdState extends BaseAppState {
             oap.adaptiveDivs = 7;
             oap.adaptiveRings = 3;
             oap.adaptiveDepth = 3;
-            
         } catch (IOException | NoSuchFieldException | IllegalAccessException ex) {
             LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
@@ -226,9 +361,9 @@ public class CrowdState extends BaseAppState {
     //graph attachment or input listener attachment.
     @Override
     protected void onEnable() {      
-        addAgent(new Vector3f(-5, 0, 0));
-        addAgent(new Vector3f(-4f, 0.0f, -1f));
-        addAgent(new Vector3f(-3, 0, 0));         
+//        addAgent(new Vector3f(-5, 0, 0));
+//        addAgent(new Vector3f(-4f, 0.0f, -1f));
+//        addAgent(new Vector3f(-3, 0, 0));         
     }
 
     @Override
@@ -305,7 +440,7 @@ public class CrowdState extends BaseAppState {
         agent.addControl(dmc);
     }
     
-        private void showDebugMeshes(MeshData meshData, boolean wireframe) {
+    private void showDebugMeshes(MeshData meshData, boolean wireframe) {
         Material matRed = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
         matRed.setColor("Color", ColorRGBA.Red);
         

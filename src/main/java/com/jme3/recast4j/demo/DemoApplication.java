@@ -69,12 +69,12 @@ public class DemoApplication extends SimpleApplication {
     }
 
     @Override
-    public void simpleInitApp() {
+    public void simpleInitApp() {        
         initKeys();
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
-        //loadNavMeshBox();
-        //loadNavMeshDune();
+//        loadNavMeshBox();
+//        loadNavMeshDune();
         loadJaime();
         loadNavMeshLevel();
         loadDoors();
