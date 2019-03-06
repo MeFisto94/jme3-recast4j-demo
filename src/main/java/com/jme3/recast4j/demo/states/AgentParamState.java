@@ -97,7 +97,6 @@ public class AgentParamState extends BaseAppState {
     private Checkbox checkHeight;
     private Checkbox checkDebugVisual;
     private Checkbox checkDebugVerbose;
-    private ApplyFunction applyFunction;
 
     @Override
     protected void initialize(Application app) {
@@ -311,13 +310,13 @@ public class AgentParamState extends BaseAppState {
         "speed the agent will move at when trying to catch up to their expected position.",
         "[Limit: >= 0]",
         " ",
-        "Max Speed - the maximum speed the agent will travel along the path when",
+        "Max Speed - The maximum speed the agent will travel along the path when",
         "unobstructed. [Limit: >= 0]",
         " ",
         "Collision Query Range - Defines how close a collision element must be before it's", 
         "considered for steering behaviors. [Limits: > 0]",
         " ",
-        "Path Optimization Range: The path visibility optimization range. [Limit: > 0]",
+        "Path Optimization Range - The path visibility optimization range. [Limit: > 0]",
         " ",
         "Separation Weight - How aggressive  the agent manager should be at avoiding collisions", 
         "with this agent. [Limit: >= 0]",
@@ -326,7 +325,7 @@ public class AgentParamState extends BaseAppState {
         "agent. Currently, the max number of avoidance types that can be configured for the", 
         "Crowd is eight. See [ Crowd ] [ Obstacle Avoidance Parameters ]. [Limits: 0 <= value < 8]",
         " ",
-        "Update Flags - Crowd agent update flags. This is a required setting.",
+        "Update Flags - Crowd agent update flags.",
         " ",
         "* ANTICIPATE_TURNS",
         " ",
@@ -339,7 +338,7 @@ public class AgentParamState extends BaseAppState {
         " ",
         "* OPTIMIZE_VIS - Attempts to optimize the path if the specified point is visible from the",
         "current position. Inaccurate locomotion or dynamic obstacle avoidance can force the", 
-        "argent position significantly outside the original corridor. Over time this can result in the", 
+        "agent position significantly outside the original corridor. Over time this can result in the", 
         "formation of a non-optimal corridor. Non-optimal paths can also form near the corners", 
         "of tiles. This is not suitable for long distance searches.",
         " ",

@@ -457,7 +457,6 @@ public class NavState extends BaseAppState {
         }
     }
     
-    
     private class ProgressListen implements RecastBuilderProgressListener {
 
         private long time = System.nanoTime();

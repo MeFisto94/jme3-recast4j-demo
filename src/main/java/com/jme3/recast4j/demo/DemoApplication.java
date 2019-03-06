@@ -22,7 +22,7 @@ import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.states.AgentGridState;
 import com.jme3.recast4j.demo.states.AgentParamState;
 import com.jme3.recast4j.demo.states.CrowdBuilderState;
-import com.jme3.recast4j.demo.states.CrowdState;
+import com.jme3.recast4j.demo.states.tutorial.CrowdState;
 import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.NavState;

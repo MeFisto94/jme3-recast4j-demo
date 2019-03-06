@@ -25,7 +25,7 @@
  * Converted from http://quadropolis.us/node/2584 [Public Domain according to the Tags of this Map]
  */
 
-package com.jme3.recast4j.demo.states;
+package com.jme3.recast4j.demo.states.tutorial;
 
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
@@ -47,6 +47,7 @@ import com.jme3.recast4j.Recast.RecastConfigBuilder;
 import com.jme3.recast4j.Recast.RecastUtils;
 import com.jme3.recast4j.Recast.SampleAreaModifications;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
+import com.jme3.recast4j.demo.states.CrowdBuilderState;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Box;
@@ -56,6 +57,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.concurrent.TimeUnit;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.MeshData;
 import org.recast4j.detour.NavMesh;
@@ -83,7 +85,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A procedural example of creating a crowd. When running this state and the gui
- * at the same time, they do not interfere with each other.
+ * at the same time, they do not interfere with each other. Used for tutorial 
+ * code examples only.
  * 
  * @author Robert
  */
@@ -346,6 +349,7 @@ public class CrowdState extends BaseAppState {
             oap.adaptiveDivs = 7;
             oap.adaptiveRings = 3;
             oap.adaptiveDepth = 3;
+            crowd.setObstacleAvoidanceParams(3, oap);
         } catch (IOException | NoSuchFieldException | IllegalAccessException ex) {
             LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
@@ -376,7 +380,7 @@ public class CrowdState extends BaseAppState {
     }
     
     /**
-     * Set the target for the selected crowd.
+     * Set the target for the crowd.
      * 
      * @param target The target to set.
      */
@@ -402,8 +406,12 @@ public class CrowdState extends BaseAppState {
         Node agent = (Node) getApplication().getAssetManager().loadModel("Models/Jaime/Jaime.j3o");
         //Set translation prior to adding controls.
         agent.setLocalTranslation(location);
-        //We have a physics crowd so we need a physics compatible control to apply
+        //If we have a physics Crowd we need a physics compatible control to apply
         //movement and direction to the spatial.
+        //agent.addControl((new BetterCharacterControl(0.3f, 1.5f, 20f)));
+        //getState(BulletAppState.class).getPhysicsSpace().add(agent);
+        
+        //Add agent to the scene.
         ((SimpleApplication) getApplication()).getRootNode().attachChild(agent);
         
         int updateFlags = CrowdAgentParams.DT_CROWD_OPTIMIZE_TOPO | CrowdAgentParams.DT_CROWD_OPTIMIZE_VIS;
@@ -440,6 +448,7 @@ public class CrowdState extends BaseAppState {
         agent.addControl(dmc);
     }
     
+    
     private void showDebugMeshes(MeshData meshData, boolean wireframe) {
         Material matRed = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
         matRed.setColor("Color", ColorRGBA.Red);
@@ -463,5 +472,54 @@ public class CrowdState extends BaseAppState {
 
         ((SimpleApplication) getApplication()).getRootNode().attachChild(g);
         ((SimpleApplication) getApplication()).getRootNode().attachChild(gDetailed);
+    }
+    
+    private class ProgressListen implements RecastBuilder.RecastBuilderProgressListener {
+
+        private long time = System.nanoTime();
+        private long elapsedTime;
+        private long avBuildTime;
+        private long estTotalTime;
+        private long estTimeRemain;
+        private long buildTimeNano;
+        private long elapsedTimeHr;
+        private long elapsedTimeMin;
+        private long elapsedTimeSec;
+        private long totalTimeHr;
+        private long totalTimeMin;
+        private long totalTimeSec;
+        private long timeRemainHr;
+        private long timeRemainMin;
+        private long timeRemainSec;
+
+        @Override
+        public void onProgress(int completed, int total) {
+            elapsedTime += System.nanoTime() - time;
+            avBuildTime = elapsedTime/(long)completed;
+            estTotalTime = avBuildTime * (long)total;
+            estTimeRemain = estTotalTime - elapsedTime;
+
+            buildTimeNano = TimeUnit.MILLISECONDS.convert(avBuildTime, TimeUnit.NANOSECONDS);
+            System.out.printf("Completed %d[%d] Average [%dms] ", completed, total, buildTimeNano);
+
+            elapsedTimeHr = TimeUnit.HOURS.convert(elapsedTime, TimeUnit.NANOSECONDS) % 24;
+            elapsedTimeMin = TimeUnit.MINUTES.convert(elapsedTime, TimeUnit.NANOSECONDS) % 60;
+            elapsedTimeSec = TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS) % 60;
+            System.out.printf("Elapsed Time [%02d:%02d:%02d] ", elapsedTimeHr, elapsedTimeMin, elapsedTimeSec);
+
+            totalTimeHr = TimeUnit.HOURS.convert(estTotalTime, TimeUnit.NANOSECONDS) % 24;
+            totalTimeMin = TimeUnit.MINUTES.convert(estTotalTime, TimeUnit.NANOSECONDS) % 60;
+            totalTimeSec = TimeUnit.SECONDS.convert(estTotalTime, TimeUnit.NANOSECONDS) % 60;
+            System.out.printf("Estimated Total [%02d:%02d:%02d] ", totalTimeHr, totalTimeMin, totalTimeSec);
+
+            timeRemainHr = TimeUnit.HOURS.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 24;
+            timeRemainMin = TimeUnit.MINUTES.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 60;
+            timeRemainSec = TimeUnit.SECONDS.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 60;
+            System.out.printf("Remaining Time [%02d:%02d:%02d]%n", timeRemainHr, timeRemainMin, timeRemainSec);
+
+            //reset time
+            time = System.nanoTime();
+        }
+        
     }
 }
