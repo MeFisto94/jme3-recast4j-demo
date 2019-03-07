@@ -8,6 +8,7 @@ import com.jme3.audio.AudioListenerState;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
+import com.jme3.export.binary.BinaryExporter;
 import com.jme3.input.KeyInput;
 import com.jme3.input.controls.ActionListener;
 import com.jme3.input.controls.KeyTrigger;
@@ -30,8 +31,16 @@ import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.scene.plugins.gltf.ExtrasLoader;
+import com.jme3.scene.plugins.gltf.GltfModelKey;
 import com.jme3.scene.shape.Box;
 import com.jme3.system.AppSettings;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.logging.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +87,7 @@ public class DemoApplication extends SimpleApplication {
         loadJaime();
         loadNavMeshLevel();
         loadDoors();
-
+        
         getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
 
@@ -158,7 +167,11 @@ public class DemoApplication extends SimpleApplication {
     }
 
     private void loadDoors() {
-        Spatial doors = getAssetManager().loadModel("Models/Level/recast_door.j3o");
+        //gltf loader test
+        GltfModelKey modelKey = new GltfModelKey("Textures/Level/recast_door.gltf");
+        ExtrasLoader extras = new GltfUserDataLoader();
+        modelKey.setExtrasLoader(extras);
+        Node doors = (Node) getAssetManager().loadModel(modelKey);
         doors.setName("doors");
         doors.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(doors);
@@ -218,6 +231,5 @@ public class DemoApplication extends SimpleApplication {
         getInputManager().addMapping("crowd pick", new KeyTrigger(KeyInput.KEY_LSHIFT));
         getInputManager().addListener(actionListener, "crowd builder", "crowd pick");
     }
-
 
 }
