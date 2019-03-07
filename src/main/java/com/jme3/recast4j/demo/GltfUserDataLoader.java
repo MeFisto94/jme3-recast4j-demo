@@ -35,7 +35,8 @@ import com.jme3.scene.plugins.gltf.GltfLoader;
 import java.util.Map.Entry;
 
 /**
- *
+ * Gltf loader for Blender user data.
+ * 
  * @author Robert
  */
 public class GltfUserDataLoader implements ExtrasLoader {
