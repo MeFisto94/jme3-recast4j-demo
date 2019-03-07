@@ -26,6 +26,7 @@ import com.jme3.recast4j.demo.states.tutorial.CrowdState;
 import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.NavState;
+import com.jme3.recast4j.demo.states.ThirdPersonCamState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
@@ -51,8 +52,8 @@ public class DemoApplication extends SimpleApplication {
                 new CrowdManagerAppstate(new CrowdManager()),
                 new LemurConfigState(),
                 /*new CrowdState(),*/
-                new GuiUtilState()
-                /*new ThirdPersonCamState()*/
+                new GuiUtilState(),
+                new ThirdPersonCamState()
         );
     }
 
@@ -80,7 +81,8 @@ public class DemoApplication extends SimpleApplication {
         loadJaime();
         loadNavMeshLevel();
         loadDoors();
-        
+        loadFish();
+                
         getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
 
@@ -180,6 +182,16 @@ public class DemoApplication extends SimpleApplication {
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(player);
         getStateManager().getState(NavState.class).getCharacters().add(player);
         getRootNode().attachChild(player);
+    }
+    
+    private void loadFish() {
+        Node fish = (Node) getAssetManager().loadModel("Models/Fish/Fish1.j3o");
+        fish.setName("fish");
+        fish.setLocalTranslation(0, 5, 0);
+        fish.addControl(new BetterCharacterControl(.2f, .2f, 1f));
+        fish.addControl(new PhysicsAgentControl());
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(fish);
+        getRootNode().attachChild(fish);
     }
     
     private ActionListener actionListener = new ActionListener() {
