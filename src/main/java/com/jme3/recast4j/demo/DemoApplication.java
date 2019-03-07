@@ -26,7 +26,6 @@ import com.jme3.recast4j.demo.states.tutorial.CrowdState;
 import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.NavState;
-import com.jme3.recast4j.demo.states.ThirdPersonCamState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
