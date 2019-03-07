@@ -52,8 +52,8 @@ public class DemoApplication extends SimpleApplication {
                 new CrowdManagerAppstate(new CrowdManager()),
                 new LemurConfigState(),
                 /*new CrowdState(),*/
-                new GuiUtilState(),
-                new ThirdPersonCamState()
+                new GuiUtilState()
+                /*new ThirdPersonCamState()*/
         );
     }
 
@@ -81,7 +81,7 @@ public class DemoApplication extends SimpleApplication {
         loadJaime();
         loadNavMeshLevel();
         loadDoors();
-        loadFish();
+//        loadFish();
                 
         getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
