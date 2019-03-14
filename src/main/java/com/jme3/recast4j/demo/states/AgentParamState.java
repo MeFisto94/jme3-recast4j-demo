@@ -36,7 +36,6 @@ import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
-import com.jme3.recast4j.Detour.Crowd.ApplyFunction;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
@@ -325,7 +324,7 @@ public class AgentParamState extends BaseAppState {
         "agent. Currently, the max number of avoidance types that can be configured for the", 
         "Crowd is eight. See [ Crowd ] [ Obstacle Avoidance Parameters ]. [Limits: 0 <= value < 8]",
         " ",
-        "Update Flags - Crowd agent update flags.",
+        "Update Flags - Flags that impact steering behavior.",
         " ",
         "* ANTICIPATE_TURNS",
         " ",

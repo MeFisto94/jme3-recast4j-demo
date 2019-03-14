@@ -31,10 +31,17 @@ import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.math.Vector3f;
+import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_ALL;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DISABLED;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_JUMP;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
@@ -43,6 +50,7 @@ import com.jme3.recast4j.demo.states.AgentGridState.Grid;
 import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.CallMethodAction;
+import com.simsilica.lemur.Checkbox;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.HAlignment;
@@ -66,8 +74,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.function.IntFunction;
+import org.recast4j.detour.DefaultQueryFilter;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshQuery;
+import org.recast4j.detour.QueryFilter;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.ObstacleAvoidanceQuery.ObstacleAvoidanceParams;
 import org.recast4j.detour.io.MeshSetReader;
@@ -75,7 +86,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Gui builder for crowd data. 
+ * 
  * @author Robert
  */
 public class CrowdBuilderState extends BaseAppState {
@@ -84,6 +96,12 @@ public class CrowdBuilderState extends BaseAppState {
 
     private Container contTabs;
     private DocumentModelFilter doc;
+    private TextField fieldCostGround;
+    private TextField fieldCostRoad;
+    private TextField fieldCostGrass;
+    private TextField fieldCostDoor;
+    private TextField fieldCostJump;
+    private TextField fieldCostWater;
     private TextField fieldNavMesh;
     private TextField fieldMaxAgents;
     private TextField fieldMaxAgentRadius;
@@ -101,13 +119,36 @@ public class CrowdBuilderState extends BaseAppState {
     private ListBox<String> listBoxMoveType;
     private ListBox<Crowd> listBoxActiveCrowds;
     private ListBox<String> listBoxActiveGrids;
-    // Keep track crowd selection changes
+    private ListBox<DefaultQueryFilter> listBoxFilters;
+    // Keep track selection changes
+    //Crowd changes.
     private VersionedReference<Set<Integer>> crowdSelectRef; 
     private VersionedReference<List<Crowd>> crowdModelRef;
-    private HashMap<Crowd, NavMeshQuery> mapCrowds;
+    //Filter changes
+    private VersionedReference<Boolean> editActiveSelRef;
+    private VersionedReference<Set<Integer>> filtersSelectRef; 
+    private VersionedReference<List<DefaultQueryFilter>> filtersModelRef;
     private String defaultActiveGridText;
-
-    
+    private Checkbox checkIncludeNone;
+    private Checkbox checkIncludeDisabled;
+    private Checkbox checkIncludeAll;
+    private Checkbox checkIncludeWalk;
+    private Checkbox checkIncludeSwim;
+    private Checkbox checkIncludeDoor;
+    private Checkbox checkIncludeJump;
+    private Checkbox checkExcludeAll;
+    private Checkbox checkExcludeNone;
+    private Checkbox checkExcludeDisabled;
+    private Checkbox checkExcludeWalk;
+    private Checkbox checkExcludeSwim;
+    private Checkbox checkExcludeDoor;
+    private Checkbox checkExcludeJump;
+    private Checkbox checkEditActive;
+    private HashMap<Crowd, NavMeshQuery> mapCrowds;
+    private static final int DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS = 8;
+    private static final int DT_CROWD_MAX_QUERY_FILTER_TYPE = 16;
+    //Currently, only six area modifications in SampleAreaModifications.
+    private static final int MAX_AREAMOD = 6;
     @Override
     protected void initialize(Application app) {
         
@@ -146,51 +187,220 @@ public class CrowdBuilderState extends BaseAppState {
         //The top container for the crowd builder panel.
         Container contCrowd = new Container(new MigLayout("align center"));
         contCrowd.setName("CrowdBuilderState contCrowd");
-        contCrowd.setAlpha(0, false);
+        contCrowd.setAlpha(0, false);        
         
         
         
-        //Container that holds the parameters for starting the crowd.
-        Container contCrowdParam = new Container(new MigLayout("wrap", "[grow]"));
-        contCrowdParam.setName("CrowdBuilderState contCrowdParam");
-        contCrowdParam.setAlpha(0, false);
-        contCrowd.addChild(contCrowdParam, "growx, growy"); 
+        Container contOAP = new Container(new MigLayout("wrap", "[grow]"));
+        contOAP.setName("CrowdBuilderState contOAP");
+        contOAP.setAlpha(1, false);
+        contOAP.addChild(new Label("Obstacle Avoidance Parameters")); 
+        contCrowd.addChild(contOAP, "growx, growy");
+                
+        //Velocity Bias.
+        contOAP.addChild(new Label("velBias"), "split 2, growx"); 
+        fieldVelocityBias = contOAP.addChild(new TextField(""));
+        fieldVelocityBias.setSingleLine(true);
+        fieldVelocityBias.setPreferredWidth(50);
         
-        //Start Crowd parameters
-        //The navmesh loader. 
-        contCrowdParam.addChild(new Label("Crowd Parameters"));
-        contCrowdParam.addChild(new Label("NavMesh"), "split 2"); 
-        fieldNavMesh = contCrowdParam.addChild(new TextField("test.nm"), "growx");
-        fieldNavMesh.setSingleLine(true);
+        //Weight desired velocity.
+        contOAP.addChild(new Label("weightDesVel"), "split 2, growx"); 
+        fieldWeightDesVel = contOAP.addChild(new TextField(""));
+        fieldWeightDesVel.setSingleLine(true);
+        fieldWeightDesVel.setPreferredWidth(50);
         
-
+        //Weight current velocity.
+        contOAP.addChild(new Label("weightCurVel"), "split 2, growx"); 
+        fieldWeightCurVel = contOAP.addChild(new TextField(""));
+        fieldWeightCurVel.setSingleLine(true);
+        fieldWeightCurVel.setPreferredWidth(50);
         
-        //Max CrowdAgents for the crowd.
-        contCrowdParam.addChild(new Label("Max Agents"), "split 2, growx"); 
+        //Weight side.
+        contOAP.addChild(new Label("weightSide"), "split 2, growx"); 
+        fieldWeightSide = contOAP.addChild(new TextField(""));
+        fieldWeightSide.setSingleLine(true);
+        fieldWeightSide.setPreferredWidth(50);        
+        
+        //Weight to impact.
+        contOAP.addChild(new Label("weightToi"), "split 2, growx"); 
+        fieldWeightToi = contOAP.addChild(new TextField(""));
+        fieldWeightToi.setSingleLine(true);
+        fieldWeightToi.setPreferredWidth(50);  
+        
+        //Horrizon time.
+        contOAP.addChild(new Label("horizTime"), "split 2, growx"); 
+        fieldHorizTime = contOAP.addChild(new TextField(""));
+        fieldHorizTime.setSingleLine(true);
+        fieldHorizTime.setPreferredWidth(50);                
+                
+        //Grid Size.
+        contOAP.addChild(new Label("gridSize"), "split 2, growx"); 
         doc = new DocumentModelFilter();
         doc.setInputTransform(TextFilters.numeric());
-        doc.setText("100");
-        fieldMaxAgents = contCrowdParam.addChild(new TextField(doc));
-        fieldMaxAgents.setSingleLine(true);
-        fieldMaxAgents.setPreferredWidth(50);
+        doc.setText("");
+        fieldGridSize = contOAP.addChild(new TextField(doc));
+        fieldGridSize.setSingleLine(true);
+        fieldGridSize.setPreferredWidth(50);
         
-        //Max CrowdAgent radius for an agent in the crowd.
-        contCrowdParam.addChild(new Label("Max Agent Radius"), "split 2, growx");
-        fieldMaxAgentRadius = contCrowdParam.addChild(new TextField("0.6"));
-        fieldMaxAgentRadius.setSingleLine(true);
-        fieldMaxAgentRadius.setPreferredWidth(50);                    
-  
+        //Adaptive Divisions.
+        contOAP.addChild(new Label("adaptiveDivs"), "split 2, growx"); 
+        doc = new DocumentModelFilter();
+        doc.setInputTransform(TextFilters.numeric());
+        doc.setText("");
+        fieldAdaptiveDivs = contOAP.addChild(new TextField(doc));
+        fieldAdaptiveDivs.setSingleLine(true);
+        fieldAdaptiveDivs.setPreferredWidth(50);
+        
+        //Adaptive Rings.
+        contOAP.addChild(new Label("adaptiveRings"), "split 2, growx"); 
+        doc = new DocumentModelFilter();
+        doc.setInputTransform(TextFilters.numeric());
+        doc.setText("");
+        fieldAdaptiveRings = contOAP.addChild(new TextField(doc));
+        fieldAdaptiveRings.setSingleLine(true);
+        fieldAdaptiveRings.setPreferredWidth(50);
+        
+        //Adaptive Depth.
+        contOAP.addChild(new Label("adaptiveDepth"), "split 2, growx"); 
+        doc = new DocumentModelFilter();
+        doc.setInputTransform(TextFilters.numeric());
+        doc.setText("");
+        fieldAdaptiveDepth = contOAP.addChild(new TextField(doc));
+        fieldAdaptiveDepth.setSingleLine(true);
+        fieldAdaptiveDepth.setPreferredWidth(50);        
         
         
-        //Container for list movement.
-        Container contListMoveType = new Container(new MigLayout("wrap", "[grow]"));
-        contListMoveType.setName("CrowdBuilderState contListMoveType");
-        contListMoveType.setAlpha(0, false);
-        contCrowd.addChild(contListMoveType, "top, growx");
+        
+        //Parameters list.
+        listBoxAvoidance = contOAP.addChild(new ListBox<>(), "growx");
+        listBoxAvoidance.setName("listBoxAvoidance");
+        listBoxAvoidance.setVisibleItems(1);
+        listBoxAvoidance.setCellRenderer(new DefaultCellRenderer<ObstacleAvoidanceParams>(new ElementId("list.item"), null) {
+            @Override
+            protected String valueToString(ObstacleAvoidanceParams param ) {
+                return formatOAP(param);
+            }
+        });
+
+        //Update a parameter button.
+        contOAP.addChild(new ActionButton(new CallMethodAction("Update Parameter", this, "updateOAP")));   
+        
+        
+        
+        //Filters.
+        Container contFilters = new Container(new MigLayout("wrap 2"));
+        contFilters.setName("CrowdBuilderState contAbilityFlags");
+        contFilters.setAlpha(1, false);
+        contFilters.addChild(new Label("Query Filters"), "span 2"); 
+        contFilters.addChild(new Label("Ability Flags"), "span 2");
+        contFilters.addChild(new Label("Inlude"));
+        contFilters.addChild(new Label("Exclude"));
+        contCrowd.addChild(contFilters, "growx, growy,top");
+        
+        //Include-exclude
+        checkIncludeAll = contFilters.addChild(new Checkbox("ALL"));  
+        checkExcludeAll = contFilters.addChild(new Checkbox("ALL"));        
+        checkIncludeNone = contFilters.addChild(new Checkbox("NONE"));
+        checkExcludeNone = contFilters.addChild(new Checkbox("NONE"));
+        checkIncludeDisabled = contFilters.addChild(new Checkbox("DISABLED"));
+        checkExcludeDisabled = contFilters.addChild(new Checkbox("DISABLED"));
+        checkIncludeWalk = contFilters.addChild(new Checkbox("WALK"));
+        checkExcludeWalk = contFilters.addChild(new Checkbox("WALK"));
+        checkIncludeSwim = contFilters.addChild(new Checkbox("SWIM"));
+        checkExcludeSwim = contFilters.addChild(new Checkbox("SWIM"));
+        checkIncludeDoor = contFilters.addChild(new Checkbox("DOOR"));
+        checkExcludeDoor = contFilters.addChild(new Checkbox("DOOR"));
+        checkIncludeJump = contFilters.addChild(new Checkbox("JUMP"));
+        checkExcludeJump = contFilters.addChild(new Checkbox("JUMP"));
+        
+        //Area type.
+        contFilters.addChild(new Label("Area Type"));
+        contFilters.addChild(new Label("Filter")); 
+        contFilters.addChild(new Label("Type"), "split 2, growx");
+        contFilters.addChild(new Label("Cost"));
+        checkEditActive = contFilters.addChild(new Checkbox("Edit Active"), "wrap");
+        editActiveSelRef = checkEditActive.getModel().createReference();
+        
+        //Ground cost.
+        contFilters.addChild(new Label("Ground"), "split 2, growx"); 
+        fieldCostGround = contFilters.addChild(new TextField(""));
+        fieldCostGround.setSingleLine(true);
+        fieldCostGround.setPreferredWidth(50);
+
+        
+        
+        //Filters listBox.
+        listBoxFilters = contFilters.addChild(new ListBox<>(), "center, span 1 4");
+        listBoxFilters.setName("listBoxActiveGrid");
+        listBoxFilters.setCellRenderer(new DefaultCellRenderer<DefaultQueryFilter>(new ElementId("list.item"), null) {
+            @Override
+            protected String valueToString(DefaultQueryFilter param ) {
+                return ((Integer) listBoxFilters.getModel().indexOf(param)).toString();
+            }
+        });
+        
+        for (int i = 0; i < DT_CROWD_MAX_QUERY_FILTER_TYPE; i++) {
+            listBoxFilters.getModel().add(new BetterDefaultQueryFilter());
+        }
+        
+        filtersModelRef = listBoxFilters.getModel().createReference();
+        filtersSelectRef = listBoxFilters.getSelectionModel().createReference();
+        listBoxFilters.getSelectionModel().setSelection(0);
+        
+        //Water cost.
+        contFilters.addChild(new Label("Water"), "split 2, growx"); 
+        fieldCostWater = contFilters.addChild(new TextField(""));
+        fieldCostWater.setSingleLine(true);
+        fieldCostWater.setPreferredWidth(50);
+        
+        //Road cost.
+        contFilters.addChild(new Label("Road"), "split 2, growx"); 
+        fieldCostRoad = contFilters.addChild(new TextField(""));
+        fieldCostRoad.setSingleLine(true);
+        fieldCostRoad.setPreferredWidth(50);
+        
+        //Grass cost.
+        contFilters.addChild(new Label("Grass"), "split 2, growx"); 
+        fieldCostGrass = contFilters.addChild(new TextField(""));
+        fieldCostGrass.setSingleLine(true);
+        fieldCostGrass.setPreferredWidth(50);
+        
+        //Door cost.
+        contFilters.addChild(new Label("Door"), "split 2, growx"); 
+        fieldCostDoor = contFilters.addChild(new TextField(""));
+        fieldCostDoor.setSingleLine(true);
+        fieldCostDoor.setPreferredWidth(50);
+        
+        
+        //Update filter button.
+        contFilters.addChild(new ActionButton(new CallMethodAction("Update Filter", this, "updateFilter")), ", center, span 1 2");
+        
+        //Jump cost.
+        contFilters.addChild(new Label("Jump"), "split 2, growx"); 
+        fieldCostJump = contFilters.addChild(new TextField(""));
+        fieldCostJump.setSingleLine(true);
+        fieldCostJump.setPreferredWidth(50);
+         
+        
+
+        //Container that holds the obstacle avoidance parameters for CrowdAgents.
+        Container contCrowdParams = new Container(new MigLayout("wrap 2", "[grow]"));
+        contCrowdParams.setName("CrowdBuilderState contCrowdParams");
+        contCrowdParams.setAlpha(1, false);
+        contCrowd.addChild(contCrowdParams, "growx, growy");
+        contCrowdParams.addChild(new Label("Crowd Parameters"));
+        contCrowdParams.addChild(new Label("Movement Type"));    
+        contCrowdParams.addChild(new Label("NavMesh"), "split 2"); 
+        
+        
+        //NavMesh field.
+        fieldNavMesh = contCrowdParams.addChild(new TextField("test.nm"), "growx");
+        fieldNavMesh.setSingleLine(true);
+        
+        
         
         //Movement types for the crowd.
-        contListMoveType.addChild(new Label("Movement Type"));
-        listBoxMoveType = contListMoveType.addChild(new ListBox<>(), "growx, growy");
+        listBoxMoveType = contCrowdParams.addChild(new ListBox<>(), "growx, growy, span 1 3");
         listBoxMoveType.setName("listBoxMoveType");
         listBoxMoveType.getSelectionModel().setSelection(0);
         listBoxMoveType.getModel().add("BETTER_CHARACTER_CONTROL");
@@ -200,13 +410,32 @@ public class CrowdBuilderState extends BaseAppState {
         
         
         
-        //Container that holds to Active Crowds.
-        Container contActiveCrowds = new Container(new MigLayout("wrap", "[grow]"));
-        contActiveCrowds.setName("CrowdBuilderState contActiveCrowds");
-        contActiveCrowds.setAlpha(0, false);
-        contCrowd.addChild(contActiveCrowds, "wrap, flowy, growx, growy");
-        contActiveCrowds.addChild(new Label("Active Crowds"));
-        listBoxActiveCrowds = contActiveCrowds.addChild(new ListBox<>(), "growx, growy"); 
+        //Max CrowdAgents for the crowd.
+        contCrowdParams.addChild(new Label("Max Agents"), "split 2, growx"); 
+        doc = new DocumentModelFilter();
+        doc.setInputTransform(TextFilters.numeric());
+        doc.setText("100");
+        fieldMaxAgents = contCrowdParams.addChild(new TextField(doc));
+        fieldMaxAgents.setSingleLine(true);
+        fieldMaxAgents.setPreferredWidth(50);
+        
+        //Max CrowdAgent radius for an agent in the crowd.
+        contCrowdParams.addChild(new Label("Max Agent Radius"), "split 2, growx, top");
+        fieldMaxAgentRadius = contCrowdParams.addChild(new TextField("0.6"), "top");
+        fieldMaxAgentRadius.setSingleLine(true);
+        fieldMaxAgentRadius.setPreferredWidth(50);                            
+        
+        
+        
+        //The Active Grids listBox.
+        contCrowdParams.addChild(new Label("Active Grids"), "wrap"); 
+        listBoxActiveGrids = contCrowdParams.addChild(new ListBox<>(), "growx, span");
+        listBoxActiveGrids.setName("listBoxActiveGrid");
+        listBoxActiveGrids.getModel().add(defaultActiveGridText);
+        
+        //Active crowds list.
+        contCrowdParams.addChild(new Label("Active Crowds"), "wrap");
+        listBoxActiveCrowds = contCrowdParams.addChild(new ListBox<>(), "growx, growy, span"); 
         listBoxActiveCrowds.setName("listBoxActiveCrowds");
         crowdSelectRef = listBoxActiveCrowds.getSelectionModel().createReference();  
         crowdModelRef = listBoxActiveCrowds.getModel().createReference();
@@ -230,152 +459,16 @@ public class CrowdBuilderState extends BaseAppState {
         });
 
         //Button to stop the Crowd.
-        contActiveCrowds.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top");
+        contCrowdParams.addChild(new ActionButton(new CallMethodAction("Shutdown Crowd", this, "shutdown")), "top, wrap");
         
         
-        
-        //Label for the Obstacle Avoidance params. Shares same row as 
-        //Active Grids label. Spans fist two columns. Give this its own row so 
-        //can can align parameters with the listBox.
-        Container contAvoidLabel = new Container(new MigLayout(null));
-        contAvoidLabel.setName("CrowdBuilderState contAvoidLabel");
-        contAvoidLabel.setAlpha(0, false);
-        contAvoidLabel.addChild(new Label("Obstacle Avoidance Parameters")); 
-        contCrowd.addChild(contAvoidLabel, "span 2");
-        
-        
-        
-        //Label for Active Grids listBox. Shares same row as 
-        //Obstacle Avoidance Parameters label. 
-        Container contActiveAgentsLabel = new Container(new MigLayout(null));
-        contActiveAgentsLabel.setName("CrowdBuilderState contActiveAgentsLabel");
-        contActiveAgentsLabel.setAlpha(0, false);
-        contActiveAgentsLabel.addChild(new Label("Active Grids")); 
-        contCrowd.addChild(contActiveAgentsLabel, "wrap");
-        
-        
-        
-        //Container that holds the obstacle avoidance parameters for CrowdAgents.
-        Container contAvoidance = new Container(new MigLayout("wrap", "[grow]"));
-        contAvoidance.setName("CrowdBuilderState contAvoidance");
-        contAvoidance.setAlpha(0, false);
-        contCrowd.addChild(contAvoidance, "growx, growy");
-                
-        //Velocity Bias.
-        contAvoidance.addChild(new Label("velBias"), "split 2, growx"); 
-        fieldVelocityBias = contAvoidance.addChild(new TextField(""));
-        fieldVelocityBias.setSingleLine(true);
-        fieldVelocityBias.setPreferredWidth(50);
-        
-        //Weight desired velocity.
-        contAvoidance.addChild(new Label("weightDesVel"), "split 2, growx"); 
-        fieldWeightDesVel = contAvoidance.addChild(new TextField(""));
-        fieldWeightDesVel.setSingleLine(true);
-        fieldWeightDesVel.setPreferredWidth(50);
-        
-        //Weight current velocity.
-        contAvoidance.addChild(new Label("weightCurVel"), "split 2, growx"); 
-        fieldWeightCurVel = contAvoidance.addChild(new TextField(""));
-        fieldWeightCurVel.setSingleLine(true);
-        fieldWeightCurVel.setPreferredWidth(50);
-        
-        //Weight side.
-        contAvoidance.addChild(new Label("weightSide"), "split 2, growx"); 
-        fieldWeightSide = contAvoidance.addChild(new TextField(""));
-        fieldWeightSide.setSingleLine(true);
-        fieldWeightSide.setPreferredWidth(50);        
-        
-        //Weight to impact.
-        contAvoidance.addChild(new Label("weightToi"), "split 2, growx"); 
-        fieldWeightToi = contAvoidance.addChild(new TextField(""));
-        fieldWeightToi.setSingleLine(true);
-        fieldWeightToi.setPreferredWidth(50);  
-        
-        //Horrizon time.
-        contAvoidance.addChild(new Label("horizTime"), "split 2, growx"); 
-        fieldHorizTime = contAvoidance.addChild(new TextField(""));
-        fieldHorizTime.setSingleLine(true);
-        fieldHorizTime.setPreferredWidth(50);                
-                
-        //Grid Size.
-        contAvoidance.addChild(new Label("gridSize"), "split 2, growx"); 
-        doc = new DocumentModelFilter();
-        doc.setInputTransform(TextFilters.numeric());
-        doc.setText("");
-        fieldGridSize = contAvoidance.addChild(new TextField(doc));
-        fieldGridSize.setSingleLine(true);
-        fieldGridSize.setPreferredWidth(50);
-        
-        //Adaptive Divisions.
-        contAvoidance.addChild(new Label("adaptiveDivs"), "split 2, growx"); 
-        doc = new DocumentModelFilter();
-        doc.setInputTransform(TextFilters.numeric());
-        doc.setText("");
-        fieldAdaptiveDivs = contAvoidance.addChild(new TextField(doc));
-        fieldAdaptiveDivs.setSingleLine(true);
-        fieldAdaptiveDivs.setPreferredWidth(50);
-        
-        //Adaptive Rings.
-        contAvoidance.addChild(new Label("adaptiveRings"), "split 2, growx"); 
-        doc = new DocumentModelFilter();
-        doc.setInputTransform(TextFilters.numeric());
-        doc.setText("");
-        fieldAdaptiveRings = contAvoidance.addChild(new TextField(doc));
-        fieldAdaptiveRings.setSingleLine(true);
-        fieldAdaptiveRings.setPreferredWidth(50);
-        
-        //Adaptive Depth.
-        contAvoidance.addChild(new Label("adaptiveDepth"), "split 2, growx"); 
-        doc = new DocumentModelFilter();
-        doc.setInputTransform(TextFilters.numeric());
-        doc.setText("");
-        fieldAdaptiveDepth = contAvoidance.addChild(new TextField(doc));
-        fieldAdaptiveDepth.setSingleLine(true);
-        fieldAdaptiveDepth.setPreferredWidth(50);        
-        
-        
-        
-        //Holds the listbox for avoidance parameters.
-        Container contListBoxAvoidance = new Container(new MigLayout("wrap", "[grow]"));
-        contListBoxAvoidance.setName("CrowdBuilderState contListBoxAvoidance");
-        contListBoxAvoidance.setAlpha(0, false);
-        contCrowd.addChild(contListBoxAvoidance, "growx, top");
-        
-        //Parameters list.
-        listBoxAvoidance = contListBoxAvoidance.addChild(new ListBox<>(), "growx");
-        listBoxAvoidance.setName("listBoxAvoidance");
-        listBoxAvoidance.setVisibleItems(1);
-        listBoxAvoidance.setCellRenderer(new DefaultCellRenderer<ObstacleAvoidanceParams>(new ElementId("list.item"), null) {
-            @Override
-            protected String valueToString(ObstacleAvoidanceParams param ) {
-                return formatOAP(param);
-            }
-        });
 
-        //Update a parameter button.
-        contListBoxAvoidance.addChild(new ActionButton(new CallMethodAction("Update Parameter", this, "updateParam")));     
-        
-        
-        
-        //Container for Active Grids.
-        Container contActiveGrid = new Container(new MigLayout("wrap", "[grow]"));
-        contActiveGrid.setName("CrowdBuilderState contActiveGrid");
-        contActiveGrid.setAlpha(0, false);
-        contCrowd.addChild(contActiveGrid, "wrap, growx, top");
-        
-        //The Active Grids listBox.
-        listBoxActiveGrids = contActiveGrid.addChild(new ListBox<>(), "growx");
-        listBoxActiveGrids.setName("listBoxActiveGrid");
-        listBoxActiveGrids.getModel().add(defaultActiveGridText);
-
-        
-        
-        //Holds the Legend and Setup buttons.
+        //Legend and Setup buttons.
         Container contButton = new Container(new MigLayout(null, // Layout Constraints
                 "[]push[][]")); // Column constraints [min][pref][max]
         contButton.setName("CrowdBuilderState contButton");
         contButton.setAlpha(1, false);
-        contCrowd.addChild(contButton, "growx, span 2"); //cell col row span w h
+        contCrowdParams.addChild(contButton, "growx, span 2"); //cell col row span w h
         //Help
         contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
         //Button to start the Crowd.
@@ -383,8 +476,7 @@ public class CrowdBuilderState extends BaseAppState {
         
         
         
-        //Create the container that will hold the tab panel for BuildGridGui and 
-        //BuildParamGui gui.
+        //Container that will hold the tab panel for BuildGridGui and BuildParamGui gui.
         contTabs = new Container(new MigLayout("wrap"));
         contTabs.setName("CrowdBuilderState contTabs");
         //Make it dragable.
@@ -468,7 +560,6 @@ public class CrowdBuilderState extends BaseAppState {
             // Selection has changed and the model or selection is empty so set 
             //defaults.
             if ( crowdSelectRef.get().isEmpty() ||  crowdModelRef.get().isEmpty()) {
-                LOG.info("Update Loop empty reference - selectionRef [{}] modelRef [{}]", crowdSelectRef.get().isEmpty(), crowdModelRef.get().isEmpty());
                                 
                 //Clear the Avoidance Param window.
                 listBoxAvoidance.getModel().clear();
@@ -495,7 +586,7 @@ public class CrowdBuilderState extends BaseAppState {
                     }
                     
                     //Populate listBoxAvoidance for the selected crowd.
-                    for (int i = 0; i < 8; i++) {
+                    for (int i = 0; i < DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS; i++) {
                         ObstacleAvoidanceParams oap = crowd.getObstacleAvoidanceParams(i);
                         listBoxAvoidance.getModel().add(oap);
                     }
@@ -525,42 +616,71 @@ public class CrowdBuilderState extends BaseAppState {
                         listBoxActiveGrids.getModel().add(defaultActiveGridText);
                     }
                     
+                    /**
+                     * Populates listBoxFilters with the selected crowds query 
+                     * filters whenever a new crowd is selected.
+                     */
+                    if (checkEditActive.isChecked() ) {
+                        updateFiltersList();
+                    }
                 } 
             }
         }
+        
+        /**
+         * Updates when listBoxFilters selections are made. If for any reason 
+         * the versioned reference returns empty, the listBoxFilters will 
+         * re-populate with BetterDefaultQueryFilters if no crowd is selected, 
+         * or with the selected crowds filters if a crowd is selected.
+         * 
+         * Selection changes update the include/exclude checkboxes based off the
+         * listBoxFilters objects.
+         */
+        if (filtersSelectRef.update() || filtersModelRef.update()) {
+            if (filtersSelectRef.get().isEmpty() || filtersModelRef.get().isEmpty()) {
+                updateFiltersList(); 
+            } else {
+                //Update include/exclude checkBoxes.
+                updateIncludeExclude();
+            }
+        }
+        
+        /**
+         * Updates when checkBoxEditActive is toggled.
+         * 
+         * If unchecked: When a new crowd is created then the current filters in 
+         * listBoxFilters are used for crowd constructor.
+         * 
+         * If checked: When a new crowd is created with a crowd already selected, 
+         * then listBoxFilters is ignored and the default constructor for crowd 
+         * creation is used where the first filter is BetterDefaultQueryFilter 
+         * and the remaining are DefaultQueryFilters. All area costs are set to 
+         * one. If no crowd is selected, then the current filters in 
+         * listBoxFilters are used for crowd constructor as well as current area 
+         * costs.
+         * 
+         * If a crowd is selected: When toggled to checked, listBoxFilters will 
+         * clear and re-populate using the selected crowd. When toggled to 
+         * unchecked, all filters are reset to new BetterDefaultQueryFilters.
+         * 
+         * If no crowd is selected: No changes to the list will be made. 
+         */
+        if (editActiveSelRef.update()) {
+            if(getSelectedCrowd() == null) {
+                //Do nothing when no crowds selected. Allows pre-fill of filters
+                //prior to starting crowd.
+            } else {
+                //Update listBoxFilters.
+                updateFiltersList();
+            }
+        }
+
     }
     
     //Explains the Crowd parameters.
     private void showHelp() {
                 
         String[] msg = { 
-        "NavMesh - The navigation mesh to use for planning.",
-        " ",
-        "Max Agents - The maximum number of agents the crowd can manage. [Limit: >= 1]",
-        "  ",
-        "Max Agent Radius - The maximum radius of any agent that will be added to the crowd.",
-        " ",
-        "Movement Type - Each type determines how movement is applied to an agent.",
-        " ",
-        "* BETTER_CHARACTER_CONTROL - Use physics and the BetterCharacterControl to set", 
-        "move and view direction. Grids containing Physics agents are the only type allowed for", 
-        "this Crowd.",
-        " ",
-        "* DIRECT - Direct setting of the agents translation and view direction. No controls are", 
-        "needed for movement.",
-        " ",
-        "* CUSTOM - With custom, you implement the applyMovement() method from the",
-        "ApplyFunction interface. This will give you access to the agents CrowdAgent object, the",
-        "new position and the velocity of the agent. It's use is not supported by this demo.",
-        " ",
-        "* NONE - No movement is implemented. You can freely interact with the crowd and",
-        "implement your own movement soloutions. It's use is not supported by this demo.",
-        " ",
-        "Active Crowds - The list of active crowds. One crowd must be selected before any", 
-        "agents can be added or targets for agents can be set.",
-        " ",
-        "* Format: Name [Crowd Number] [Active Agents Limit] Movement Type",  
-        " ",
         "Obstacle Avoidance Parameters - The shared avoidance configuration for an Agent", 
         "inside the crowd. When first instantiating the crowd, you are allotted eight parameter", 
         "objects in total. All eight slots are filled with the defaults listed below.", 
@@ -605,6 +725,74 @@ public class CrowdBuilderState extends BaseAppState {
         "* adaptiveRings - Number of rings. [Limit: 1-4]",
         " ",
         "* adaptiveDepth - Number of iterations at best velocity.",
+        " ",
+        "Query Filters - Upon GUI startup, the filters list will be populated with BetterDefaultQuery", 
+        "filters and display the selected filter include/exclude flags. Each filter in the list has \"All\" include ",
+        "flags, no exclude flags and all area costs are 1.0f. You use this panel to create new filters or ",
+        "update existing crowd filters. These Area Modifications are broken down into Area Types and ",
+        "Ability Flags.",
+        " ",
+        "* Area Type - Specifies the cost to travel across the polygon.",
+        "* Ability Flag - Specifies if the agent can travel through the area at all.",
+        " ",
+        "There are 64 Area Types and 16 Ability Flags that can be created. The polygon flag filter works ", 
+        "so that you can specify certain flags (abilities), which must be on (included), and certain flags ", 
+        "which must not be on (excluded) for a polygon to be valid for the path. Polygons have a travel ", 
+        "cost set when generating the NavMesh which is the Area Type. Agents prefer paths that have a ", 
+        "lower cost. You set the filter for the agent in the [ Agent Parameters ] tab.",
+        " ",
+        "* Filter - Each Crowd has 16 filters available for path finding. You can set these filters, their ",
+        "include/exclude flags and costs prior to starting any crowd, but only flags may be updated after ",
+        "startup. Selecting any filter in the list will also display that filters include/exclude flags but not ",
+        "Area Costs. They will never update because the getCost() method is expected to be used only ",
+        "internally after creation.",
+        " ",
+        "* Edit Active - If unchecked: When a new crowd is created, the current filters in the Filters list ",
+        "are used for the crowd constructor that accepts filters.",
+        " ",
+        "If checked: When a new crowd is created and no crowd is selected, then the current filters in ",
+        "the Filters list are used for the crowd constructor that accepts filters. With a crowd already ",
+        "selected, then the Filters list is ignored and the default constructor for crowd creation is used ",
+        "where the first filter is BetterDefaultQueryFilter and the remaining are DefaultQueryFilters. ",
+        "Each filter has \"All\" include flags, no exclude flags and all area costs are 1.0f. ",
+        " ",
+        "If a crowd is selected: When toggled to checked, the Filters list will clear and re-populate using ",
+        "the selected crowd. When toggled to unchecked, all filters are reset to new ",
+        "BetterDefaultQueryFilters.",
+        " ",
+        "If no crowd is selected: No changes to the list will be made.",
+        " ",
+        
+        "* Update Filter - This will create a new filter, replacing the selected filter, using any ",
+        "include/exclude flags and area costs. Any cost not filled or improperly filled will be ", 
+        "set to one upon using the update button.", 
+        " ",
+        "NavMesh - The navigation mesh to use for planning.",
+        " ",
+        "Max Agents - The maximum number of agents the crowd can manage. [Limit: >= 1]",
+        "  ",
+        "Max Agent Radius - The maximum radius of any agent that will be added to the crowd.",
+        " ",
+        "Movement Type - Each type determines how movement is applied to an agent.",
+        " ",
+        "* BETTER_CHARACTER_CONTROL - Use physics and the BetterCharacterControl to set", 
+        "move and view direction. Grids containing Physics agents are the only type allowed for", 
+        "this Crowd.",
+        " ",
+        "* DIRECT - Direct setting of the agents translation and view direction. No controls are", 
+        "needed for movement.",
+        " ",
+        "* CUSTOM - With custom, you implement the applyMovement() method from the",
+        "ApplyFunction interface. This will give you access to the agents CrowdAgent object, the",
+        "new position and the velocity of the agent. It's use is not supported by this demo.",
+        " ",
+        "* NONE - No movement is implemented. You can freely interact with the crowd and",
+        "implement your own movement soloutions. It's use is not supported by this demo.",
+        " ",
+        "Active Crowds - The list of active crowds. One crowd must be selected before any", 
+        "agents can be added or targets for agents can be set.",
+        " ",
+        "* Format: Name [Crowd Number] [Active Agents Limit] Movement Type",  
         " ",
         "Active Grids - Displays information about active grids residing in the selected crowd.",
         " ",
@@ -711,8 +899,12 @@ public class CrowdBuilderState extends BaseAppState {
                 //user to reselect.
                 listBoxActiveCrowds.getSelectionModel().setSelection(-1);
                 iterator.remove();
-                //refresh Agent Parameter panel.
+                //Refresh Agent Parameter panel.
                 getState(AgentParamState.class).updateParams();
+                //Refresh filters panel if checkEditActive.
+                if (checkEditActive.isChecked()) {
+                    updateFiltersList();
+                }
                 break;
             }
         } 
@@ -787,9 +979,29 @@ public class CrowdBuilderState extends BaseAppState {
             //Create the query object for pathfinding in this Crowd. Will be 
             //added to the mapCrowds as a crowd so each query object is referenced.  
             NavMeshQuery query = new NavMeshQuery(navMesh);
+                            
+            Crowd crowd;
             
-            //Create the crowd.
-            Crowd crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
+            if (checkEditActive.isChecked() && getSelectedCrowd() != null) {
+                /**
+                 * Create crowd using default filters where first filter will be
+                 * BetterDefaultQueryFilter and rest DefaultQueryFilter when 
+                 * checkeditActive and there is a crowd selected.
+                 */
+                crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh);
+            } else {
+                //Create crowd using filters from list.
+                IntFunction<QueryFilter> filters = (int i) -> listBoxFilters.getModel().get(i);
+                //Create the crowd.
+                crowd = new Crowd(applicationType, maxAgents, maxAgentRadius, navMesh, filters);
+                /**
+                 * Clear and re-populate the listBoxFilters list with new 
+                 * filters if checkedEditActive is unchecked or there is no 
+                 * currently selected crowd and checkEditActive is checked .
+                 * Failure to update will leave referenced filters in the list.
+                 */
+                updateFiltersList();
+            }
             
             //Add to CrowdManager, mapCrowds, and listBoxActiveCrowds.
             getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
@@ -809,7 +1021,7 @@ public class CrowdBuilderState extends BaseAppState {
      * 
      * @param format The string to be formatted.
      */
-    private void updateParam() {
+    private void updateOAP() {
         float velBias;
         float weightDesVel;
         float weightCurVel;
@@ -1028,7 +1240,7 @@ public class CrowdBuilderState extends BaseAppState {
         Crowd selectedCrowd = getSelectedCrowd();
         
         if (selectedCrowd != null) {
-            for (int k = 0; k < 8; k++) {
+            for (int k = 0; k < DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS; k++) {
                 if (selectedCrowd.getObstacleAvoidanceParams(k).equals(oap)) {
                     idx = k;
                     break;
@@ -1037,7 +1249,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
 
         String str = 
-          "<==========    " + idx + "    ==========>\n"  
+          "<=====    " + idx + "    =====>\n"  
         + "velBias              = $b\n"
         + "weightDesVel  = $v\n"
         + "weightCurVel   = $V\n"
@@ -1115,6 +1327,242 @@ public class CrowdBuilderState extends BaseAppState {
         LOG.info("<========== END CrowdBuilderState formatOAP [{}] ==========>", idx);
         return buf.toString();
         
+    }
+    
+    /**
+     * Updates a single query filter. If a crowd is selected and checkEditActive 
+     * is checked then only the selected crowds selected filter will be updated 
+     * and then only the include/exclude flags.
+     * 
+     * For all other situations, a new filter will be created using the 
+     * includes/excludes flags and any valid area cost above 1.0f. Any cost 
+     * field that is not valid or <= 1.0f will be set to one.
+     */
+    private void updateFilter() {
+
+        Integer selected = listBoxFilters.getSelectionModel().getSelection();
+        DefaultQueryFilter filter;
+
+        //We are editing an existing crowd filter so only set filters.
+        if (checkEditActive.isChecked() && getSelectedCrowd() != null) {
+            filter = listBoxFilters.getModel().get(selected);
+            filter.setIncludeFlags(getIncludes());
+            filter.setExcludeFlags(getExcludes());
+        } else {
+            //We are editing a new filter so we can create and replace any 
+            //filters we choose using areaCosts.
+            float[] areaCost = new float[MAX_AREAMOD];
+        
+            //Prefill array in case invalid data is in any of the following 
+            //textfields.
+            for (int i = 0; i < MAX_AREAMOD; i++) {
+                areaCost[i] = 1.0f;
+            }
+
+            //All types be in same order as those in SampleAreaModifications.
+            if (!fieldCostGround.getText().isEmpty() 
+            &&   getState(GuiUtilState.class).isNumeric(fieldCostGround.getText()) ) {
+                float cost = new Float(fieldCostGround.getText());
+                if (cost > 1.0f) {
+                    areaCost[0] = cost;
+                }
+            }
+
+            if (!fieldCostWater.getText().isEmpty()
+            &&   getState(GuiUtilState.class).isNumeric(fieldCostWater.getText()) ) {
+                float cost = new Float(fieldCostWater.getText());
+                if (cost > 1.0f) {
+                    areaCost[1] = cost;
+                }
+            }
+
+            if (!fieldCostRoad.getText().isEmpty()
+            &&   getState(GuiUtilState.class).isNumeric(fieldCostRoad.getText()) ) {
+                float cost = new Float(fieldCostRoad.getText());
+                if (cost > 1.0f) {
+                    areaCost[2] = cost;
+                }
+            }
+
+            if (!fieldCostGrass.getText().isEmpty()
+            &&   getState(GuiUtilState.class).isNumeric(fieldCostGrass.getText()) ) {
+                float cost = new Float(fieldCostGrass.getText());
+                if (cost > 1.0f) {
+                    areaCost[3] = cost;
+                }
+            }
+
+            if (!fieldCostDoor.getText().isEmpty()
+            &&   getState(GuiUtilState.class).isNumeric(fieldCostDoor.getText()) ) {
+                float cost = new Float(fieldCostDoor.getText());
+                if (cost > 1.0f) {
+                    areaCost[4] = cost;
+                }
+            }
+
+            if (!fieldCostJump.getText().isEmpty()
+            &&   getState(GuiUtilState.class).isNumeric(fieldCostJump.getText()) ) {
+                float cost = new Float(fieldCostJump.getText());
+                if (cost > 1.0f) {
+                    areaCost[5] = cost;
+                }
+            } 
+            
+            filter = new BetterDefaultQueryFilter(getIncludes(), getExcludes(), areaCost);
+            listBoxFilters.getModel().remove((int) selected);
+            listBoxFilters.getModel().add((int) selected, filter);
+        }
+
+        setCheckedFilters(listBoxFilters.getModel().get(selected).getIncludeFlags(), true);
+        setCheckedFilters(listBoxFilters.getModel().get(selected).getExcludeFlags(), false);
+    }
+    
+    /**
+     * Updates listBoxFilters and resets any include or exclude checkBoxes.
+     * 
+     * If checkEditActive is checked: Updates by clearing the list then 
+     * re-populating using the selected crowd query filters or if no crowd is 
+     * selected, re-populates by creating all new BetterDefaultQueryFilter.
+     * 
+     * If checkEditActive is unchecked: Updates by clearing the list then 
+     * re-populating using all new BetterDeafaultQueryFilter.
+     */
+    private void updateFiltersList() {
+        listBoxFilters.getModel().clear();
+        
+        if (checkEditActive.isChecked() && getSelectedCrowd() != null) {
+            Crowd crowd = getSelectedCrowd();
+            for (int i = 0; i < DT_CROWD_MAX_QUERY_FILTER_TYPE; i++) {
+                listBoxFilters.getModel().add(i, (DefaultQueryFilter) crowd.getFilter(i));
+            }
+        } else {
+            for (int i = 0; i < DT_CROWD_MAX_QUERY_FILTER_TYPE; i++) {
+                listBoxFilters.getModel().add(new BetterDefaultQueryFilter());
+            }
+        }
+        
+        //Update include/exclude checkBoxes.
+        updateIncludeExclude();
+    }    
+    
+    /**
+     * Updates all include/exclude query filter checkBoxes.
+     */
+    private void updateIncludeExclude() {
+        Integer selection = listBoxFilters.getSelectionModel().getSelection();
+        setCheckedFilters(listBoxFilters.getModel().get(selection).getIncludeFlags(), true);
+        setCheckedFilters(listBoxFilters.getModel().get(selection).getExcludeFlags(), false);
+    }
+    
+    /**
+     * Sets checkBoxes for filter include/exclude.
+     * 
+     * @param filterFlags The filter flags to set.
+     * @param includes If true, set include flags, false set exclude flags.
+     */
+    private void setCheckedFilters(int filterFlags, boolean includes) {
+        
+        if (includes) {
+            this.checkIncludeNone.setChecked(filterFlags == 0);
+            this.checkIncludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
+            this.checkIncludeDisabled.setChecked(isBitSet(SAMPLE_POLYFLAGS_DISABLED, filterFlags));
+            this.checkIncludeDoor.setChecked(isBitSet(SAMPLE_POLYFLAGS_DOOR, filterFlags));
+            this.checkIncludeJump.setChecked(isBitSet(SAMPLE_POLYFLAGS_JUMP, filterFlags));
+            this.checkIncludeSwim.setChecked(isBitSet(SAMPLE_POLYFLAGS_SWIM, filterFlags));
+            this.checkIncludeWalk.setChecked(isBitSet(SAMPLE_POLYFLAGS_WALK, filterFlags));
+        } else {
+            this.checkExcludeNone.setChecked(filterFlags == 0);
+            this.checkExcludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
+            this.checkExcludeDisabled.setChecked(isBitSet(SAMPLE_POLYFLAGS_DISABLED, filterFlags));
+            this.checkExcludeDoor.setChecked(isBitSet(SAMPLE_POLYFLAGS_DOOR, filterFlags));
+            this.checkExcludeJump.setChecked(isBitSet(SAMPLE_POLYFLAGS_JUMP, filterFlags));
+            this.checkExcludeSwim.setChecked(isBitSet(SAMPLE_POLYFLAGS_SWIM, filterFlags));
+            this.checkExcludeWalk.setChecked(isBitSet(SAMPLE_POLYFLAGS_WALK, filterFlags));
+        }
+        
+    }
+    
+    /**
+     * Gets all checked query filter includes.
+     * 
+     * @return The checked includes. 
+     */
+    private int getIncludes() {
+        
+        int includes = 0;
+        
+        if (checkIncludeAll.isChecked()) {
+            includes |= SAMPLE_POLYFLAGS_ALL;
+        } 
+        
+        if (checkIncludeDisabled.isChecked()) {
+            includes |= SAMPLE_POLYFLAGS_DISABLED;
+        }
+        
+        if (checkIncludeWalk.isChecked()) {
+            includes |= SAMPLE_POLYFLAGS_WALK;
+        }
+        
+        if (checkIncludeSwim.isChecked()) {
+            includes |= SAMPLE_POLYFLAGS_SWIM;
+        }
+        
+        if (checkIncludeDoor.isChecked()) {
+            includes |= SAMPLE_POLYFLAGS_DOOR;
+        }
+        
+        if (checkIncludeJump.isChecked()) {
+            includes |= SAMPLE_POLYFLAGS_JUMP;
+        }
+        
+        return includes;
+    }
+    
+    /**
+     * Gets all checked query filter excludes.
+     * 
+     * @return The checked excludes. 
+     */
+    private int getExcludes() {
+        
+        int excludes = 0;
+        
+        if (checkExcludeAll.isChecked()) {
+            excludes |= SAMPLE_POLYFLAGS_ALL;
+        }
+
+        if (checkExcludeDisabled.isChecked()) {
+            excludes |= SAMPLE_POLYFLAGS_DISABLED;
+        }
+        
+        if (checkExcludeWalk.isChecked()) {
+            excludes |= SAMPLE_POLYFLAGS_WALK;
+        }
+        
+        if (checkExcludeSwim.isChecked()) {
+            excludes |= SAMPLE_POLYFLAGS_SWIM;
+        }
+        
+        if (checkExcludeDoor.isChecked()) {
+            excludes |= SAMPLE_POLYFLAGS_DOOR;
+        }
+        
+        if (checkExcludeJump.isChecked()) {
+            excludes |= SAMPLE_POLYFLAGS_JUMP;
+        }
+        
+        return excludes;
+    }
+    
+    /**
+     * Checks whether a bit flag is set.
+     * 
+     * @param flag The flag to check for.
+     * @param flags The flags to check for the supplied flag.
+     * @return True if the supplied flag is set for the given flags.
+     */
+    private boolean isBitSet(int flag, int flags) {
+        return (flags & flag) == flag;
     }
     
     /**
@@ -1210,6 +1658,5 @@ public class CrowdBuilderState extends BaseAppState {
         }
         return -1;
     }
-
     
 }

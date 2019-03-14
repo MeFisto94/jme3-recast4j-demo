@@ -99,8 +99,8 @@ public class CrowdState extends BaseAppState {
     
     @Override
     protected void initialize(Application app) {   
-//        buildSolo();
-        buildTiled();
+        buildSolo();
+//        buildTiled();
 //        buildCrowd();
     }
     
@@ -156,6 +156,7 @@ public class CrowdState extends BaseAppState {
                 paramBuilder.withPolyFlags(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
                 | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR);
             }
+
             if (pmesh.areas[i] > 0) {
                 pmesh.areas[i]--;
             }
@@ -297,6 +298,7 @@ public class CrowdState extends BaseAppState {
             int maxTiles = navMeshFromSaved.getMaxTiles();
             for (int i = 0; i < maxTiles; i++) {
                 MeshData meshdata = navMeshFromSaved.getTile(i).data;
+
                 if (meshdata != null ) {
                     showDebugMeshes(meshdata, true);
                 }
