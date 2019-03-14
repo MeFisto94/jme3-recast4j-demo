@@ -45,6 +45,8 @@ import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.recast4j.demo.states.AgentGridState.Grid;
 import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
+import static com.jme3.recast4j.demo.states.CrowdBuilderState.DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS;
+import static com.jme3.recast4j.demo.states.CrowdBuilderState.DT_CROWD_MAX_QUERY_FILTER_TYPE;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Torus;
@@ -87,6 +89,7 @@ public class AgentParamState extends BaseAppState {
     private TextField fieldTargetY;
     private TextField fieldTargetZ;
     private ListBox<Integer> listBoxAvoidance;
+    private ListBox<Object> listBoxQuery;
     private Checkbox checkAvoid;
     private Checkbox checkSep;
     private Checkbox checkTopo;
@@ -105,93 +108,125 @@ public class AgentParamState extends BaseAppState {
         contAgentParams.setName("AgentParamState contAgentParams");
         contAgentParams.setAlpha(0, false);
         
-        //The parmeters container.
-        Container contParams = new Container(new MigLayout("wrap", "[grow]"));
-        contParams.setName("AgentParamState contParams");
-        contParams.setAlpha(0, false);
-        contAgentParams.addChild(contParams, "top, growx");
+        //Panel one.
+        Container contPanel1 = new Container(new MigLayout("wrap 2", "[grow]"));
+        contPanel1.setName("AgentParamState contPanel1");
+        contPanel1.setAlpha(1, false);
+        contAgentParams.addChild(contPanel1, "top, growx");
 
         //Begin the CrowdAgent parameters section.
-        contParams.addChild(new Label("Crowd Agent Parameters"));
+        contPanel1.addChild(new Label("Crowd Agent Parameters"), "wrap");
         
         //The auto-generate radius checkbox.
-        checkRadius = contParams.addChild(new Checkbox("Agent Radius"), "split 2, growx");
-        fieldRadius = contParams.addChild(new TextField(""));
+        checkRadius = contPanel1.addChild(new Checkbox("Agent Radius"));
+        fieldRadius = contPanel1.addChild(new TextField(""));
         fieldRadius.setSingleLine(true);
         fieldRadius.setPreferredWidth(50);
         
         //The auto-generate height checkbox.
-        checkHeight = contParams.addChild(new Checkbox("Agent Height"), "split 2, growx");
-        fieldHeight = contParams.addChild(new TextField(""));
+        checkHeight = contPanel1.addChild(new Checkbox("Agent Height"));
+        fieldHeight = contPanel1.addChild(new TextField(""));
         fieldHeight.setSingleLine(true);
         fieldHeight.setPreferredWidth(50);
         
         //The max acceleration field.
-        contParams.addChild(new Label("Max Acceleration"), "split 2, growx");
-        fieldMaxAccel = contParams.addChild(new TextField(""));
+        contPanel1.addChild(new Label("Max Acceleration"));
+        fieldMaxAccel = contPanel1.addChild(new TextField(""));
         fieldMaxAccel.setSingleLine(true);
         fieldMaxAccel.setPreferredWidth(50);
         
         //The max speed field.
-        contParams.addChild(new Label("Max Speed"), "split 2, growx");
-        fieldMaxSpeed = contParams.addChild(new TextField(""));
+        contPanel1.addChild(new Label("Max Speed"));
+        fieldMaxSpeed = contPanel1.addChild(new TextField(""));
         fieldMaxSpeed.setSingleLine(true);
         fieldMaxSpeed.setPreferredWidth(50);
         
         //The collision query range.
-        contParams.addChild(new Label("Collision Query Range"), "split 2, growx");
-        fieldColQueryRange = contParams.addChild(new TextField(""));
+        contPanel1.addChild(new Label("Collision Query Range"));
+        fieldColQueryRange = contPanel1.addChild(new TextField(""));
         fieldColQueryRange.setSingleLine(true);
         fieldColQueryRange.setPreferredWidth(50);
         
         //The path optimization range.
-        contParams.addChild(new Label("Path Optimize Range"), "split 2, growx");
-        fieldPathOptimizeRange = contParams.addChild(new TextField(""));
+        contPanel1.addChild(new Label("Path Optimize Range"));
+        fieldPathOptimizeRange = contPanel1.addChild(new TextField(""));
         fieldPathOptimizeRange.setSingleLine(true);
         fieldPathOptimizeRange.setPreferredWidth(50);
         
         //The separation weight.
-        contParams.addChild(new Label("Separation Weight"), "split 2, growx");
-        fieldSeparationWeight = contParams.addChild(new TextField(""));
+        contPanel1.addChild(new Label("Separation Weight"));
+        fieldSeparationWeight = contPanel1.addChild(new TextField(""));
         fieldSeparationWeight.setSingleLine(true);
         fieldSeparationWeight.setPreferredWidth(50);
         
         
-        Container contAvoidance = new Container(new MigLayout("wrap"));
-        contAvoidance.setName("AgentParamState contAvoidance");
-        contAvoidance.setAlpha(0, false);
-        contAgentParams.addChild(contAvoidance, "top, split 2, flowy");
-        
-        //Obstacle avoidance listbox.
-        contAvoidance.addChild(new Label("Avoidance Type"));
+        //Obstacle avoidance.
+        contPanel1.addChild(new Label("Avoidance Type"), "align center");
+        //Query filter.
+        contPanel1.addChild(new Label("Query Filter"), "align center");
 
-        listBoxAvoidance = contAvoidance.addChild(new ListBox<>(), "align center");
+        
+        
+        //Obstacle avoidance list
+        listBoxAvoidance = contPanel1.addChild(new ListBox<>(), "align center");
         //Have to set this here since Crowd has package-private access the to 
         //the DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS variable. Currently this is eight.
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS; i++) {
             listBoxAvoidance.getModel().add(i);
         }
-        listBoxAvoidance.getSelectionModel().setSelection(0);  
+        
+        listBoxAvoidance.getSelectionModel().setSelection(0);
         
         
-        Container contDebug = new Container(new MigLayout("wrap"));
-        contDebug.setName("AgentParamState contDebug");
-        contDebug.setAlpha(0, false);
-        contAgentParams.addChild(contDebug, "wrap");
         
-        //The debug movement checkbox.
-        contDebug.addChild(new Label("Debug Movement"));
-        checkDebugVisual = contDebug.addChild(new Checkbox("Visual"));
+        //Obstacle avoidance list
+        listBoxQuery = contPanel1.addChild(new ListBox<>(), "align center");
+        //Have to set this here since Crowd has package-private access the to 
+        //the DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS variable. Currently this is eight.
+        for (int i = 0; i < DT_CROWD_MAX_QUERY_FILTER_TYPE; i++) {
+            listBoxQuery.getModel().add(i);
+        }
+        
+        listBoxQuery.getSelectionModel().setSelection(0);
+        
+        
+        
+        //Panel two.
+        Container contPanel2 = new Container(new MigLayout("wrap 2", "[grow]"));
+        contPanel2.setName("AgentParamState contPanel2");
+        contPanel2.setAlpha(1, false);
+        contAgentParams.addChild(contPanel2, "top, growy");
+              
+        //Update flags.
+        contPanel2.addChild(new Label("Update Flags"));
+        //Debug.
+        contPanel2.addChild(new Label("Debug Movement"));
+
+        //Update flags.
+        checkTurns = contPanel2.addChild(new Checkbox("ANTICIPATE_TURNS"));    
+        
+        //Debug.
+        checkDebugVisual = contPanel2.addChild(new Checkbox("Visual"));
         checkDebugVisual.getModel().setChecked(true);
-        checkDebugVerbose = contDebug.addChild(new Checkbox("Verbose"));        
-          
-       
+
+        //Update flags.
+        checkAvoid = contPanel2.addChild(new Checkbox("OBSTACLE_AVOIDANCE"));
+        
+        //Debug.
+        checkDebugVerbose = contPanel2.addChild(new Checkbox("Verbose")); 
+
+        //Update flags.
+        checkTopo = contPanel2.addChild(new Checkbox("OPTIMIZE_TOPO"), "wrap");
+        checkVis = contPanel2.addChild(new Checkbox("OPTIMIZE_VIS"), "wrap");
+        checkSep = contPanel2.addChild(new Checkbox("SEPARATION"), "wrap");
+
+        
         
         //Container that holds the start position components.
         Container contTarget = new Container(new MigLayout(null, "[grow]"));
         contTarget.setName("CrowdBuilderState contTarget");
         contTarget.setAlpha(0, false);
-        contAgentParams.addChild(contTarget, "split 2, top, flowy");
+        contPanel2.addChild(contTarget, "pushy, span");
         
         //The start postion field.
         contTarget.addChild(new Label("Target Position"), "wrap"); 
@@ -216,30 +251,16 @@ public class AgentParamState extends BaseAppState {
 
         
         
-        //Holds the Legend and Setup buttons.
+        //Holds the Help and Setup buttons.
         Container contButton = new Container(new MigLayout(null, // Layout Constraints
                 "[]push[][]")); // Column constraints [min][pref][max]
         contButton.setName("AgentParamState contButton");
         contButton.setAlpha(1, false);
-        contAgentParams.addChild(contButton, "growx");
+        contPanel2.addChild(contButton, "growx, span");
         
         //Buttons.
         contButton.addChild(new ActionButton(new CallMethodAction("Help", this, "showHelp")));
         contButton.addChild(new ActionButton(new CallMethodAction("Add Grid Crowd", this, "addGridCrowd")));  
-        
-        //Update flags.
-        Container contUpdateFlags = new Container(new MigLayout("wrap"));
-        contUpdateFlags.setName("AgentParamState contUpdateFlags");
-        contUpdateFlags.setAlpha(0, false);
-        contAgentParams.addChild(contUpdateFlags, "top");
-                
-        contUpdateFlags.addChild(new Label("Update Flags"));
-        checkTurns = contUpdateFlags.addChild(new Checkbox("ANTICIPATE_TURNS"));        
-        checkAvoid = contUpdateFlags.addChild(new Checkbox("OBSTACLE_AVOIDANCE"));
-        checkTopo = contUpdateFlags.addChild(new Checkbox("OPTIMIZE_TOPO"));
-        checkVis = contUpdateFlags.addChild(new Checkbox("OPTIMIZE_VIS"));
-        checkSep = contUpdateFlags.addChild(new Checkbox("SEPARATION"));
-
 
     }
 
@@ -324,6 +345,10 @@ public class AgentParamState extends BaseAppState {
         "agent. Currently, the max number of avoidance types that can be configured for the", 
         "Crowd is eight. See [ Crowd ] [ Obstacle Avoidance Parameters ]. [Limits: 0 <= value < 8]",
         " ",
+        "Query Filter - The path finding filter to be used by this grids agents. Currently, the max number ",
+        "of Query filters that can be configured for the Crowd is sixteen. See [ Crowd ] [ Query Filters ]. ",
+        "[Limits: 0 <= value < 16]",
+        " ",
         "Update Flags - Flags that impact steering behavior.",
         " ",
         "* ANTICIPATE_TURNS",
@@ -393,7 +418,6 @@ public class AgentParamState extends BaseAppState {
         float pathOptimizeRange;
         float separationWeight;
         int updateFlags;
-        int obstacleAvoidanceType;
 
         //Get the selected crowd from the CrowdBuilderState where all crowds live.
         Crowd crowd = getState(CrowdBuilderState.class).getSelectedCrowd();
@@ -529,12 +553,7 @@ public class AgentParamState extends BaseAppState {
 
         if (checkSep.isChecked()) {
             updateFlags |= CrowdAgentParams.DT_CROWD_SEPARATION;
-        }
-
-        //Obstacle Avoidance Type. Selection is set to 0 when creating 
-        //the listBoxAvoidance so shouldn't need to check for null or
-        //parameter configurations less than 0. 
-        obstacleAvoidanceType = listBoxAvoidance.getSelectionModel().getSelection();        
+        }      
         
         //Everything checks out so far so grab the selected list of agents for 
         //the grid.
@@ -605,7 +624,8 @@ public class AgentParamState extends BaseAppState {
         ap.pathOptimizationRange    = pathOptimizeRange;
         ap.separationWeight         = separationWeight;
         ap.updateFlags              = updateFlags;
-        ap.obstacleAvoidanceType    = obstacleAvoidanceType;        
+        ap.obstacleAvoidanceType    = listBoxAvoidance.getSelectionModel().getSelection(); 
+        ap.queryFilterType          = listBoxQuery.getSelectionModel().getSelection();
         
         LOG.info("radius                [{}]", ap.radius);
         LOG.info("height                [{}]", ap.height);
@@ -615,6 +635,7 @@ public class AgentParamState extends BaseAppState {
         LOG.info("pathOptimizationRange [{}]", ap.pathOptimizationRange);
         LOG.info("separationWeight      [{}]", ap.separationWeight);
         LOG.info("obstacleAvoidanceType [{}]", ap.obstacleAvoidanceType);
+        LOG.info("queryFilterType       [{}]", ap.queryFilterType);
         LOG.info("updateFlags           [{}]", ap.updateFlags);
         LOG.info("Agents Grid           [{}]", listGridAgents);
         
@@ -862,6 +883,7 @@ public class AgentParamState extends BaseAppState {
         this.fieldPathOptimizeRange.setText(reset ? "" : "30.0");
         this.fieldSeparationWeight.setText(reset ? "" : "2.0");
         this.listBoxAvoidance.getSelectionModel().setSelection(0);
+        this.listBoxQuery.getSelectionModel().setSelection(0);
         this.checkDebugVisual.setChecked(true);
         this.checkTurns.setChecked(false);
         this.checkAvoid.setChecked(false);
@@ -902,6 +924,7 @@ public class AgentParamState extends BaseAppState {
                 this.fieldPathOptimizeRange.setText("" + params.pathOptimizationRange);
                 this.fieldSeparationWeight.setText("" + params.separationWeight);
                 this.listBoxAvoidance.getSelectionModel().setSelection(params.obstacleAvoidanceType);
+                this.listBoxQuery.getSelectionModel().setSelection(params.queryFilterType);
                 //Clear any selections for debug.
                 this.checkDebugVisual.setChecked(false);
                 this.checkDebugVerbose.setChecked(false);

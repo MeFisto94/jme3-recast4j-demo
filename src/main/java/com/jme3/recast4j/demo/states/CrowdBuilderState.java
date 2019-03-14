@@ -145,8 +145,8 @@ public class CrowdBuilderState extends BaseAppState {
     private Checkbox checkExcludeJump;
     private Checkbox checkEditActive;
     private HashMap<Crowd, NavMeshQuery> mapCrowds;
-    private static final int DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS = 8;
-    private static final int DT_CROWD_MAX_QUERY_FILTER_TYPE = 16;
+    public static final int DT_CROWD_MAX_OBSTAVOIDANCE_PARAMS = 8;
+    public static final int DT_CROWD_MAX_QUERY_FILTER_TYPE = 16;
     //Currently, only six area modifications in SampleAreaModifications.
     private static final int MAX_AREAMOD = 6;
     @Override
@@ -1359,7 +1359,7 @@ public class CrowdBuilderState extends BaseAppState {
                 areaCost[i] = 1.0f;
             }
 
-            //All types be in same order as those in SampleAreaModifications.
+            //All types must be in same order as those in SampleAreaModifications.
             if (!fieldCostGround.getText().isEmpty() 
             &&   getState(GuiUtilState.class).isNumeric(fieldCostGround.getText()) ) {
                 float cost = new Float(fieldCostGround.getText());
