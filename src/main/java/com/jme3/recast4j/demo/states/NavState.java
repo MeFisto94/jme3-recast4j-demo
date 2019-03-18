@@ -95,7 +95,7 @@ public class NavState extends BaseAppState {
 
     private static final Logger LOG = LoggerFactory.getLogger(NavState.class.getName());
     
-    private Spatial worldMap;
+    private Node worldMap;
     private NavMesh navMesh;
     private NavMeshQuery query;
     private List<Node> characters;
@@ -121,7 +121,7 @@ public class NavState extends BaseAppState {
     //graph attachment or input listener attachment.
     @Override
     protected void onEnable() {
-        worldMap = ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
+        worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
 //        buildSolo();
         buildTiled();
         
@@ -303,7 +303,7 @@ public class NavState extends BaseAppState {
         private void buildSolo() {
                 System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
-        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder((Node)worldMap).
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).
                 build(new RecastConfigBuilder()
                         .withAgentRadius(.3f)           // r
                         .withAgentHeight(1.7f)          // h
@@ -320,7 +320,7 @@ public class NavState extends BaseAppState {
         
         //Split up for testing.
         NavMeshDataCreateParams build = new NavMeshDataCreateParamsBuilder(
-                new RecastBuilder().build(new GeometryProviderBuilder((Node)worldMap).build(), bcfg)).build(bcfg);
+                new RecastBuilder().build(new GeometryProviderBuilder(worldMap).build(), bcfg)).build(bcfg);
         MeshData meshData = NavMeshBuilder.createNavMeshData(build);
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
@@ -346,7 +346,7 @@ public class NavState extends BaseAppState {
         float agentMaxClimb = .3f;
         
         //Step 1. Gather our geometry.
-        InputGeomProvider geomProvider = new GeometryProviderBuilder((Node)worldMap).build();
+        InputGeomProvider geomProvider = new GeometryProviderBuilder(worldMap).build();
         //Step 2. Create a Recast configuration object.
         RecastConfigBuilder builder = new RecastConfigBuilder();
         //Instantiate the configuration parameters.
@@ -361,9 +361,9 @@ public class NavState extends BaseAppState {
                 .withEdgeMaxLen(3.2f)               // r*8
                 .withEdgeMaxError(1.3f)             // 1.1 - 1.5
                 .withDetailSampleDistance(6.0f)     // increase if exception
-                .withDetailSampleMaxError(5.0f)     // increase if exception
+                .withDetailSampleMaxError(6.0f)     // increase if exception
                 .withVertsPerPoly(3)
-                .withTileSize(64).build(); 
+                .withTileSize(16).build(); 
         // Build all tiles
         RecastBuilder rb = new RecastBuilder(new ProgressListen());
         RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1);

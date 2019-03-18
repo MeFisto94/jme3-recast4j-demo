@@ -26,10 +26,10 @@ import com.jme3.recast4j.demo.states.tutorial.CrowdState;
 import com.jme3.recast4j.demo.states.GuiUtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.NavState;
+import com.jme3.recast4j.demo.states.ThirdPersonCamState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
-import com.jme3.scene.Spatial;
 import com.jme3.scene.plugins.gltf.ExtrasLoader;
 import com.jme3.scene.plugins.gltf.GltfModelKey;
 import com.jme3.scene.shape.Box;
@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class DemoApplication extends SimpleApplication {
-    private Spatial worldMap;
+    private Node worldMap;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     
     public DemoApplication() {
@@ -51,8 +51,8 @@ public class DemoApplication extends SimpleApplication {
                 new CrowdManagerAppstate(new CrowdManager()),
                 new LemurConfigState(),
                 /*new CrowdState(),*/
-                new GuiUtilState()
-                /*new ThirdPersonCamState()*/
+                new GuiUtilState(),
+                new ThirdPersonCamState()
         );
     }
 
@@ -71,21 +71,26 @@ public class DemoApplication extends SimpleApplication {
     }
 
     @Override
-    public void simpleInitApp() {        
+    public void simpleInitApp() {    
         initKeys();
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
 //        loadNavMeshBox();
 //        loadNavMeshDune();
         loadJaime();
-        loadNavMeshLevel();
-        loadDoors();
-//        loadFish();
-                
-        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
+//        loadNavMeshLevel();
+//        loadDoors();
+        loadFish();
+        loadPond();
+        loadSurface();
+//        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
 
     private void setupWorld() {
+        worldMap = new Node();
+        worldMap.setName("worldmap");
+        getRootNode().attachChild(worldMap);
+        
         BulletAppState bullet = new BulletAppState();
         // Performance is better when threading in parallel
         bullet.setThreadingType(BulletAppState.ThreadingType.PARALLEL);
@@ -118,6 +123,12 @@ public class DemoApplication extends SimpleApplication {
     @Override
     public void simpleRender(RenderManager rm) {
     }
+    
+    private void initKeys() {
+        getInputManager().addMapping("crowd builder", new KeyTrigger(KeyInput.KEY_F1));
+        getInputManager().addMapping("crowd pick", new KeyTrigger(KeyInput.KEY_LSHIFT));
+        getInputManager().addListener(actionListener, "crowd builder", "crowd pick");
+    }
 
     private void addAJaime(int idx) {
         Node tmp = (Node)assetManager.loadModel("Models/Jaime/Jaime.j3o");
@@ -136,14 +147,13 @@ public class DemoApplication extends SimpleApplication {
         mat.setColor("Ambient", ColorRGBA.White);
         mat.setBoolean("UseMaterialColors", true);
         
+        Geometry worldMapGeo = new Geometry("", new Box(8f, 1f, 8f));
+        worldMapGeo.setMaterial(mat);
+        worldMapGeo.addControl(new RigidBodyControl(0f));
         
-        worldMap = new Geometry("", new Box(8f, 1f, 8f));
-        worldMap.setMaterial(mat);
-        worldMap.addControl(new RigidBodyControl(0f));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMapGeo);
         
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
-        
-        rootNode.attachChild(worldMap);
+        worldMap.attachChild(worldMapGeo);
     }
 
 //    private void loadNavMeshDune() {
@@ -153,11 +163,10 @@ public class DemoApplication extends SimpleApplication {
 //    }
 
     private void loadNavMeshLevel() {  
-        worldMap = getAssetManager().loadModel("Models/Level/recast_level.j3o"); 
-        worldMap.setName("worldmap");
-        worldMap.addControl(new RigidBodyControl(0));
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(worldMap);
-        getRootNode().attachChild(worldMap);
+        Node level = (Node) getAssetManager().loadModel("Models/Level/recast_level.j3o"); 
+        level.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(level);
+        worldMap.attachChild(level);
     }
 
     private void loadDoors() {
@@ -186,10 +195,10 @@ public class DemoApplication extends SimpleApplication {
     private void loadFish() {
         Node fish = (Node) getAssetManager().loadModel("Models/Fish/Fish1.j3o");
         fish.setName("fish");
-        fish.setLocalTranslation(0, 5, 0);
-        fish.addControl(new BetterCharacterControl(.2f, .2f, 1f));
-        fish.addControl(new PhysicsAgentControl());
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(fish);
+        fish.setLocalTranslation(-8f, -.2f, 0f);
+//        fish.addControl(new BetterCharacterControl(.2f, .4f, 1f));
+//        fish.addControl(new PhysicsAgentControl());
+//        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(fish);
         getRootNode().attachChild(fish);
     }
     
@@ -230,10 +239,18 @@ public class DemoApplication extends SimpleApplication {
         }
     };
 
-    private void initKeys() {
-        getInputManager().addMapping("crowd builder", new KeyTrigger(KeyInput.KEY_F1));
-        getInputManager().addMapping("crowd pick", new KeyTrigger(KeyInput.KEY_LSHIFT));
-        getInputManager().addListener(actionListener, "crowd builder", "crowd pick");
+    private void loadPond() {
+        Node pond = (Node) getAssetManager().loadModel("Models/Pond/pond_ground.j3o"); 
+        pond.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(pond);
+        worldMap.attachChild(pond);
+    }
+
+    private void loadSurface() {
+        Node surface = (Node) getAssetManager().loadModel("Models/Pond/pond_surface.j3o");
+        surface.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(surface);
+        worldMap.attachChild(surface);
     }
 
 }
