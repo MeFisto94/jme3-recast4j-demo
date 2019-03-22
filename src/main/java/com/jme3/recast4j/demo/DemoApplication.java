@@ -16,6 +16,7 @@ import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
 import com.jme3.math.Vector3f;
+import com.jme3.post.FilterPostProcessor;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
@@ -34,6 +35,8 @@ import com.jme3.scene.plugins.gltf.ExtrasLoader;
 import com.jme3.scene.plugins.gltf.GltfModelKey;
 import com.jme3.scene.shape.Box;
 import com.jme3.system.AppSettings;
+import com.jme3.texture.Texture2D;
+import com.jme3.water.WaterFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +85,7 @@ public class DemoApplication extends SimpleApplication {
 //        loadDoors();
         loadFish();
         loadPond();
-        loadSurface();
+        loadPondSurface();
 //        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
 
@@ -115,6 +118,10 @@ public class DemoApplication extends SimpleApplication {
 
         getCamera().setLocation(new Vector3f(0f, 40f, 0f));
         getCamera().lookAtDirection(new Vector3f(0f, -1f, 0f), Vector3f.UNIT_Z);
+        
+//        FilterPostProcessor fpp = new FilterPostProcessor(getAssetManager());
+//        getViewPort().addProcessor(fpp);
+//        fpp.addFilter(setupWater());
     }
 
     @Override
@@ -202,6 +209,23 @@ public class DemoApplication extends SimpleApplication {
         getRootNode().attachChild(fish);
     }
     
+    private void loadPond() {
+        Node pond = (Node) getAssetManager().loadModel("Models/Pond/pond_ground.j3o"); 
+        pond.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(pond);
+        worldMap.attachChild(pond);
+    }
+
+    private void loadPondSurface() {
+        Node surface = (Node) getAssetManager().loadModel("Models/Pond/pond_surface.j3o");
+        surface.setName("water");
+        Vector3f localTranslation = surface.getLocalTranslation();
+        surface.setLocalTranslation(localTranslation.x, 4f, localTranslation.z);
+        surface.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(surface);
+        worldMap.attachChild(surface);
+    }
+    
     private ActionListener actionListener = new ActionListener() {
         @Override
         public void onAction(String name, boolean keyPressed, float tpf) {
@@ -228,7 +252,9 @@ public class DemoApplication extends SimpleApplication {
             if (name.equals("crowd pick") && !keyPressed) {
                 if (getStateManager().getState(AgentParamState.class) != null) {
                     Vector3f locOnMap = getStateManager().getState(NavState.class).getLocationOnMap(); // Don't calculate three times
-                    getStateManager().getState(AgentParamState.class).setFieldTargetXYZ(locOnMap);
+                    if (locOnMap != null) {
+                        getStateManager().getState(AgentParamState.class).setFieldTargetXYZ(locOnMap);
+                    }
                 } 
                 
                 if (getStateManager().getState(CrowdState.class) != null) {
@@ -239,18 +265,40 @@ public class DemoApplication extends SimpleApplication {
         }
     };
 
-    private void loadPond() {
-        Node pond = (Node) getAssetManager().loadModel("Models/Pond/pond_ground.j3o"); 
-        pond.addControl(new RigidBodyControl(0));
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(pond);
-        worldMap.attachChild(pond);
-    }
+    private WaterFilter setupWater() {
+        //Water Filter
+        WaterFilter waterPond = new WaterFilter(getRootNode(), new Vector3f(0.5f, -0.5f, -0.5f));
 
-    private void loadSurface() {
-        Node surface = (Node) getAssetManager().loadModel("Models/Pond/pond_surface.j3o");
-        surface.addControl(new RigidBodyControl(0));
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(surface);
-        worldMap.attachChild(surface);
+        //foam
+        waterPond.setUseFoam(false);
+        waterPond.setFoamTexture((Texture2D) getAssetManager().loadTexture("Common/MatDefs/Water/Textures/foam2.jpg"));
+        waterPond.setFoamIntensity(0.4f);
+        waterPond.setFoamHardness(0.3f);
+        waterPond.setFoamExistence(new Vector3f(0.8f, 8f, 1f));
+        //light reflection
+        waterPond.setReflectionDisplace(50);
+        waterPond.setRefractionConstant(0.25f);
+        waterPond.setRefractionStrength(0.2f);
+        //water color
+        waterPond.setColorExtinction(new Vector3f(30, 50, 70));
+        waterPond.setWaterColor(new ColorRGBA().setAsSrgb(0.0078f, 0.3176f, 0.5f, 1.0f));
+        waterPond.setDeepWaterColor(new ColorRGBA().setAsSrgb(0.0039f, 0.00196f, 0.145f, 1.0f));
+        waterPond.setWaterTransparency(0.12f);
+        //underwater
+        waterPond.setCausticsIntensity(0.4f);
+        waterPond.setUnderWaterFogDistance(80);
+        //waves
+        waterPond.setUseRipples(true);
+        waterPond.setSpeed(0.75f);
+        waterPond.setWaterHeight(-.1f);
+        waterPond.setMaxAmplitude(0.3f);
+        waterPond.setWaveScale(0.008f);
+        //translation and shorline
+        waterPond.setCenter(new Vector3f(-7.6f, -1f, 0));
+        waterPond.setRadius(6.75f);
+        waterPond.setShapeType(WaterFilter.AreaShape.Circular);
+        
+        return waterPond;
     }
 
 }

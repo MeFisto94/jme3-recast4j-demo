@@ -106,9 +106,11 @@ public class CrowdDebugControl extends AbstractControl {
             }
             
             if (verbose) {
-                LOG.info("<========== BEGIN CrowdDebugControl [{}] ==========>", spatial.getName());
-                LOG.info("isActive [{}] targetState [{}]", agent.active, agent.targetState);
-                LOG.info("<========== END CrowdDebugControl   [{}] ==========>", spatial.getName());
+                LOG.info("<========== BEGIN CrowdDebugControl [{}] index [{}] ==========>", spatial.getName(), agent.idx);
+                LOG.info("isActive              [{}]", agent.active);
+                LOG.info("MoveRequestState      [{}]", agent.targetState );
+                LOG.info("CrowdAgentState       [{}]", agent.state);
+                LOG.info("<========== END   CrowdDebugControl [{}] index [{}] ==========>", spatial.getName(), agent.idx);
             }
             
             timer = 0;

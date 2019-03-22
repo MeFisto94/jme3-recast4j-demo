@@ -54,7 +54,7 @@ public class CrowdChangeControl extends AbstractControl {
 
     @Override
     protected void controlUpdate(float tpf) {
-        if (curCrowd != crowd) {
+        if (curCrowd != crowd || curCrowdAgent != crowdAgent) {
             //When first adding control, currCrowd and curCrowdAgent will be null
             //so skip crowd interaction and just set variables.
             if (curCrowd == null) {

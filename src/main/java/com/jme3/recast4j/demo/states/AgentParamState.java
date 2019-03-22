@@ -64,6 +64,7 @@ import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.NavMeshQuery;
 import org.recast4j.detour.crowd.CrowdAgent;
+import static org.recast4j.detour.crowd.CrowdAgent.CrowdAgentState.DT_CROWDAGENT_STATE_INVALID;
 import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -819,7 +820,8 @@ public class AgentParamState extends BaseAppState {
                 LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
             } else {
                 //Sets all CrowdAgent targets at same time.
-                crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
+                boolean requestMoveToTarget = crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
+                LOG.info("requestMoveToTarget   [{}]", requestMoveToTarget);
             }
             
             LOG.info("<========== END AgentParamState setTarget ==========>");
