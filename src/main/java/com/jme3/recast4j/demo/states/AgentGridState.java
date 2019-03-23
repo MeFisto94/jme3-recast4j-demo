@@ -112,9 +112,9 @@ public class AgentGridState extends BaseAppState {
         contStats.setAlpha(0, false);
         contAgentGrid.addChild(contStats, "split 2, growy");
 
-        //The grid name field.
+        //The grid name field. 
         contStats.addChild(new Label("Grid Name"), "split 2");
-        fieldGridName = contStats.addChild(new TextField("Grid Jaime"), "growx");
+        fieldGridName = contStats.addChild(new TextField("Grid"), "growx");
         fieldGridName.setSingleLine(true);
         
         //The use physics checkbox.
@@ -154,10 +154,12 @@ public class AgentGridState extends BaseAppState {
         contAgentGrid.addChild(contAgent, "wrap, wmin 100");
         
         //The agentPath listbox. Add new model name here. Add the asset path 
+        //to addGrid # MODELS.
         contAgent.addChild(new Label("Agent"));
         //models in butAddAgentGrid listener under the #Model Section.
         listBoxAgent = contAgent.addChild(new ListBox<>());
         listBoxAgent.getModel().add("Jamie");
+        listBoxAgent.getModel().add("Fish");
         listBoxAgent.setVisibleItems(7);
         listBoxAgent.getSelectionModel().setSelection(0);
         
@@ -523,12 +525,15 @@ public class AgentGridState extends BaseAppState {
             }
         }
 
-        //###### Model Section #####
+        //###### MODELS Section #####
         //Model to use for the grid. Selection is set to 0 when creating 
         //the listBoxAgent so shouldn't need to check for null.
         switch(listBoxAgent.getSelectionModel().getSelection()) {
             case 0: 
                 agentPath = "Models/Jaime/Jaime.j3o";
+                break;
+            case 1:
+                agentPath = "Models/Fish/Fish1.j3o";
                 break;
             default: agentPath = null;
         }

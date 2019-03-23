@@ -83,7 +83,6 @@ public class DemoApplication extends SimpleApplication {
         loadJaime();
 //        loadNavMeshLevel();
 //        loadDoors();
-        loadFish();
         loadPond();
         loadPondSurface();
 //        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);

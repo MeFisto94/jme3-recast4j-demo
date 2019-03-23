@@ -50,6 +50,7 @@ import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_GR
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_JUMP;
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_ROAD;
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_WATER;
+import com.jme3.recast4j.demo.RecastBuilder2;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
@@ -66,6 +67,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.recast4j.detour.FindNearestPolyResult;
@@ -147,7 +149,8 @@ public class NavState extends BaseAppState {
         worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
 //        buildSolo();
 //        buildTiled();
-        buildSoloRecast4j();
+//        buildSoloRecast4j();
+        buildSoloTest();
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -156,7 +159,7 @@ public class NavState extends BaseAppState {
                 
                 // First clear existing pathGeometries from the old path finding:
                 pathGeometries.forEach(Geometry::removeFromParent);
-                // Clicked on the map, so build a path to:
+                // Clicked on the map, so params a path to:
                 Vector3f locOnMap = getLocationOnMap(); // Don'from calculate three times
                 LOG.info("Will walk from {} to {}", getCharacters().get(0).getWorldTranslation(), locOnMap);
                 ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredBoxAt(ColorRGBA.Green, getCharacters().get(0).getWorldTranslation().add(0f, 0.5f, 0f)));
@@ -364,10 +367,455 @@ public class NavState extends BaseAppState {
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
     }
     
+    private PartitionType m_partitionType = PartitionType.WATERSHED;
+    
+    /**
+     * Returns the first string after split "_" converted to lower case. 
+     * Expected use is for material names.
+     * 
+     * Example: 
+     *      road_asphalt = road
+     *      water_blue   = water
+     *      grass_green  = grass
+     * 
+     * @param str Material name to parse. 
+     * @return First returned string of split converted to lower case.
+     */
+    private String getModification(String str) {
+        String[] split = str.toLowerCase().split("_");
+        return split[0];
+    }
+    
+    private float maxClimb = .3f;
+    private float radius = 0.4f;
+    private float height = 2.0f;
+    private float cs = 0.2f;
+    private float ch = 0.1f;
+    
+    private void buildSoloRecast4j() {
+        
+        List<Integer> listTriLength = new ArrayList<>();
+        List<AreaModification> areaMod = new ArrayList<>();
+       
+        SceneGraphVisitor visitor = new SceneGraphVisitor() {
+
+            @Override
+            public void visit(Spatial spat) {
+                if (spat instanceof Geometry) {
+                    //Load triangle lengths so we can pick them out from the 
+                    //TriMesh later.
+                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                    
+                    /**
+                     * Set Are Type based off materials in this case. UserData 
+                     * can be added as a optional way to do this. UserData would 
+                     * require separating the geometry in blender which is not 
+                     * any different really than using materials. 
+                     * 
+                     * Doors could work the same way, mark the path between the 
+                     * two rooms with a material or separate the door path 
+                     * geometry into a separate object so it can be picked out. 
+                     * 
+                     * Off mesh connections can use a similar format. We could 
+                     * parse the geometry looking for two connection geometry 
+                     * that are flagged as same connection and set the off mesh 
+                     * connections programmatically. 
+                     */
+                    String name = getModification(((Geometry) spat).getMaterial().getName());
+                    System.out.println(name);
+                    
+                    switch (name) {
+                        
+                        case "water":
+                            areaMod.add(SAMPLE_AREAMOD_WATER);
+                            break;
+                        case "road":
+                            areaMod.add(SAMPLE_AREAMOD_ROAD);
+                            break;
+                        case "grass":
+                            areaMod.add(SAMPLE_AREAMOD_GRASS);
+                            break;
+                        case "door":
+                            areaMod.add(SAMPLE_AREAMOD_DOOR);
+                            break;
+                        case "jump":
+                            areaMod.add(SAMPLE_AREAMOD_JUMP);
+                            break;
+                        default:
+                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
+                    }
+                }
+            }
+        };
+        
+        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
+
+        //Build merged mesh.
+        InputGeomProvider geomProvider = new GeometryProviderBuilder(
+                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
+
+        //Get min/max bounds.
+        float[] bmin = geomProvider.getMeshBoundsMin();
+        float[] bmax = geomProvider.getMeshBoundsMax();
+        Context m_ctx = new Context();
+        
+        //We could use multiple configs here based off area type list.
+        RecastConfigBuilder builder = new RecastConfigBuilder();
+        RecastConfig cfg = builder
+            .withAgentRadius(radius)              // r
+            .withAgentHeight(height)              // h
+            //cs and ch should be .1 at min.
+            .withCellSize(cs)                 // cs=r/2
+            .withCellHeight(ch)               // ch=cs/2 but not < .1f
+            .withAgentMaxClimb(maxClimb)            // > 2*ch
+            .withAgentMaxSlope(45f)
+            .withEdgeMaxLen(3.2f)               // r*8
+            .withEdgeMaxError(1.3f)             // 1.1 - 1.5
+            .withDetailSampleDistance(8.0f)     // increase if exception
+            .withDetailSampleMaxError(8.0f)     // increase if exception
+            .withWalkableAreaMod(SampleAreaModifications.SAMPLE_AREAMOD_GROUND)
+            .withVertsPerPoly(3).build();
+        
+        RecastBuilderConfig bcfg = new RecastBuilderConfig(cfg, bmin, bmax);
+        
+        Heightfield m_solid = new Heightfield(bcfg.width, bcfg.height, bcfg.bmin, bcfg.bmax, cfg.cs, cfg.ch);
+        for (TriMesh geom : geomProvider.meshes()) {
+            float[] verts = geom.getVerts();
+            int[] tris = geom.getTris();
+            int ntris = tris.length / 3;
+            
+            //Separate individual triangles into a arrays so we can mark Area Type.
+            List<int[]> listTris = new ArrayList<>();
+            int fromIndex = 0;
+            for(int length: listTriLength) {
+                int[] triangles = new int[length];
+                System.arraycopy(tris, fromIndex, triangles, 0, length);
+                listTris.add(triangles);
+                fromIndex += length;
+            }
+            
+            /**
+             * Set the Area Type for each triangle. We could use separate cfg 
+             * instead. Would give minor ability to fine tune navMeshes but the 
+             * only benefit would be from cfg.walkableClimb.
+             */
+            List<int[]> areas = new ArrayList<>();
+            for (int i = 0; i < areaMod.size(); i++) {
+                int[] m_triareas = Recast.markWalkableTriangles(
+                        m_ctx, cfg.walkableSlopeAngle, verts, listTris.get(i), listTris.get(i).length/3, areaMod.get(i));
+                areas.add(m_triareas);
+            }
+            
+            //Prepare the new array for all areas.
+            int[] m_triareasAll = new int[ntris];
+            int length = 0;
+            //Copy all flagged areas into new array.
+            for (int[] area: areas) {
+                System.arraycopy(area, 0, m_triareasAll, length, area.length);
+                length += area.length;
+            }
+            RecastRasterization.rasterizeTriangles(m_ctx, verts, tris, m_triareasAll, ntris, m_solid, cfg.walkableClimb);
+        }
+        
+        RecastFilter.filterLowHangingWalkableObstacles(m_ctx, cfg.walkableClimb, m_solid);
+        RecastFilter.filterLedgeSpans(m_ctx, cfg.walkableHeight, cfg.walkableClimb, m_solid);
+        RecastFilter.filterWalkableLowHeightSpans(m_ctx, cfg.walkableHeight, m_solid);
+
+        CompactHeightfield m_chf = Recast.buildCompactHeightfield(m_ctx, cfg.walkableHeight, cfg.walkableClimb,
+                m_solid);
+
+        RecastArea.erodeWalkableArea(m_ctx, cfg.walkableRadius, m_chf);
+
+        /*
+         * ConvexVolume vols = m_geom->getConvexVolumes(); for (int i = 0; i < m_geom->getConvexVolumeCount(); ++i)
+         * rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].nverts, vols[i].hmin, vols[i].hmax, (unsigned
+         * char)vols[i].area, *m_chf);
+         */
+
+        if (m_partitionType == PartitionType.WATERSHED) {
+            // Prepare for region partitioning, by calculating distance field
+            // along the walkable surface.
+            RecastRegion.buildDistanceField(m_ctx, m_chf);
+            // Partition the walkable surface into simple regions without holes.
+            RecastRegion.buildRegions(m_ctx, m_chf, 0, cfg.minRegionArea, cfg.mergeRegionArea);
+        } else if (m_partitionType == PartitionType.MONOTONE) {
+            // Partition the walkable surface into simple regions without holes.
+            // Monotone partitioning does not need distancefield.
+            RecastRegion.buildRegionsMonotone(m_ctx, m_chf, 0, cfg.minRegionArea, cfg.mergeRegionArea);
+        } else {
+            // Partition the walkable surface into simple regions without holes.
+            RecastRegion.buildLayerRegions(m_ctx, m_chf, 0, cfg.minRegionArea);
+        }
+
+        ContourSet m_cset = RecastContour.buildContours(m_ctx, m_chf, cfg.maxSimplificationError, cfg.maxEdgeLen,
+                RecastConstants.RC_CONTOUR_TESS_WALL_EDGES);
+
+        // Build polygon navmesh from the contours.
+        PolyMesh m_pmesh = RecastMesh.buildPolyMesh(m_ctx, m_cset, cfg.maxVertsPerPoly);
+
+        //Set Ability flags.
+        for (int i = 0; i < m_pmesh.npolys; ++i) {
+            if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
+              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
+              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
+                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
+            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
+                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
+            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
+                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
+                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+            }
+            if (m_pmesh.areas[i] > 0) {
+                m_pmesh.areas[i]--;
+            }
+        }
+
+        //Create detailed mesh for picking.
+        PolyMeshDetail m_dmesh = RecastMeshDetail.buildPolyMeshDetail(m_ctx, m_pmesh, m_chf, cfg.detailSampleDist,
+                cfg.detailSampleMaxError);
+        
+        NavMeshDataCreateParams params = new NavMeshDataCreateParams();
+
+        params.verts = m_pmesh.verts;
+        params.vertCount = m_pmesh.nverts;
+        params.polys = m_pmesh.polys;
+        params.polyAreas = m_pmesh.areas;
+        params.polyFlags = m_pmesh.flags;
+        params.polyCount = m_pmesh.npolys;
+        params.nvp = m_pmesh.nvp;
+        params.detailMeshes = m_dmesh.meshes;
+        params.detailVerts = m_dmesh.verts;
+        params.detailVertsCount = m_dmesh.nverts;
+        params.detailTris = m_dmesh.tris;
+        params.detailTriCount = m_dmesh.ntris;
+        params.walkableHeight = height; //Should add getter for this.
+        params.walkableRadius = radius; //Should add getter for this.
+        params.walkableClimb = maxClimb; //Should add getter for this.
+        params.bmin = m_pmesh.bmin;
+        params.bmax = m_pmesh.bmax;
+        params.cs = cfg.cs; //Should add getter for this.
+        params.ch = cfg.ch; //Should add getter for this.
+        params.buildBvTree = true;
+        
+        MeshData meshData = NavMeshBuilder.createNavMeshData(params);
+        navMesh = new NavMesh(meshData, params.nvp, 0);
+        
+        query = new NavMeshQuery(navMesh);
+        
+        try {
+            MeshDataWriter mdw = new MeshDataWriter();
+            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+        } catch (Exception ex) {
+            LOG.error("[{}]", ex);
+        }
+
+        //Show wireframe. Helps with param tweaks. false = solid color.
+        showDebugMeshes(meshData, true);
+        
+}
+    
+    private void buildSoloTest() {
+        List<Integer> listTriLength = new ArrayList<>();
+        List<AreaModification> areaMod = new ArrayList<>();
+       
+        SceneGraphVisitor visitor = new SceneGraphVisitor() {
+
+            @Override
+            public void visit(Spatial spat) {
+                if (spat instanceof Geometry) {
+                    //Load triangle lengths so we can pick them out from the 
+                    //TriMesh later.
+                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                    
+                    /**
+                     * Set Area Type based off materials in this case. UserData 
+                     * can be added as a optional way to do this. UserData would 
+                     * require separating the geometry in blender which is not 
+                     * any different really than using materials. 
+                     * 
+                     * Doors could work the same way, mark the path between the 
+                     * two rooms with a material or separate the door path 
+                     * geometry into a separate object so it can be picked out. 
+                     * 
+                     * Off mesh connections can use a similar format. We could 
+                     * parse the geometry looking for two connection geometry 
+                     * that are flagged as same connection and set the off mesh 
+                     * connections programmatically. 
+                     */
+                    String name = getModification(((Geometry) spat).getMaterial().getName());
+                    System.out.println(name);
+                    
+                    switch (name) {
+                        
+                        case "water":
+                            areaMod.add(SAMPLE_AREAMOD_WATER);
+                            break;
+                        case "road":
+                            areaMod.add(SAMPLE_AREAMOD_ROAD);
+                            break;
+                        case "grass":
+                            areaMod.add(SAMPLE_AREAMOD_GRASS);
+                            break;
+                        case "door":
+                            areaMod.add(SAMPLE_AREAMOD_DOOR);
+                            break;
+                        case "jump":
+                            areaMod.add(SAMPLE_AREAMOD_JUMP);
+                            break;
+                        default:
+                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
+                    }
+                }
+            }
+        };
+        
+        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
+
+        //Build merged mesh.
+        InputGeomProvider geomProvider = new GeometryProviderBuilder(
+                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
+        
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).withDetailMesh(true).
+                build(new RecastConfigBuilder()
+                        .withAgentRadius(.3f)           // r
+                        .withAgentHeight(1.7f)          // h
+                        //cs and ch should probably be .1 at min.
+                        .withCellSize(.1f)              // cs=r/3
+                        .withCellHeight(.1f)            // ch=cs 
+                        .withAgentMaxClimb(.3f)         // > 2*ch
+                        .withAgentMaxSlope(45f)         
+                        .withEdgeMaxLen(2.4f)             // r*8
+                        .withEdgeMaxError(1.3f)         // 1.1 - 1.5
+                        .withDetailSampleDistance(8.0f) // increase if exception
+                        .withDetailSampleMaxError(8.0f) // increase if exception
+                        .withVertsPerPoly(3).build());
+        
+        //Split up for testing.
+        RecastBuilderResult result = new RecastBuilder2().build(geomProvider, bcfg, listTriLength, areaMod);
+        
+        NavMeshDataCreateParamsBuilder navMeshDataCreateParamsBuilder = new NavMeshDataCreateParamsBuilder(result);
+        PolyMesh m_pmesh = result.getMesh();
+        
+        //Set Ability flags.
+        for (int i = 0; i < m_pmesh.npolys; ++i) {
+            if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
+              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
+              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
+                navMeshDataCreateParamsBuilder.withPolyFlag(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK);
+            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
+                navMeshDataCreateParamsBuilder.withPolyFlag(i, SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM);
+            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
+                navMeshDataCreateParamsBuilder.withPolyFlags(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
+                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR);
+            }
+            if (m_pmesh.areas[i] > 0) {
+                m_pmesh.areas[i]--;
+            }
+        }
+        
+        //Must either set variables for parameters walkableHeight, 
+        //walkableRadius, walkableClimb manually for mesh data unless 
+        //jme3-recast4j fixed.
+        NavMeshDataCreateParams params = navMeshDataCreateParamsBuilder.build(bcfg);
+//        params.walkableClimb = maxClimb; //Should add getter for this.
+//        params.walkableHeight = height; //Should add getter for this.
+//        params.walkableRadius = radius; //Should add getter for this.
+        MeshData meshData = NavMeshBuilder.createNavMeshData(params);
+        navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
+        query = new NavMeshQuery(navMesh);
+        
+        try {
+            MeshDataWriter mdw = new MeshDataWriter();
+            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+        } catch (Exception ex) {
+            LOG.error("[{}]", ex);
+        }
+
+        //Show wireframe. Helps with param tweaks. false = solid color.
+        showDebugMeshes(meshData, true);
+    }
+
+    /**
+     * Get all triangles from a mesh. Should open up jme3-recast4j existing 
+     * GeometryProviderBuilder method.
+     *
+     * @param mesh Mesh to get triangles from.
+     * @return Returns array of triangles.
+     */
+    private int[] getTriangles(Mesh mesh) {
+        int[] indices = new int[3];
+        int[] triangles = new int[mesh.getTriangleCount() * 3];
+
+        for (int i = 0; i < triangles.length; i += 3) {
+            mesh.getTriangle(i / 3, indices);
+            triangles[i] = indices[0];
+            triangles[i + 1] = indices[1];
+            triangles[i + 2] = indices[2];
+        }
+        return triangles;
+    }
+    
     private void buildTiled() {
-        float agentHeight = 1.7f;
-        float agentRadius = .3f;
-        float agentMaxClimb = .3f;
+        
+        List<Integer> listTriLength = new ArrayList<>();
+        List<AreaModification> areaMod = new ArrayList<>();
+       
+        SceneGraphVisitor visitor = new SceneGraphVisitor() {
+
+            @Override
+            public void visit(Spatial spat) {
+                if (spat instanceof Geometry) {
+                    //Load triangle lengths so we can pick them out from the 
+                    //TriMesh later.
+                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                    
+                    /**
+                     * Set Area Type based off materials in this case. UserData 
+                     * can be added as a optional way to do this. UserData would 
+                     * require separating the geometry in blender which is not 
+                     * any different really than using materials. 
+                     * 
+                     * Doors could work the same way, mark the path between the 
+                     * two rooms with a material or separate the door path 
+                     * geometry into a separate object so it can be picked out. 
+                     * 
+                     * Off mesh connections can use a similar format. We could 
+                     * parse the geometry looking for two connection geometry 
+                     * that are flagged as same connection and set the off mesh 
+                     * connections programmatically. 
+                     */
+                    String name = getModification(((Geometry) spat).getMaterial().getName());
+                    System.out.println(name);
+                    
+                    switch (name) {
+                        
+                        case "water":
+                            areaMod.add(SAMPLE_AREAMOD_WATER);
+                            break;
+                        case "road":
+                            areaMod.add(SAMPLE_AREAMOD_ROAD);
+                            break;
+                        case "grass":
+                            areaMod.add(SAMPLE_AREAMOD_GRASS);
+                            break;
+                        case "door":
+                            areaMod.add(SAMPLE_AREAMOD_DOOR);
+                            break;
+                        case "jump":
+                            areaMod.add(SAMPLE_AREAMOD_JUMP);
+                            break;
+                        default:
+                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
+                    }
+                }
+            }
+        };
+        
+        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
         
         //Step 1. Gather our geometry.
         InputGeomProvider geomProvider = new GeometryProviderBuilder(worldMap).build();
@@ -375,12 +823,12 @@ public class NavState extends BaseAppState {
         RecastConfigBuilder builder = new RecastConfigBuilder();
         //Instantiate the configuration parameters.
         RecastConfig cfg = builder
-                .withAgentRadius(agentRadius)       // r
-                .withAgentHeight(agentHeight)       // h
+                .withAgentRadius(.3f)       // r
+                .withAgentHeight(1.7f)       // h
                 //cs and ch should be .1 at min.
                 .withCellSize(0.1f)                 // cs=r/2
                 .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
-                .withAgentMaxClimb(agentMaxClimb)   // > 2*ch
+                .withAgentMaxClimb(.3f)   // > 2*ch
                 .withAgentMaxSlope(45f)
                 .withEdgeMaxLen(3.2f)               // r*8
                 .withEdgeMaxError(1.3f)             // 1.1 - 1.5
@@ -389,7 +837,7 @@ public class NavState extends BaseAppState {
                 .withVertsPerPoly(3)
                 .withTileSize(16).build(); 
         // Build all tiles
-        RecastBuilder rb = new RecastBuilder(new ProgressListen());
+        RecastBuilder rb = new RecastBuilder2(new ProgressListen());
         RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1);
         // Add tiles to nav mesh
         int tw = rcResult.length;
@@ -441,9 +889,9 @@ public class NavState extends BaseAppState {
                 params.detailVertsCount = dmesh.nverts;
                 params.detailTris = dmesh.tris;
                 params.detailTriCount = dmesh.ntris;
-                params.walkableHeight = agentHeight;
-                params.walkableRadius = agentRadius;
-                params.walkableClimb = agentMaxClimb;
+                params.walkableHeight = cfg.walkableHeight;
+                params.walkableRadius = cfg.walkableRadius;
+                params.walkableClimb = cfg.walkableClimb;
                 params.bmin = pmesh.bmin;
                 params.bmax = pmesh.bmax;
                 params.cs = cfg.cs;
@@ -610,273 +1058,5 @@ public class NavState extends BaseAppState {
     public List<Node> getCharacters() {
         return characters;
     }
-    
-    private PartitionType m_partitionType = PartitionType.WATERSHED;
-    private float maxClimb = .3f;
-    private float radius = 0.4f;
-    private float height = 2.0f;
-    private float cs = 0.2f;
-    private float ch = 0.1f;
-    /**
-     * Returns the first string after split "_" converted to lower case. 
-     * Expected use is for material names.
-     * 
-     * Example: 
-     *      road_asphalt = road
-     *      water_blue   = water
-     *      grass_green  = grass
-     * 
-     * @param str Material name to parse. 
-     * @return First returned string of split converted to lower case.
-     */
-    private String getModification(String str) {
-        String[] split = str.toLowerCase().split("_");
-        return split[0];
-    }
-    
-    private void buildSoloRecast4j() {
-        
-        List<Integer> listTriLength = new ArrayList<>();
-        List<AreaModification> areaMod = new ArrayList<>();
-       
-        SceneGraphVisitor visitor = new SceneGraphVisitor() {
 
-            @Override
-            public void visit(Spatial spat) {
-                if (spat instanceof Geometry) {
-                    //Load triangle lengths so we can pick them out from the 
-                    //TriMesh later.
-                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                    
-                    /**
-                     * Set Are Type based off materials in this case. UserData 
-                     * can be added as a optional way to do this. UserData would 
-                     * require separating the geometry in blender which is not 
-                     * any different really than using materials. 
-                     * 
-                     * Doors could work the same way, mark the path between the 
-                     * two rooms with a material or separate the door path 
-                     * geometry into a separate object so it can be picked out. 
-                     * 
-                     * Off mesh connections can use a similar format. We could 
-                     * parse the geometry looking for two connection geometry 
-                     * that are flagged as same connection and set the off mesh 
-                     * connections programmatically. 
-                     */
-                    String name = getModification(((Geometry) spat).getMaterial().getName());
-                    System.out.println(name);
-                    
-                    switch (name) {
-                        
-                        case "water":
-                            areaMod.add(SAMPLE_AREAMOD_WATER);
-                            break;
-                        case "road":
-                            areaMod.add(SAMPLE_AREAMOD_ROAD);
-                            break;
-                        case "grass":
-                            areaMod.add(SAMPLE_AREAMOD_GRASS);
-                            break;
-                        case "door":
-                            areaMod.add(SAMPLE_AREAMOD_DOOR);
-                            break;
-                        case "jump":
-                            areaMod.add(SAMPLE_AREAMOD_JUMP);
-                            break;
-                        default:
-                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
-                    }
-                }
-            }
-        };
-        
-        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
-
-        //Build merged mesh.
-        InputGeomProvider geomProvider = new GeometryProviderBuilder(
-                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
-
-        //Get min/max bounds.
-        float[] bmin = geomProvider.getMeshBoundsMin();
-        float[] bmax = geomProvider.getMeshBoundsMax();
-        Context m_ctx = new Context();
-        
-        //We could use multiple configs here based off area type list.
-        RecastConfigBuilder builder = new RecastConfigBuilder();
-        RecastConfig cfg = builder
-            .withAgentRadius(radius)              // r
-            .withAgentHeight(height)              // h
-            //cs and ch should be .1 at min.
-            .withCellSize(cs)                 // cs=r/2
-            .withCellHeight(ch)               // ch=cs/2 but not < .1f
-            .withAgentMaxClimb(maxClimb)            // > 2*ch
-            .withAgentMaxSlope(45f)
-            .withEdgeMaxLen(3.2f)               // r*8
-            .withEdgeMaxError(1.3f)             // 1.1 - 1.5
-            .withDetailSampleDistance(8.0f)     // increase if exception
-            .withDetailSampleMaxError(8.0f)     // increase if exception
-            .withWalkableAreaMod(SampleAreaModifications.SAMPLE_AREAMOD_GROUND)
-            .withVertsPerPoly(3).build();
-        
-        RecastBuilderConfig bcfg = new RecastBuilderConfig(cfg, bmin, bmax);
-        
-        Heightfield m_solid = new Heightfield(bcfg.width, bcfg.height, bcfg.bmin, bcfg.bmax, cfg.cs, cfg.ch);
-        
-        for (TriMesh geom : geomProvider.meshes()) {
-            float[] verts = geom.getVerts();
-            int[] tris = geom.getTris();
-            int ntris = tris.length / 3;
-            
-            //Separate individual triangles into a arrays so we can mark Area Type.
-            List<int[]> listTris = new ArrayList<>();
-            int fromIndex = 0;
-            for(int length: listTriLength) {
-                int[] triangles = new int[length];
-                System.arraycopy(tris, fromIndex, triangles, 0, length);
-                listTris.add(triangles);
-                fromIndex += length;
-            }
-            
-            /**
-             * Set the Area Type for each triangle. We could use separate cfg 
-             * instead. Would give minor ability to fine tune navMeshes but the 
-             * only benefit would be from cfg.walkableClimb.
-             */
-            List<int[]> areas = new ArrayList<>();
-            for (int i = 0; i < areaMod.size(); i++) {
-                int[] m_triareas = Recast.markWalkableTriangles(
-                        m_ctx, cfg.walkableSlopeAngle, verts, listTris.get(i), listTris.get(i).length/3, areaMod.get(i));
-                areas.add(m_triareas);
-            }
-            
-            //Prepare the new array for all areas.
-            int[] m_triareasAll = new int[ntris];
-            int length = 0;
-            //Copy all flagged areas into new array.
-            for (int[] area: areas) {
-                System.arraycopy(area, 0, m_triareasAll, length, area.length);
-                length += area.length;
-            }
-            
-            RecastRasterization.rasterizeTriangles(m_ctx, verts, tris, m_triareasAll, ntris, m_solid, cfg.walkableClimb);
-        }
-        
-        RecastFilter.filterLowHangingWalkableObstacles(m_ctx, cfg.walkableClimb, m_solid);
-        RecastFilter.filterLedgeSpans(m_ctx, cfg.walkableHeight, cfg.walkableClimb, m_solid);
-        RecastFilter.filterWalkableLowHeightSpans(m_ctx, cfg.walkableHeight, m_solid);
-
-        CompactHeightfield m_chf = Recast.buildCompactHeightfield(m_ctx, cfg.walkableHeight, cfg.walkableClimb,
-                m_solid);
-
-        RecastArea.erodeWalkableArea(m_ctx, cfg.walkableRadius, m_chf);
-
-        /*
-         * ConvexVolume vols = m_geom->getConvexVolumes(); for (int i = 0; i < m_geom->getConvexVolumeCount(); ++i)
-         * rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].nverts, vols[i].hmin, vols[i].hmax, (unsigned
-         * char)vols[i].area, *m_chf);
-         */
-
-        if (m_partitionType == PartitionType.WATERSHED) {
-            // Prepare for region partitioning, by calculating distance field
-            // along the walkable surface.
-            RecastRegion.buildDistanceField(m_ctx, m_chf);
-            // Partition the walkable surface into simple regions without holes.
-            RecastRegion.buildRegions(m_ctx, m_chf, 0, cfg.minRegionArea, cfg.mergeRegionArea);
-        } else if (m_partitionType == PartitionType.MONOTONE) {
-            // Partition the walkable surface into simple regions without holes.
-            // Monotone partitioning does not need distancefield.
-            RecastRegion.buildRegionsMonotone(m_ctx, m_chf, 0, cfg.minRegionArea, cfg.mergeRegionArea);
-        } else {
-            // Partition the walkable surface into simple regions without holes.
-            RecastRegion.buildLayerRegions(m_ctx, m_chf, 0, cfg.minRegionArea);
-        }
-
-        ContourSet m_cset = RecastContour.buildContours(m_ctx, m_chf, cfg.maxSimplificationError, cfg.maxEdgeLen,
-                RecastConstants.RC_CONTOUR_TESS_WALL_EDGES);
-
-        // Build polygon navmesh from the contours.
-        PolyMesh m_pmesh = RecastMesh.buildPolyMesh(m_ctx, m_cset, cfg.maxVertsPerPoly);
-
-        //Set Ability flags.
-        for (int i = 0; i < m_pmesh.npolys; ++i) {
-            if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
-              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
-              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
-            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
-            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
-                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
-            }
-            if (m_pmesh.areas[i] > 0) {
-                m_pmesh.areas[i]--;
-            }
-        }
-
-        //Create detailed mesh for picking.
-        PolyMeshDetail m_dmesh = RecastMeshDetail.buildPolyMeshDetail(m_ctx, m_pmesh, m_chf, cfg.detailSampleDist,
-                cfg.detailSampleMaxError);
-        
-        NavMeshDataCreateParams params = new NavMeshDataCreateParams();
-
-        params.verts = m_pmesh.verts;
-        params.vertCount = m_pmesh.nverts;
-        params.polys = m_pmesh.polys;
-        params.polyAreas = m_pmesh.areas;
-        params.polyFlags = m_pmesh.flags;
-        params.polyCount = m_pmesh.npolys;
-        params.nvp = m_pmesh.nvp;
-        params.detailMeshes = m_dmesh.meshes;
-        params.detailVerts = m_dmesh.verts;
-        params.detailVertsCount = m_dmesh.nverts;
-        params.detailTris = m_dmesh.tris;
-        params.detailTriCount = m_dmesh.ntris;
-        params.walkableHeight = height; //Should add getter for this.
-        params.walkableRadius = radius; //Should add getter for this.
-        params.walkableClimb = maxClimb; //Should add getter for this.
-        params.bmin = m_pmesh.bmin;
-        params.bmax = m_pmesh.bmax;
-        params.cs = cs; //Should add getter for this.
-        params.ch = ch; //Should add getter for this.
-        params.buildBvTree = true;
-        
-        MeshData meshData = NavMeshBuilder.createNavMeshData(params);
-        navMesh = new NavMesh(meshData, params.nvp, 0);
-        
-        query = new NavMeshQuery(navMesh);
-        
-        try {
-            MeshDataWriter mdw = new MeshDataWriter();
-            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
-            MeshSetWriter msw = new MeshSetWriter();
-            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
-        } catch (Exception ex) {
-            LOG.error("[{}]", ex);
-        }
-
-        //Show wireframe. Helps with param tweaks. false = solid color.
-        showDebugMeshes(meshData, true);
-        
-    }
-
-    /**
-     * Get all triangles from a mesh. Should open up jme3-recast4j existing 
-     * GeometryProviderBuilder method.
-     *
-     * @param mesh Mesh to get triangles from.
-     * @return Returns array of triangles.
-     */
-    private int[] getTriangles(Mesh mesh) {
-        int[] indices = new int[3];
-        int[] triangles = new int[mesh.getTriangleCount() * 3];
-
-        for (int i = 0; i < triangles.length; i += 3) {
-            mesh.getTriangle(i / 3, indices);
-            triangles[i] = indices[0];
-            triangles[i + 1] = indices[1];
-            triangles[i + 2] = indices[2];
-        }
-        return triangles;
-    }
 }
