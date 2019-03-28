@@ -50,7 +50,7 @@ import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_GR
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_JUMP;
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_ROAD;
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_WATER;
-import com.jme3.recast4j.demo.RecastBuilder2;
+import com.jme3.recast4j.demo.RecastBuilder;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
@@ -67,7 +67,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.recast4j.detour.FindNearestPolyResult;
@@ -93,7 +92,6 @@ import org.recast4j.recast.PolyMesh;
 import org.recast4j.recast.PolyMeshDetail;
 import org.recast4j.recast.Recast;
 import org.recast4j.recast.RecastArea;
-import org.recast4j.recast.RecastBuilder;
 import org.recast4j.recast.RecastBuilder.RecastBuilderProgressListener;
 import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
 import org.recast4j.recast.RecastBuilderConfig;
@@ -148,9 +146,9 @@ public class NavState extends BaseAppState {
     protected void onEnable() {
         worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
 //        buildSolo();
-//        buildTiled();
+        buildTiled();
 //        buildSoloRecast4j();
-        buildSoloTest();
+//        buildSoloTest();
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -318,8 +316,8 @@ public class NavState extends BaseAppState {
         Geometry g = new Geometry("DebugMeshSimple", RecastUtils.getDebugMesh(meshData));
         g.setMaterial(matRed);
         gDetailed.setMaterial(matGreen);
-        System.out.println("VertCount Regular Mesh: " + g.getVertexCount());
-        System.out.println("VertCount Detailed Mesh: " + gDetailed.getVertexCount());
+//        System.out.println("VertCount Regular Mesh: " + g.getVertexCount());
+//        System.out.println("VertCount Detailed Mesh: " + gDetailed.getVertexCount());
         g.move(0f, 0.125f, 0f);
         gDetailed.move(0f, 0.25f, 0f);
 
@@ -367,36 +365,20 @@ public class NavState extends BaseAppState {
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
     }
     
-    private PartitionType m_partitionType = PartitionType.WATERSHED;
+    private PartitionType m_partitionType = PartitionType.WATERSHED;   
+    private float maxClimb = .3f; //Should add getter for this.
+    private float radius = 0.4f; //Should add getter for this.
+    private float height = 1.7f; //Should add getter for this.
     
-    /**
-     * Returns the first string after split "_" converted to lower case. 
-     * Expected use is for material names.
-     * 
-     * Example: 
-     *      road_asphalt = road
-     *      water_blue   = water
-     *      grass_green  = grass
-     * 
-     * @param str Material name to parse. 
-     * @return First returned string of split converted to lower case.
-     */
-    private String getModification(String str) {
-        String[] split = str.toLowerCase().split("_");
-        return split[0];
-    }
-    
-    private float maxClimb = .3f;
-    private float radius = 0.4f;
-    private float height = 2.0f;
-    private float cs = 0.2f;
-    private float ch = 0.1f;
-    
+    //This example builds the mesh manually by skipping recastBuilder and most 
+    //jme3-recast4j methods.
     private void buildSoloRecast4j() {
         
+        //Collect each geometry length of triangles to pass to buildTile.
         List<Integer> listTriLength = new ArrayList<>();
+        //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
-       
+        
         SceneGraphVisitor visitor = new SceneGraphVisitor() {
 
             @Override
@@ -407,7 +389,7 @@ public class NavState extends BaseAppState {
                     listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
                     
                     /**
-                     * Set Are Type based off materials in this case. UserData 
+                     * Set Area Type based off materials in this case. UserData 
                      * can be added as a optional way to do this. UserData would 
                      * require separating the geometry in blender which is not 
                      * any different really than using materials. 
@@ -421,8 +403,7 @@ public class NavState extends BaseAppState {
                      * that are flagged as same connection and set the off mesh 
                      * connections programmatically. 
                      */
-                    String name = getModification(((Geometry) spat).getMaterial().getName());
-                    System.out.println(name);
+                    String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
                     
                     switch (name) {
                         
@@ -462,14 +443,14 @@ public class NavState extends BaseAppState {
         //We could use multiple configs here based off area type list.
         RecastConfigBuilder builder = new RecastConfigBuilder();
         RecastConfig cfg = builder
-            .withAgentRadius(radius)              // r
-            .withAgentHeight(height)              // h
+            .withAgentRadius(radius)            // r
+            .withAgentHeight(height)            // h
             //cs and ch should be .1 at min.
-            .withCellSize(cs)                 // cs=r/2
-            .withCellHeight(ch)               // ch=cs/2 but not < .1f
-            .withAgentMaxClimb(maxClimb)            // > 2*ch
+            .withCellSize(0.1f)                 // cs=r/2
+            .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
+            .withAgentMaxClimb(maxClimb)        // > 2*ch
             .withAgentMaxSlope(45f)
-            .withEdgeMaxLen(3.2f)               // r*8
+            .withEdgeMaxLen(2.4f)               // r*8
             .withEdgeMaxError(1.3f)             // 1.1 - 1.5
             .withDetailSampleDistance(8.0f)     // increase if exception
             .withDetailSampleMaxError(8.0f)     // increase if exception
@@ -495,9 +476,7 @@ public class NavState extends BaseAppState {
             }
             
             /**
-             * Set the Area Type for each triangle. We could use separate cfg 
-             * instead. Would give minor ability to fine tune navMeshes but the 
-             * only benefit would be from cfg.walkableClimb.
+             * Set the Area Type for each triangle.
              */
             List<int[]> areas = new ArrayList<>();
             for (int i = 0; i < areaMod.size(); i++) {
@@ -593,8 +572,8 @@ public class NavState extends BaseAppState {
         params.walkableClimb = maxClimb; //Should add getter for this.
         params.bmin = m_pmesh.bmin;
         params.bmax = m_pmesh.bmax;
-        params.cs = cfg.cs; //Should add getter for this.
-        params.ch = cfg.ch; //Should add getter for this.
+        params.cs = cfg.cs; 
+        params.ch = cfg.ch;
         params.buildBvTree = true;
         
         MeshData meshData = NavMeshBuilder.createNavMeshData(params);
@@ -613,11 +592,16 @@ public class NavState extends BaseAppState {
 
         //Show wireframe. Helps with param tweaks. false = solid color.
         showDebugMeshes(meshData, true);
-        
-}
+    }
     
+    //This example sets Area Type based off geometry of each individual mesh and 
+    //uses the custom RecastBuilder class with jme3-recast4j wrapper methods.
     private void buildSoloTest() {
+        
+        
+        //Collect each geometry length of triangles to pass to buildTile.
         List<Integer> listTriLength = new ArrayList<>();
+        //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
        
         SceneGraphVisitor visitor = new SceneGraphVisitor() {
@@ -644,8 +628,7 @@ public class NavState extends BaseAppState {
                      * that are flagged as same connection and set the off mesh 
                      * connections programmatically. 
                      */
-                    String name = getModification(((Geometry) spat).getMaterial().getName());
-                    System.out.println(name);
+                    String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
                     
                     switch (name) {
                         
@@ -693,7 +676,7 @@ public class NavState extends BaseAppState {
                         .withVertsPerPoly(3).build());
         
         //Split up for testing.
-        RecastBuilderResult result = new RecastBuilder2().build(geomProvider, bcfg, listTriLength, areaMod);
+        RecastBuilderResult result = new RecastBuilder().build(geomProvider, bcfg, listTriLength, areaMod);
         
         NavMeshDataCreateParamsBuilder navMeshDataCreateParamsBuilder = new NavMeshDataCreateParamsBuilder(result);
         PolyMesh m_pmesh = result.getMesh();
@@ -715,13 +698,15 @@ public class NavState extends BaseAppState {
             }
         }
         
-        //Must either set variables for parameters walkableHeight, 
-        //walkableRadius, walkableClimb manually for mesh data unless 
-        //jme3-recast4j fixed.
+        /**
+         * Must set variables for parameters walkableHeight, walkableRadius, 
+         * walkableClimb manually for mesh data unless jme3-recast4j fixed.
+         */
         NavMeshDataCreateParams params = navMeshDataCreateParamsBuilder.build(bcfg);
-//        params.walkableClimb = maxClimb; //Should add getter for this.
-//        params.walkableHeight = height; //Should add getter for this.
-//        params.walkableRadius = radius; //Should add getter for this.
+        params.walkableClimb = maxClimb; //Should add getter for this.
+        params.walkableHeight = height; //Should add getter for this.
+        params.walkableRadius = radius; //Should add getter for this.
+            
         MeshData meshData = NavMeshBuilder.createNavMeshData(params);
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
@@ -738,32 +723,16 @@ public class NavState extends BaseAppState {
         //Show wireframe. Helps with param tweaks. false = solid color.
         showDebugMeshes(meshData, true);
     }
-
-    /**
-     * Get all triangles from a mesh. Should open up jme3-recast4j existing 
-     * GeometryProviderBuilder method.
-     *
-     * @param mesh Mesh to get triangles from.
-     * @return Returns array of triangles.
-     */
-    private int[] getTriangles(Mesh mesh) {
-        int[] indices = new int[3];
-        int[] triangles = new int[mesh.getTriangleCount() * 3];
-
-        for (int i = 0; i < triangles.length; i += 3) {
-            mesh.getTriangle(i / 3, indices);
-            triangles[i] = indices[0];
-            triangles[i + 1] = indices[1];
-            triangles[i + 2] = indices[2];
-        }
-        return triangles;
-    }
     
+    //This example sets Area Type based off geometry of each individual mesh and 
+    //uses the custom RecastBuilder class.
     private void buildTiled() {
         
+        //Collect each geometry length of triangles to pass to buildTile.
         List<Integer> listTriLength = new ArrayList<>();
+        //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
-       
+
         SceneGraphVisitor visitor = new SceneGraphVisitor() {
 
             @Override
@@ -788,8 +757,7 @@ public class NavState extends BaseAppState {
                      * that are flagged as same connection and set the off mesh 
                      * connections programmatically. 
                      */
-                    String name = getModification(((Geometry) spat).getMaterial().getName());
-                    System.out.println(name);
+                    String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
                     
                     switch (name) {
                         
@@ -816,7 +784,7 @@ public class NavState extends BaseAppState {
         };
         
         ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
-        
+
         //Step 1. Gather our geometry.
         InputGeomProvider geomProvider = new GeometryProviderBuilder(worldMap).build();
         //Step 2. Create a Recast configuration object.
@@ -828,7 +796,7 @@ public class NavState extends BaseAppState {
                 //cs and ch should be .1 at min.
                 .withCellSize(0.1f)                 // cs=r/2
                 .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
-                .withAgentMaxClimb(.3f)   // > 2*ch
+                .withAgentMaxClimb(.3f)             // > 2*ch
                 .withAgentMaxSlope(45f)
                 .withEdgeMaxLen(3.2f)               // r*8
                 .withEdgeMaxError(1.3f)             // 1.1 - 1.5
@@ -837,8 +805,8 @@ public class NavState extends BaseAppState {
                 .withVertsPerPoly(3)
                 .withTileSize(16).build(); 
         // Build all tiles
-        RecastBuilder rb = new RecastBuilder2(new ProgressListen());
-        RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1);
+        RecastBuilder rb = new RecastBuilder(new ProgressListen());
+        RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1, listTriLength, areaMod);
         // Add tiles to nav mesh
         int tw = rcResult.length;
         int th = rcResult[0].length;
@@ -857,7 +825,6 @@ public class NavState extends BaseAppState {
                 if (pmesh.npolys == 0) {
                         continue;
                 }
-                
                 // Update poly flags from areas.
                 for (int i = 0; i < pmesh.npolys; ++i) {
                     if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
@@ -889,9 +856,9 @@ public class NavState extends BaseAppState {
                 params.detailVertsCount = dmesh.nverts;
                 params.detailTris = dmesh.tris;
                 params.detailTriCount = dmesh.ntris;
-                params.walkableHeight = cfg.walkableHeight;
-                params.walkableRadius = cfg.walkableRadius;
-                params.walkableClimb = cfg.walkableClimb;
+                params.walkableHeight = height;
+                params.walkableRadius = radius;
+                params.walkableClimb = maxClimb;
                 params.bmin = pmesh.bmin;
                 params.bmax = pmesh.bmax;
                 params.cs = cfg.cs;
@@ -913,13 +880,11 @@ public class NavState extends BaseAppState {
             MeshSetReader msr = new MeshSetReader();
             NavMesh navMeshFromSaved = msr.read(new FileInputStream("test.nm"), 3);
             int maxTiles = navMeshFromSaved.getMaxTiles();
-            System.out.println("Tile count " + navMeshFromSaved.getTileCount());
 
             //Tile data can be null since maxTiles is not an exact science.
             for (int i = 0; i < maxTiles; i++) {
                 MeshData meshdata = navMeshFromSaved.getTile(i).data;
 
-                System.out.println("Tile " + i);
                 if (meshdata != null ) {
                     showDebugMeshes(meshdata, true);
                 }
@@ -929,6 +894,46 @@ public class NavState extends BaseAppState {
         }
     }
     
+    /**
+     * Get all triangles from a mesh. Should open up jme3-recast4j existing 
+     * GeometryProviderBuilder method.
+     *
+     * @param mesh Mesh to get triangles from.
+     * @return Returns array of triangles.
+     */
+    private int[] getTriangles(Mesh mesh) {
+        int[] indices = new int[3];
+        int[] triangles = new int[mesh.getTriangleCount() * 3];
+
+        for (int i = 0; i < triangles.length; i += 3) {
+            mesh.getTriangle(i / 3, indices);
+            triangles[i] = indices[0];
+            triangles[i + 1] = indices[1];
+            triangles[i + 2] = indices[2];
+        }
+        return triangles;
+    }    
+    
+    /**
+     * Returns the first string after split "_" converted to lower case. 
+     * Expected use is for material names.
+     * 
+     * Example: 
+     *      road_asphalt = road
+     *      water_blue   = water
+     *      grass_green  = grass
+     * 
+     * @param str Material name to parse. 
+     * @return First returned string of split converted to lower case.
+     */
+    private String getAreaTypeFromMaterial(String str) {
+        String[] split = str.toLowerCase().split("_");
+        return split[0];
+    }
+    
+    /**
+     * Listener for build process of tiled builds.
+     */
     private class ProgressListen implements RecastBuilderProgressListener {
 
         private long time = System.nanoTime();
