@@ -508,121 +508,54 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
          * listAreaTris.
          */
         List<int[]> listMarkedTris = new ArrayList<>();
-        //Assure at least one pass of search.
-        do {
 
-            //Where we are in the node array.
-            int nodeIndex = 0;
-            //Previous area.
-            int prevArea = 0;
-            //Current area.
-            int indexOfArea = 0;
+        int prevArea = 0;
+        int[] nodeTri = new int[3];
+        int[] areaTri = new int[3];
+        boolean found;
+        List<Integer> listUnmarkedTris = new ArrayList<>();
 
-            int[] nodeTri = new int[3];
-            int[] areaTri = new int[3];
-            boolean found;
-            List<Integer> listUnmarkedTris = new ArrayList<>();
+        //Node triangles.
+        for (int i = 0; i < node_ntris; i++) {                            
 
-            //Node triangles.
-            for (int i = 0; i < node_ntris; i++) {                            
-                //We need this to know when we are at the end of this nodes 
-                //triangles so we can exit.
-                nodeIndex = i;
+            //Create a triangle from the node.
+            nodeTri[0] = node_tris[i*3];
+            nodeTri[1] = node_tris[i*3+1];
+            nodeTri[2] = node_tris[i*3+2];   
 
-                //Create a triangle from the node.
-                nodeTri[0] = node_tris[i*3];
-                nodeTri[1] = node_tris[i*3+1];
-                nodeTri[2] = node_tris[i*3+2];   
+            /**
+             * Search will start from first geometry and continue until we 
+             * find the triangle.
+             */
+            found = false;
 
-                /**
-                 * Search will start from first geometry and continue until we 
-                 * find the triangle.
-                 */
-                found = false;
+            //Area triangles.
+            for(int[] areaTris: listAreaTris) {
 
-                while(true) {
+                for (int j = 0; j < areaTris.length/3; j++) {
 
-                    //Area triangles.
-                    for(int[] areaTris: listAreaTris) {
+                    //Create triangle from the area.
+                    areaTri[0] = areaTris[j*3];
+                    areaTri[1] = areaTris[j*3+1];
+                    areaTri[2] = areaTris[j*3+2];
 
-                        //Track current area type.
-                        indexOfArea = listAreaTris.indexOf(areaTris);
+                    /**
+                     * If we find a matching triangle in this area, we are 
+                     * done with this group.
+                     */
+                    if (Arrays.equals(nodeTri, areaTri)) {
 
-                        for (int j = 0; j < areaTris.length/3; j++) {
-
-                            //Create triangle from the area.
-                            areaTri[0] = areaTris[j*3];
-                            areaTri[1] = areaTris[j*3+1];
-                            areaTri[2] = areaTris[j*3+2];
-
-                            /**
-                             * If we find a matching triangle in this area, we 
-                             * are done with this group.
-                             */
-                            if (Arrays.equals(nodeTri, areaTri)) {
-
-                                //Notify the outer loops we are done. 
-                                found = true;
-
-                                /**
-                                 * If the list still has elements and we are 
-                                 * here it means there is a check of the next 
-                                 * geometry going on and it may not be the same 
-                                 * area type so we need to mark these triangles 
-                                 * and clear the list for any new triangles that 
-                                 * may from come from this current geometry.
-                                 */
-                                if (listUnmarkedTris.size() > 0 && indexOfArea != prevArea) {
-
-                                    //Move unmarked tris into array.
-                                    int[] array = new int[listUnmarkedTris.size()];
-                                    for (int idx = 0; idx < array.length; idx++) {
-                                        array[idx] = listUnmarkedTris.get(idx);
-                                    }
-
-//                                    System.out.println("MARK AREA "  + prevArea 
-//                                            + " area mod " + areaMod.get(prevArea).getMaskedValue());
-
-                                    /**
-                                     * Mark the Area Type based on previous area 
-                                     * since we have a new triangle with possibly  
-                                     * different area type.
-                                     */
-                                    int[] m_triareas = Recast.markWalkableTriangles(
-                                            ctx, cfg.walkableSlopeAngle, verts, array, array.length/3,areaMod.get(prevArea));
-
-                                    //Add to the marked list.
-                                    listMarkedTris.add(m_triareas);
-
-                                    //Clear the unmarked list.
-                                    listUnmarkedTris.clear();
-                                }
-
-//                                System.out.println("FOUND nodeIndex " + nodeIndex 
-//                                        + " areaIndex " + j 
-//                                        +  " area " + listAreaTris.indexOf(areaTris) 
-//                                        + " area mod " + areaMod.get(listAreaTris.indexOf(areaTris)).getMaskedValue());
-
-                                //Add found triangle to the unmarked list.
-                                listUnmarkedTris.add(nodeTri[0]);
-                                listUnmarkedTris.add(nodeTri[1]);
-                                listUnmarkedTris.add(nodeTri[2]);
-
-                                //Track area changes.
-                                if (indexOfArea != prevArea) {
-                                    prevArea = indexOfArea;
-                                }
-                                break;
-                            }                                        
-                        }
+                        //Notify the outer loops we are done. 
+                        found = true;
 
                         /**
-                         * If we are here, we have reached the end 
-                         * of this nodes triangles so we need to 
-                         * mark unmarked triangles. We need to know 
-                         * the Area Type so do it here.
+                         * If the list still has elements and we are here it 
+                         * means there is a check of the next geometry going on 
+                         * and it may not be the same area type so we need to 
+                         * mark these triangles and clear the list for any new 
+                         * triangles that may from come from this current geometry.
                          */
-                        if (listUnmarkedTris.size() > 0 && nodeIndex == node_ntris - 1) {
+                        if (listUnmarkedTris.size() > 0 && listAreaTris.indexOf(areaTris) != prevArea) {
 
                             //Move unmarked tris into array.
                             int[] array = new int[listUnmarkedTris.size()];
@@ -630,45 +563,81 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                                 array[idx] = listUnmarkedTris.get(idx);
                             }
 
-//                            System.out.println("MARK AREA " + listAreaTris.indexOf(areaTris) 
-//                                    + " area mod " + areaMod.get(listAreaTris.indexOf(areaTris)).getMaskedValue());
+//                            System.out.println("MARK AREA "  + prevArea 
+//                                    + " area mod " + areaMod.get(prevArea).getMaskedValue());
 
                             /**
-                             * Mark the Area Type based on current area since we 
-                             * have reached the end of the nodes triangles.
+                             * Mark the Area Type based on previous area since 
+                             * we have a new triangle with possibly different 
+                             * area type.
                              */
                             int[] m_triareas = Recast.markWalkableTriangles(
-                                    ctx, cfg.walkableSlopeAngle, verts, array, array.length/3,areaMod.get(listAreaTris.indexOf(areaTris)));
-                            
+                                    ctx, cfg.walkableSlopeAngle, verts, array, array.length/3,areaMod.get(prevArea));
+
                             //Add to the marked list.
                             listMarkedTris.add(m_triareas);
-                            
+
                             //Clear the unmarked list.
                             listUnmarkedTris.clear();
                         }
 
-                        //If found, we are done with this node tri.
-                        if (found) {     
-                            break;
+//                        System.out.println("FOUND nodeIndex " + nodeIndex 
+//                                + " areaIndex " + j 
+//                                +  " area " + listAreaTris.indexOf(areaTris) 
+//                                + " area mod " + areaMod.get(listAreaTris.indexOf(areaTris)).getMaskedValue());
+
+                        //Add found triangle to the unmarked list.
+                        listUnmarkedTris.add(nodeTri[0]);
+                        listUnmarkedTris.add(nodeTri[1]);
+                        listUnmarkedTris.add(nodeTri[2]);
+
+                        //Track area changes.
+                        if (listAreaTris.indexOf(areaTris) != prevArea) {
+                            prevArea = listAreaTris.indexOf(areaTris);
                         }
+                        break;
+                    }                                        
+                }
+
+                /**
+                 * If we are here, we have reached the end of this nodes 
+                 * triangles so we need to mark unmarked triangles. We need to 
+                 * know the Area Type so do it here.
+                 */
+                if (listUnmarkedTris.size() > 0 && i == node_ntris - 1) {
+
+                    //Move unmarked tris into array.
+                    int[] array = new int[listUnmarkedTris.size()];
+                    for (int idx = 0; idx < array.length; idx++) {
+                        array[idx] = listUnmarkedTris.get(idx);
                     }
+
+//                    System.out.println("MARK AREA " + listAreaTris.indexOf(areaTris) 
+//                            + " area mod " + areaMod.get(listAreaTris.indexOf(areaTris)).getMaskedValue());
 
                     /**
-                     * If found, we are done with this node tri. By breaking out 
-                     * we will either advance to the  next tri or exit marking.
+                     * Mark the Area Type based on current area since we have 
+                     * reached the end of the nodes triangles.
                      */
-                    if (found) {
-                        break;
-                    }
+                    int[] m_triareas = Recast.markWalkableTriangles(
+                            ctx, cfg.walkableSlopeAngle, verts, array, array.length/3,areaMod.get(listAreaTris.indexOf(areaTris)));
+
+                    //Add to the marked list.
+                    listMarkedTris.add(m_triareas);
+
+                    //Clear the unmarked list.
+                    listUnmarkedTris.clear();
+                }
+
+                /**
+                 * If found, we are done with this node tri. By breaking out we 
+                 * will either advance to the  next tri or exit marking.
+                 */
+                if (found) {     
+                    break;
                 }
             }
-
-            //If we are here, we have reached the end of this nodes 
-            //triangles so exit.
-            if (nodeIndex == node_ntris - 1) {
-                break;
-            }
-        } while(true);
+        }
 
         //Prepare a new array to combine all marked triangles.
         int[] mergeArea = new int[node_ntris];
