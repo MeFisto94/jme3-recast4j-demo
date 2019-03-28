@@ -317,7 +317,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                  * Last, we merge all marked triangles into one array for 
                  * Rasterisation.
                  */
-                List<int[]> listMarkedTris = new ArrayList<>();
+                List<Integer> listMarkedTris = new ArrayList<>();
                 int[] nodeTri = new int[3];
                 int[] areaTri = new int[3];
 
@@ -353,17 +353,23 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                         /**
                          * We found that nodeTri matched areaTri so mark 
                          * Area Type which is represented by its areaTris 
-                         * index. We then break out of the loop to 
-                         * advance to the next node triangle to check. If no
+                         * index. This is a single triangle we are passing to 
+                         * markWalkableTriangles. We then break out of the loop 
+                         * to advance to the next node triangle to check. If no
                          * match was found for this group, we check the next 
                          * area and continue the search. 
                          */
                         if (found) {
-                            //Mark the triangle
+                            //Mark single triangle.
                             int[] m_triareas = Recast.markWalkableTriangles(
                                     ctx, cfg.walkableSlopeAngle, verts, nodeTri, nodeTri.length/3,areaMod.get(listAreaTris.indexOf(areaTris)));
-                            //Add marked triangle to the marked area listMarkedTris.
-                            listMarkedTris.add(m_triareas);
+                            
+                            /**
+                             * Add marked triangle area to the listMarkedTris.
+                             * We passed in a single triangle so there is only
+                             * one element in the array.
+                             */
+                            listMarkedTris.add(m_triareas[0]);
                             break;
                         }
                     }
@@ -372,11 +378,9 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
 
                 //Prepare a new array to combine all marked triangles.
                 int[] mergeArea = new int[node_ntris];
-                int length = 0;
                 //Copy each marked triangle into the new array.
-                for (int[] area: listMarkedTris) {
-                    System.arraycopy(area, 0, mergeArea, length, area.length);
-                    length += area.length;
+                for (int i = 0; i < mergeArea.length; i++) {
+                    mergeArea[i] = listMarkedTris.get(i);
                 }   
                                         
                 RecastRasterization.rasterizeTriangles(ctx, verts, node_tris, mergeArea, node_ntris, solid, cfg.walkableClimb);
