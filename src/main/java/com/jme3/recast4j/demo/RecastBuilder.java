@@ -400,12 +400,12 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                      * message to quickly identify fails. There should never be 
                      * one.
                      */
-                    if (!Arrays.equals(mergeArea, testAreaTypes(ctx, cfg, verts, node_tris, listAreaTris, areaMod ))) {
-                        System.out.println("TEST FAILED");
-                    }
-                    
-                    System.out.println("flagWhenFound " + Arrays.toString(mergeArea) 
-                            + " length " + mergeArea.length + "\n");
+//                    if (!Arrays.equals(mergeArea, testAreaTypes(ctx, cfg, verts, node_tris, listAreaTris, areaMod ))) {
+//                        System.out.println("TEST FAILED");
+//                    }
+//                    
+//                    System.out.println("flagWhenFound " + Arrays.toString(mergeArea) 
+//                            + " length " + mergeArea.length + "\n");
                 }
             } else {
 
