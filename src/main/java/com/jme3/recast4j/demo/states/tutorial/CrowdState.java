@@ -380,13 +380,13 @@ public class CrowdState extends BaseAppState {
         float[] ext = crowd.getQueryExtents();
 
         //Locate the nearest poly ref/pos.
-        FindNearestPolyResult nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
+        Result<FindNearestPolyResult> nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
 
-        if (nearest.getNearestRef() == 0) {
-            LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
+        if (!nearest.status.isSuccess() || nearest.result.getNearestRef() == 0) {
+            LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.result.getNearestRef());
         } else {
             //Sets all agent targets at same time.
-            crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
+            crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.result.getNearestPos()), nearest.result.getNearestRef());
         }
     }
     

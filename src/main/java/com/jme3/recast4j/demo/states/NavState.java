@@ -129,16 +129,17 @@ public class NavState extends BaseAppState {
                 
                 if (getCharacters().size() == 1) {
                     QueryFilter filter = new BetterDefaultQueryFilter();
-                    FindNearestPolyResult startPoly = query.findNearestPoly(getCharacters().get(0).getWorldTranslation().toArray(null), new float[]{1.0f, 1.0f, 1.0f}, filter);
-                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{1.0f, 1.0f, 1.0f}, filter);
-                    if (startPoly.getNearestRef() == 0 || endPoly.getNearestRef() == 0) {
+                    Result<FindNearestPolyResult> startPoly = query.findNearestPoly(getCharacters().get(0).getWorldTranslation().toArray(null), new float[]{1.0f, 1.0f, 1.0f}, filter);
+                    Result<FindNearestPolyResult> endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{1.0f, 1.0f, 1.0f}, filter);
+                    // Note: not isFailure() here, because isSuccess guarantees us, that the result isn't "RUNNING", which it could be if we only check it's not failure.
+                    if (!startPoly.status.isSuccess() || !endPoly.status.isSuccess() || startPoly.result.getNearestRef() == 0 || endPoly.result.getNearestRef() == 0) {
                         LOG.info("Neither Start or End reference can be 0. startPoly [{}] endPoly [{}]", startPoly, endPoly);
                         pathGeometries.forEach(Geometry::removeFromParent);
                     } else {
                         if (event.getButtonIndex() == MouseInput.BUTTON_LEFT) {
-                            findPathImmediately(getCharacters().get(0), filter, startPoly, endPoly);
+                            findPathImmediately(getCharacters().get(0), filter, startPoly.result, endPoly.result);
                         } else if (event.getButtonIndex() == MouseInput.BUTTON_RIGHT) {
-                            findPathSlicedPartial(getCharacters().get(0), filter, startPoly, endPoly);
+                            findPathSlicedPartial(getCharacters().get(0), filter, startPoly.result, endPoly.result);
                         }
                     }
                 }

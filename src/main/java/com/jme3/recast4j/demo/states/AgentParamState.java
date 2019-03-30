@@ -63,6 +63,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.recast4j.detour.FindNearestPolyResult;
 import org.recast4j.detour.NavMeshQuery;
+import org.recast4j.detour.Result;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.slf4j.Logger;
@@ -812,14 +813,14 @@ public class AgentParamState extends BaseAppState {
             LOG.info("setTarget             [{}]", target);
             
             //Locate the nearest poly ref/pos.
-            FindNearestPolyResult nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
+            Result<FindNearestPolyResult> nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
 
-            LOG.info("nearesPos             [{}] nearestRef [{}]", nearest.getNearestPos(), nearest.getNearestRef());
-            if (nearest.getNearestRef() == 0) {
-                LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
+            LOG.info("nearesPos             [{}] nearestRef [{}]", nearest.result.getNearestPos(), nearest.result.getNearestRef());
+            if (!nearest.status.isSuccess() || nearest.result.getNearestRef() == 0) {
+                LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.result.getNearestRef());
             } else {
                 //Sets all CrowdAgent targets at same time.
-                boolean requestMoveToTarget = crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
+                boolean requestMoveToTarget = crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.result.getNearestPos()), nearest.result.getNearestRef());
                 LOG.info("requestMoveToTarget   [{}]", requestMoveToTarget);
             }
             
