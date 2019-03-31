@@ -1001,6 +1001,8 @@ public class CrowdBuilderState extends BaseAppState {
                  */
                 updateFiltersList();
             }
+
+            crowd.setFormationHandler(null);
             
             //Add to CrowdManager, mapCrowds, and listBoxActiveCrowds.
             getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
