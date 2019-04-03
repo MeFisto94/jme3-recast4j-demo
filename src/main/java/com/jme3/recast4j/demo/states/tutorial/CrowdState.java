@@ -376,6 +376,7 @@ public class CrowdState extends BaseAppState {
      */
     public void setTarget(Vector3f target) {
 
+        /*
         //Get the query extent for this crowd.
         float[] ext = crowd.getQueryExtents();
 
@@ -387,7 +388,8 @@ public class CrowdState extends BaseAppState {
         } else {
             //Sets all agent targets at same time.
             crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.result.getNearestPos()), nearest.result.getNearestRef());
-        }
+        }*/
+        crowd.requestMoveToTarget(target);
     }
     
     private void addAgent(Vector3f location) {
