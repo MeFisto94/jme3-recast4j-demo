@@ -322,6 +322,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                 int[] areaTri = new int[3];
 
                 for (int i = 0; i < node_ntris; i++) {
+                    
                     //Create a triangle from the node.
                     nodeTri[0] = node_tris[i*3];
                     nodeTri[1] = node_tris[i*3+1];
@@ -407,7 +408,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
 //                    if (!Arrays.equals(mergeArea, testAreaTypes(ctx, cfg, verts, node_tris, listAreaTris, areaMod ))) {
 //                        System.out.println("TEST FAILED");
 //                    }
-//                    
+                    
 //                    System.out.println("flagWhenFound " + Arrays.toString(mergeArea) 
 //                            + " length " + mergeArea.length + "\n");
                 }
@@ -425,17 +426,17 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                 }
 
                 //Prepare a new array to combine all marked triangles.
-                int[] mergeTriArea = new int[ntris];
+                int[] mergeArea = new int[ntris];
                 int length = 0;
                 //Copy each marked triangle into the new array.
                 for (int[] area: listMarkedTris) {
-                    System.arraycopy(area, 0, mergeTriArea, length, area.length);
+                    System.arraycopy(area, 0, mergeArea, length, area.length);
                     length += area.length;
                 }
                 
 //                System.out.println("mergeArea " + Arrays.toString(mergeArea) + " length " + mergeArea.length + "\n");
                 
-                RecastRasterization.rasterizeTriangles(ctx, verts, tris, mergeTriArea, ntris, solid, cfg.walkableClimb);
+                RecastRasterization.rasterizeTriangles(ctx, verts, tris, mergeArea, ntris, solid, cfg.walkableClimb);
                 
 //                int[] controlGroup = Recast.markWalkableTriangles(ctx, cfg.walkableSlopeAngle, verts, tris, ntris,cfg.walkableAreaMod);
 //                System.out.println("controlGroup " + Arrays.toString(controlGroup) + " length " + controlGroup.length + "\n");
@@ -508,12 +509,12 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
          * listAreaTris.
          */
         List<int[]> listMarkedTris = new ArrayList<>();
+        List<Integer> listUnmarkedTris = new ArrayList<>();
 
         int prevArea = 0;
         int[] nodeTri = new int[3];
         int[] areaTri = new int[3];
         boolean found;
-        List<Integer> listUnmarkedTris = new ArrayList<>();
 
         //Node triangles.
         for (int i = 0; i < node_ntris; i++) {                            
@@ -553,7 +554,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                          * means there is a check of the next geometry going on 
                          * and it may not be the same area type so we need to 
                          * mark these triangles and clear the list for any new 
-                         * triangles that may from come from this current geometry.
+                         * triangles that may come from this current geometry.
                          */
                         if (listUnmarkedTris.size() > 0 && listAreaTris.indexOf(areaTris) != prevArea) {
 
@@ -647,7 +648,6 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
             System.arraycopy(area, 0, mergeArea, lengths, area.length);
             lengths += area.length;
         }
-
 
         System.out.println("flagUseArrays " + Arrays.toString(mergeArea) + " length " + mergeArea.length + "\n");
         

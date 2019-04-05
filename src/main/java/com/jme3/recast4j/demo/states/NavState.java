@@ -30,6 +30,7 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
+import com.jme3.bounding.BoundingBox;
 import com.jme3.collision.CollisionResults;
 import com.jme3.input.MouseInput;
 import com.jme3.input.event.MouseButtonEvent;
@@ -50,12 +51,19 @@ import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_GR
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_JUMP;
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_ROAD;
 import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_WATER;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DISABLED;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_JUMP;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
+import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
 import com.jme3.recast4j.demo.RecastBuilder;
+import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Mesh;
 import com.jme3.scene.Node;
 import com.jme3.scene.SceneGraphVisitor;
+import com.jme3.scene.SceneGraphVisitorAdapter;
 import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
@@ -69,7 +77,9 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.recast4j.detour.DefaultQueryFilter;
 import org.recast4j.detour.FindNearestPolyResult;
+import org.recast4j.detour.FindPolysAroundResult;
 import org.recast4j.detour.MeshData;
 import org.recast4j.detour.NavMesh;
 import org.recast4j.detour.NavMeshBuilder;
@@ -118,12 +128,16 @@ public class NavState extends BaseAppState {
 
     private static final Logger LOG = LoggerFactory.getLogger(NavState.class.getName());
     
-    private Node worldMap;
+    private Node worldMap, doorNode;
     private NavMesh navMesh;
     private NavMeshQuery query;
     private List<Node> characters;
     private List<Geometry> pathGeometries;
-
+    private PartitionType m_partitionType = PartitionType.WATERSHED;   
+    private float maxClimb = .3f; //Should add getter for this.
+    private float radius = 0.4f; //Should add getter for this.
+    private float height = 1.7f; //Should add getter for this.
+    
     public NavState() {
         pathGeometries = new ArrayList<>(64);
         characters = new ArrayList<>(64);  
@@ -164,7 +178,14 @@ public class NavState extends BaseAppState {
                 ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredBoxAt(ColorRGBA.Yellow, locOnMap.add(0f, 0.5f, 0f)));
                 
                 if (getCharacters().size() == 1) {
-                    QueryFilter filter = new BetterDefaultQueryFilter();
+                    DefaultQueryFilter filter = new BetterDefaultQueryFilter();
+                    
+                    int includeFlags = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
+                    filter.setIncludeFlags(includeFlags);
+                    
+                    int excludeFlags = SAMPLE_POLYFLAGS_DISABLED;
+                    filter.setExcludeFlags(excludeFlags);
+                    
                     FindNearestPolyResult startPoly = query.findNearestPoly(getCharacters().get(0).getWorldTranslation().toArray(null), new float[]{1.0f, 1.0f, 1.0f}, filter);
                     FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{1.0f, 1.0f, 1.0f}, filter);
                     if (startPoly.getNearestRef() == 0 || endPoly.getNearestRef() == 0) {
@@ -180,8 +201,223 @@ public class NavState extends BaseAppState {
                 }
             }
         });
+        
+        //If the doorNode in DemoApplication is not null, we will create doors.
+        doorNode = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("doorNode");
+        
+        /**
+         * This check will set any doors found in the doorNode open/closed flags
+         * by adding a lemur MouseEventControl to each door found. The click 
+         * method for the MouseEventControl will determine when and which flags
+         * to set for the door. It will notify the DoorSwingControl of which 
+         * animation to play based off the determination.
+         * 
+         * This is an all or none setting where either the door is open or 
+         * closed. 
+         */
+        if (doorNode != null) {
+                        
+            //Gather all doors from the doorNode.
+            List<Spatial> children = doorNode.getChildren();
+            
+            //Cycle through the list and add a MouseEventControl to each door.
+            for (Spatial child: children) {
+                
+                /**
+                 * We are adding the MouseEventControl to the doors hitBox not 
+                 * the door. It would be easier to use the door by turning 
+                 * hardware skinning off but for some reason it always throws an 
+                 * exception when doing so.
+                 */
+                Spatial hitBox = ((Node) child).getChild("collisionNode");
+
+                MouseEventControl.addListenersToSpatial(hitBox, new DefaultMouseListener() {
+
+                    @Override
+                    protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
+            
+                        LOG.info("<========== BEGIN Door MouseEventControl ==========>");
+
+                        /**
+                         * We have the worldmap and the doors using 
+                         * MouseEventControl. In certain circumstances, usually
+                         * when moving and clicking, click will return target as 
+                         * worldmap so we have to then use capture to get the 
+                         * proper spatial.
+                         */
+                        if (!target.getName().equals("collisionNode")) {
+                            LOG.info("Wrong target found [{}] parentName [{}].", target.getName(), target.getParent().getName());
+                            LOG.info("Switching to capture [{}] capture parent [{}].",capture.getName(), capture.getParent().getName());
+                            target = capture;
+                        }
+                        
+                        //The filter to use for this search.
+                        DefaultQueryFilter filter = new BetterDefaultQueryFilter();
+
+                        //Limit the search to only door flags.
+                        int includeFlags = SAMPLE_POLYFLAGS_DOOR;
+                        filter.setIncludeFlags(includeFlags);
+
+                        //Include everything.
+                        int excludeFlags = 0;                   
+                        filter.setExcludeFlags(excludeFlags);
+
+                        /**
+                         * Look for the largest radius to search for. This will 
+                         * make it possible to grab only one of a double door. 
+                         * The width of the door is preferred over thickness. 
+                         * The idea is to only return polys within the width of 
+                         * the door so in cases where there are double doors, 
+                         * only the selected door will open/close. This means 
+                         * doors with large widths should not be in range of 
+                         * other doors or the other doors polys will be included.
+                         * 
+                         * Searches take place from the origin of the attachment
+                         * node which should be the same as the doors origin.
+                         */
+                        BoundingBox bounds = (BoundingBox) target.getWorldBound();
+                        float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
+                        FindNearestPolyResult findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
+                        
+                        //No obj, no go.
+                        if (findNearestPoly.getNearestRef() == 0) {
+                            LOG.info("Reference 0. door findNearestPoly [{}]", findNearestPoly);
+                            return;
+                        }
+
+                        Result<FindPolysAroundResult> result = query.findPolysAroundCircle(findNearestPoly.getNearestRef(), findNearestPoly.getNearestPos(), maxXZ, filter);
+                        
+                        //Success
+                        if (result.succeeded()) {
+                            List<Long> m_polys = result.result.getRefs();
+                            
+//                            //May need these for something else eventually.
+//                            List<Long> m_parent = result.result.getParentRefs();
+//                            List<Float> m_costs = result.result.getCosts();
+                            
+                            /**
+                             * Store each poly and flag in a single object and 
+                             * add it to this list so we can later check they 
+                             * all have the same flag.
+                             */
+                            List<PolyAndFlag> listPolyAndFlag = new ArrayList<>();
+                            
+                            //The flags that say this door is open.
+                            int open = SAMPLE_POLYFLAGS_DOOR | SAMPLE_POLYFLAGS_WALK;
+                            
+                            //The flags that say this door is closed, i.e. open
+                            // flags and SAMPLE_POLYFLAGS_DISABLED
+                            int closed = open | SAMPLE_POLYFLAGS_DISABLED;
+                            
+                            /**
+                             * We iterate through the polys looking for the open
+                             * or closed flags.
+                             */
+                            for (long poly: m_polys) {
+
+                                LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyFlags(poly).result);
+                                printFlags(poly);
+                                                                    
+                                /**
+                                 * We look for closed or open doors and add the 
+                                 * poly id and flag to set for the poly to the 
+                                 * list. We will later check to see if all poly 
+                                 * flags are the same and act accordingly. If 
+                                 * the door is closed, we add the open flags, if 
+                                 * open, add the closed flags. 
+                                 */
+                                if (isBitSet(closed, navMesh.getPolyFlags(poly).result)) {
+                                    listPolyAndFlag.add(new PolyAndFlag(poly, open));
+                                } else if (isBitSet(open, navMesh.getPolyFlags(poly).result)) {
+                                    listPolyAndFlag.add(new PolyAndFlag(poly, closed));
+                                }
+                            }
+                            
+                            /**
+                             * Check that all poly flags for the door are either 
+                             * all open or all closed. This prevents changing 
+                             * door flags in circumstances where a user may be 
+                             * allowed to block open or closed doors with in 
+                             * game objects through tile caching. If the object 
+                             * was placed in such a way that not all polys in a 
+                             * door opening were blocked by the object, not 
+                             * checking if all polys had the same flag would 
+                             * allow bypassing the blocking object flag setting. 
+                             */
+                            boolean same = true;
+                            for (PolyAndFlag obj: listPolyAndFlag) {
+                                //If any flag does not match, were done.
+                                if (obj.getFlag() != listPolyAndFlag.get(0).getFlag()) {
+                                    same = false;
+                                    break;
+                                }
+                            }
+
+                            //If all flags match set door open/closed.
+                            if (same) {
+                                /**
+                                 * The door hit object is the child of a bone.
+                                 * We must find the top most parent to make sure 
+                                 * we find the DoorSwingControl. Stop the search 
+                                 * when we find that the parent is the doorNode.
+                                 * 
+                                 * With the way MouseEventControl works by 
+                                 * having target and capture spatials, sometimes
+                                 * the worldNode will be the target for an 
+                                 * unknown reason so if there is no check to 
+                                 * determine which node is target, this will 
+                                 * throw a null pointer exception because it 
+                                 * will travel up to the rootNode since that is 
+                                 * the parent of worldmap.
+                                 */
+                                Spatial door = target;
+                                while (door.getParent() != doorNode) {
+                                    door = door.getParent();
+                                }
+                                
+                                /**
+                                 * Assuming we have the top parent node for the 
+                                 * model, we then need to locate the 
+                                 * DoorSwingControl. If no control is found, we 
+                                 * do nothing.
+                                 */
+                                door.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+                                    @Override
+                                    public void visit(Node node) {
+                                        if (node.getControl(DoorSwingControl.class) != null) {
+                                            //Set the doorControl control.
+                                            DoorSwingControl doorControl = node.getControl(DoorSwingControl.class);
+                                            
+                                            //Set all obj flags.
+                                            for (PolyAndFlag obj: listPolyAndFlag) {
+                                                navMesh.setPolyFlags(obj.getPoly(), obj.getFlag());
+                                                LOG.info("<========== POST flag set Poly ID [{}] Flags [{}] ==========>", obj.getPoly(), navMesh.getPolyFlags(obj.getPoly()).result);
+                                                printFlags(obj.getPoly());
+                                            }
+                                            
+                                            /**
+                                             * All flags are the same so we only 
+                                             * need the first object.
+                                             */
+                                            if (listPolyAndFlag.get(0).getFlag() == (open)) {
+                                                //Open doorControl.
+                                                doorControl.setOpen(true);
+                                            } else {
+                                                //Close doorControl.
+                                                doorControl.setOpen(false);
+                                            }
+                                        }
+                                    }       
+                                });
+                            }
+                        }
+                        LOG.info("<========== END Door MouseEventControl Add ==========>");
+                    }
+                });
+            }
+        }
     }
-    
+        
     private void findPathImmediately(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
         Result<List<Long>> fpr = query.findPath(startPoly.getNearestRef(), endPoly.getNearestRef(), startPoly.getNearestPos(), endPoly.getNearestPos(), filter);
         if (fpr.succeeded()) {
@@ -324,6 +560,87 @@ public class NavState extends BaseAppState {
         ((SimpleApplication) getApplication()).getRootNode().attachChild(g);
         ((SimpleApplication) getApplication()).getRootNode().attachChild(gDetailed);
     }
+        
+    /**
+     * Returns the Location on the Map which is currently under the Cursor. 
+     * For this we use the Camera to project the point onto the near and far 
+     * plane (because we don'from have the depth information [map height]). Then 
+     * we can use this information to do a raycast, ideally the world is in 
+     * between those planes and we hit it at the correct place.
+     * 
+     * @return The Location on the Map
+     */
+    public Vector3f getLocationOnMap() {
+        Vector3f worldCoordsNear = getApplication().getCamera().getWorldCoordinates(getApplication().getInputManager().getCursorPosition(), 0);
+        Vector3f worldCoordsFar = getApplication().getCamera().getWorldCoordinates(getApplication().getInputManager().getCursorPosition(), 1);
+
+        // From closest at the camera to most far away
+        Ray mouseRay = new Ray(worldCoordsNear, worldCoordsFar.subtractLocal(worldCoordsNear).normalizeLocal());
+        CollisionResults cr = new CollisionResults();
+        worldMap.collideWith(mouseRay, cr);
+
+        if (cr.size() > 0) {
+            return cr.getClosestCollision().getContactPoint();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Helper method to place a colored box at a specific location and fill the pathGeometries list with it,
+     * so that later on we can remove all existing pathGeometries (from a previous path finding)
+     *
+     * @param color The color the box should have
+     * @param position The position where the box will be placed
+     * @return the box
+     */
+    public Geometry placeColoredBoxAt(ColorRGBA color, Vector3f position) {
+        Geometry result = new Geometry("Box", new Box(0.25f, 0.25f, 0.25f));
+        Material mat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        mat.setColor("Color", color);
+        result.setMaterial(mat);
+        result.setLocalTranslation(position);
+        pathGeometries.add(result);
+        return result;
+    }
+    
+    /**
+     * Helper method to place a colored line between two specific locations and fill the pathGeometries list with it,
+     * so that later on we can remove all existing pathGeometries (from a previous path finding)
+     *
+     * @param color The color the box should have
+     * @param from The position where the line starts
+     * @param to The position where the line is finished.
+     * @return the line
+     */
+    public Geometry placeColoredLineBetween(ColorRGBA color, Vector3f from, Vector3f to) {
+        Geometry result = new Geometry("Line", new Line(from, to));
+        Material mat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+        mat.setColor("Color", color);
+        mat.getAdditionalRenderState().setLineWidth(2f);
+        result.setMaterial(mat);
+        pathGeometries.add(result);
+        return result;
+    }
+    
+    @Override
+    protected void onDisable() {
+        //Called when the state was previously enabled but is now disabled 
+        //either because setEnabled(false) was called or the state is being 
+        //cleaned up.
+    }
+    
+    @Override
+    public void update(float tpf) {
+        //TODO: implement behavior during runtime
+    }
+
+    /**
+     * @return the characters
+     */
+    public List<Node> getCharacters() {
+        return characters;
+    }
     
     private void buildSolo() {
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
@@ -364,12 +681,7 @@ public class NavState extends BaseAppState {
         
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
     }
-    
-    private PartitionType m_partitionType = PartitionType.WATERSHED;   
-    private float maxClimb = .3f; //Should add getter for this.
-    private float radius = 0.4f; //Should add getter for this.
-    private float height = 1.7f; //Should add getter for this.
-    
+        
     //This example builds the mesh manually by skipping recastBuilder and most 
     //jme3-recast4j methods.
     private void buildSoloRecast4j() {
@@ -594,10 +906,11 @@ public class NavState extends BaseAppState {
         showDebugMeshes(meshData, true);
     }
     
-    //This example sets Area Type based off geometry of each individual mesh and 
-    //uses the custom RecastBuilder class with jme3-recast4j wrapper methods.
+    /**
+     * This example sets Area Type based off geometry of each individual mesh 
+     * and uses the custom RecastBuilder class with jme3-recast4j wrapper methods.
+     */
     private void buildSoloTest() {
-        
         
         //Collect each geometry length of triangles to pass to buildTile.
         List<Integer> listTriLength = new ArrayList<>();
@@ -671,8 +984,8 @@ public class NavState extends BaseAppState {
                         .withAgentMaxSlope(45f)         
                         .withEdgeMaxLen(2.4f)             // r*8
                         .withEdgeMaxError(1.3f)         // 1.1 - 1.5
-                        .withDetailSampleDistance(8.0f) // increase if exception
-                        .withDetailSampleMaxError(8.0f) // increase if exception
+                        .withDetailSampleDistance(1.0f) // increase to 8 if exception on level model
+                        .withDetailSampleMaxError(1.0f) // increase to 8 if exception on level model
                         .withVertsPerPoly(3).build());
         
         //Split up for testing.
@@ -741,7 +1054,6 @@ public class NavState extends BaseAppState {
                     //Load triangle lengths so we can pick them out from the 
                     //TriMesh later.
                     listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                    
                     /**
                      * Set Area Type based off materials in this case. UserData 
                      * can be added as a optional way to do this. UserData would 
@@ -758,7 +1070,7 @@ public class NavState extends BaseAppState {
                      * connections programmatically. 
                      */
                     String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
-                    
+
                     switch (name) {
                         
                         case "water":
@@ -825,7 +1137,7 @@ public class NavState extends BaseAppState {
                 if (pmesh.npolys == 0) {
                         continue;
                 }
-                // Update poly flags from areas.
+                // Update obj flags from areas.
                 for (int i = 0; i < pmesh.npolys; ++i) {
                     if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
                             || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
@@ -892,7 +1204,7 @@ public class NavState extends BaseAppState {
         }  catch (IOException ex) {
             LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
-    }
+    }    
     
     /**
      * Get all triangles from a mesh. Should open up jme3-recast4j existing 
@@ -929,6 +1241,45 @@ public class NavState extends BaseAppState {
     private String getAreaTypeFromMaterial(String str) {
         String[] split = str.toLowerCase().split("_");
         return split[0];
+    }
+    
+    /**
+     * Prints any polygons found flags to the log.
+     * 
+     * @param poly The polygon id to look for flags.
+     */
+    private void printFlags (long poly) {
+        if (isBitSet(SAMPLE_POLYFLAGS_DOOR, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("SAMPLE_POLYFLAGS_DOOR [{}]", SAMPLE_POLYFLAGS_DOOR);
+        }
+
+        if (isBitSet(SAMPLE_POLYFLAGS_WALK, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("SAMPLE_POLYFLAGS_WALK [{}]", SAMPLE_POLYFLAGS_WALK);
+        }
+
+        if (isBitSet(SAMPLE_POLYFLAGS_SWIM, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("SAMPLE_POLYFLAGS_SWIM [{}]" , SAMPLE_POLYFLAGS_SWIM);
+        }
+
+        if (isBitSet(SAMPLE_POLYFLAGS_JUMP, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("SAMPLE_POLYFLAGS_JUMP [{}]", SAMPLE_POLYFLAGS_JUMP);
+        }
+
+        if (isBitSet(SAMPLE_POLYFLAGS_DISABLED, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("SAMPLE_POLYFLAGS_DISABLED [{}]", SAMPLE_POLYFLAGS_DISABLED);
+        }
+        
+    }
+    
+    /**
+     * Checks whether a bit flag is set.
+     * 
+     * @param flag The flag to check for.
+     * @param flags The flags to check for the supplied flag.
+     * @return True if the supplied flag is set for the given flags.
+     */
+    private boolean isBitSet(int flag, int flags) {
+        return (flags & flag) == flag;
     }
     
     /**
@@ -982,86 +1333,34 @@ public class NavState extends BaseAppState {
         }
         
     }
-        
+    
     /**
-     * Returns the Location on the Map which is currently under the Cursor. 
-     * For this we use the Camera to project the point onto the near and far 
-     * plane (because we don'from have the depth information [map height]). Then 
-     * we can use this information to do a raycast, ideally the world is in 
-     * between those planes and we hit it at the correct place.
-     * 
-     * @return The Location on the Map
+     * Class to hold the obj id and flags for the MouseEventControl check that 
+ assures all flags are the same.
      */
-    public Vector3f getLocationOnMap() {
-        Vector3f worldCoordsNear = getApplication().getCamera().getWorldCoordinates(getApplication().getInputManager().getCursorPosition(), 0);
-        Vector3f worldCoordsFar = getApplication().getCamera().getWorldCoordinates(getApplication().getInputManager().getCursorPosition(), 1);
+    private class PolyAndFlag {
+        private long poly;
+        private int flag;
 
-        // From closest at the camera to most far away
-        Ray mouseRay = new Ray(worldCoordsNear, worldCoordsFar.subtractLocal(worldCoordsNear).normalizeLocal());
-        CollisionResults cr = new CollisionResults();
-        worldMap.collideWith(mouseRay, cr);
-
-        if (cr.size() > 0) {
-            return cr.getClosestCollision().getContactPoint();
-        } else {
-            return null;
+        public PolyAndFlag(long poly, int flag) {
+            this.poly = poly;
+            this.flag = flag;
         }
-    }
 
-    /**
-     * Helper method to place a colored box at a specific location and fill the pathGeometries list with it,
-     * so that later on we can remove all existing pathGeometries (from a previous path finding)
-     *
-     * @param color The color the box should have
-     * @param position The position where the box will be placed
-     * @return the box
-     */
-    public Geometry placeColoredBoxAt(ColorRGBA color, Vector3f position) {
-        Geometry result = new Geometry("Box", new Box(0.25f, 0.25f, 0.25f));
-        Material mat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-        mat.setColor("Color", color);
-        result.setMaterial(mat);
-        result.setLocalTranslation(position);
-        pathGeometries.add(result);
-        return result;
-    }
-    
-    /**
-     * Helper method to place a colored line between two specific locations and fill the pathGeometries list with it,
-     * so that later on we can remove all existing pathGeometries (from a previous path finding)
-     *
-     * @param color The color the box should have
-     * @param from The position where the line starts
-     * @param to The position where the line is finished.
-     * @return the line
-     */
-    public Geometry placeColoredLineBetween(ColorRGBA color, Vector3f from, Vector3f to) {
-        Geometry result = new Geometry("Line", new Line(from, to));
-        Material mat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
-        mat.setColor("Color", color);
-        mat.getAdditionalRenderState().setLineWidth(2f);
-        result.setMaterial(mat);
-        pathGeometries.add(result);
-        return result;
-    }
-    
-    @Override
-    protected void onDisable() {
-        //Called when the state was previously enabled but is now disabled 
-        //either because setEnabled(false) was called or the state is being 
-        //cleaned up.
-    }
-    
-    @Override
-    public void update(float tpf) {
-        //TODO: implement behavior during runtime
-    }
+        /**
+         * @return the obj
+         */
+        public long getPoly() {
+            return poly;
+        }
 
-    /**
-     * @return the characters
-     */
-    public List<Node> getCharacters() {
-        return characters;
+        /**
+         * @return the flag
+         */
+        public int getFlag() {
+            return flag;
+        }
+
     }
 
 }

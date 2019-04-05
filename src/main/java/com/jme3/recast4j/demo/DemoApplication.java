@@ -1,10 +1,13 @@
 package com.jme3.recast4j.demo;
 
+import com.jme3.anim.SkinningControl;
+import com.jme3.animation.SkeletonControl;
 import com.jme3.app.DebugKeysAppState;
 import com.jme3.app.LostFocusBehavior;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.StatsAppState;
 import com.jme3.audio.AudioListenerState;
+import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.control.BetterCharacterControl;
 import com.jme3.bullet.control.RigidBodyControl;
@@ -15,10 +18,12 @@ import com.jme3.light.AmbientLight;
 import com.jme3.light.DirectionalLight;
 import com.jme3.material.Material;
 import com.jme3.math.ColorRGBA;
+import com.jme3.math.FastMath;
+import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
-import com.jme3.post.FilterPostProcessor;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
+import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.states.AgentGridState;
 import com.jme3.recast4j.demo.states.AgentParamState;
@@ -31,8 +36,9 @@ import com.jme3.recast4j.demo.states.ThirdPersonCamState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
-import com.jme3.scene.plugins.gltf.ExtrasLoader;
-import com.jme3.scene.plugins.gltf.GltfModelKey;
+import com.jme3.scene.SceneGraphVisitorAdapter;
+import com.jme3.scene.Spatial;
+import com.jme3.scene.control.Control;
 import com.jme3.scene.shape.Box;
 import com.jme3.system.AppSettings;
 import com.jme3.texture.Texture2D;
@@ -42,7 +48,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class DemoApplication extends SimpleApplication {
-    private Node worldMap;
+    
+    private final Quaternion YAW180 = new Quaternion().fromAngleAxis(FastMath.PI, new Vector3f(0,1,0));
+    private Node worldMap, doorNode;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     
     public DemoApplication() {
@@ -81,16 +89,14 @@ public class DemoApplication extends SimpleApplication {
 //        loadNavMeshBox();
 //        loadNavMeshDune();
         loadJaime();
-//        loadNavMeshLevel();
-//        loadDoors();
-        loadPond();
-        loadPondSurface();
+        loadNavMeshLevel();
+//        loadPond();
+//        loadPondSurface();
 //        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
 
     private void setupWorld() {
-        worldMap = new Node();
-        worldMap.setName("worldmap");
+        worldMap = new Node("worldmap");
         getRootNode().attachChild(worldMap);
         
         BulletAppState bullet = new BulletAppState();
@@ -168,24 +174,142 @@ public class DemoApplication extends SimpleApplication {
 //        TangentBinormalGenerator.generate(worldMap.getMesh());
 //    }
 
+    /**
+     * Loads the room scene and adds, rotates, and moves the doors into place.
+     */
     private void loadNavMeshLevel() {  
-        Node level = (Node) getAssetManager().loadModel("Models/Level/recast_level.j3o"); 
+        Node level = (Node) getAssetManager().loadModel("Models/Level/recast_level.mesh.j3o"); 
         level.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(level);
         worldMap.attachChild(level);
+        
+        /**
+         * Create door node here since NavState checks the door node for null 
+         * to avoid trying to add MouseEventControl when no door node is used. 
+         * Like when loading different scenes such as the pond. The nodes name 
+         * is used for locating it as a child of rootNode.
+         */
+        doorNode = new Node("doorNode");
+        getRootNode().attachChild(doorNode);
+
+        /**
+         * Creating doors in blender with their origin at (0,0,0) is required.
+         * The findPolysAroundCircle method in MouseEventControl uses the doors 
+         * origin to localize the search for door polys so doors must be moved 
+         * into their final position. If you apply location in blender, then 
+         * findPolysAroundCircle would start the search from (0,0,0).
+         */
+        loadDoor(new Vector3f(-.39f, 0f, -10.03f), null);
+        loadDoor(new Vector3f(-15.49f, 2.7f, -2.23f), null);
+        loadDoor(new Vector3f(-21.49f, 2.7f, -2.23f), null);
+        loadDoor(new Vector3f(-22.51f, 2.7f, 2.23f), YAW180);
+        loadDoor(new Vector3f(-16.51f, 2.7f, 2.23f), YAW180);
     }
 
-    private void loadDoors() {
-        //gltf loader test
-        GltfModelKey modelKey = new GltfModelKey("Textures/Level/recast_door.gltf");
-        ExtrasLoader extras = new GltfUserDataLoader();
-        modelKey.setExtrasLoader(extras);
-        Node doors = (Node) getAssetManager().loadModel(modelKey);
-        doors.setName("doors");
-        doors.addControl(new RigidBodyControl(0));
-        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(doors);
-        getRootNode().attachChild(doors);
-    }    
+    /**
+     * Adds a door to the scene at the given location and rotation.
+     * 
+     * @param location Where to move the door to.
+     * @param rotation The doors rotation. A null value will keep the doors 
+     * current rotation.
+     */
+    private void loadDoor(Vector3f location, Quaternion rotation) {
+        
+        /**
+         * gltf loader test. This works but gltf doesn't when it comes to 
+         * exporting animations created in blender. Imported animations into 
+         * blender that are then exported do work however.
+         */
+//        GltfModelKey modelKey = new GltfModelKey("Textures/Level/Door.gltf");
+//        ExtrasLoader extras = new GltfUserDataLoader();
+//        modelKey.setExtrasLoader(extras);
+        
+        //Load a door.
+        Node door = (Node) getAssetManager().loadModel("Models/Level/Door.mesh.j3o");
+        door.setName("door");
+        
+        /**
+         * Couldn't get hardware skinning to turn off which would allow the 
+         * bounding box to move with the door as it opens or closes so added
+         * a hitBox to the root bone instead.
+         */
+        door.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+            @Override
+            public void visit(Node node) {
+
+                if (node.getControl(SkeletonControl.class) != null) {
+                    
+                    SkeletonControl skelControl = node.getControl(SkeletonControl.class);
+                    
+                    //Create a box shape with the same dimensions as the door.
+                    BoundingBox bounds = (BoundingBox) door.getWorldBound();
+                    Box boxMesh = new Box(bounds.getXExtent(),bounds.getYExtent(),bounds.getZExtent()); 
+                    
+                    //The geometry for the door.
+                    Geometry boxGeo = new Geometry("hitBox", boxMesh); 
+                    
+                    //The material.
+                    Material boxMat = new Material(getAssetManager(), "Common/MatDefs/Light/Lighting.j3md"); 
+                    boxMat.setBoolean("UseMaterialColors", true); 
+                    boxMat.setColor("Ambient", ColorRGBA.Green); 
+                    boxMat.setColor("Diffuse", ColorRGBA.Green); 
+                    boxGeo.setMaterial(boxMat); 
+                    //Toggle visibility.
+                    boxGeo.setCullHint(Spatial.CullHint.Always);
+                    
+                    //Center hitBox to door.
+                    boxGeo.setLocalTranslation(bounds.getCenter());
+                    
+                    /**
+                     * Create a node that will use the same origin as the root
+                     * bone which has the same origin as the door. This will 
+                     * keep the searches in MouseEventControl localized to this 
+                     * door.
+                     */
+                    Node collisionNode = new Node("collisionNode");
+                    collisionNode.attachChild(boxGeo);
+                    
+                    //Our root bone for the animations.
+                    skelControl.getAttachmentsNode("Root").attachChild(collisionNode);
+                }
+            }
+        });
+        
+        /**
+         * Creating doors in blender with their origin at (0,0,0) is required.
+         * The findPolysAroundCircle method in MouseEventControl uses the doors 
+         * origin to localize the search for door polys so doors must be moved 
+         * into their final position. If you apply location in blender, then 
+         * findPolysAroundCircle would start the search from (0,0,0).
+         */ 
+        door.setLocalTranslation(location);
+        
+        //Some doors need rotating.
+        if (rotation != null) {
+            door.setLocalRotation(rotation);
+        }
+        
+        //Add our animation swing control and attach to rootNode.
+        door.addControl(new DoorSwingControl());
+        doorNode.attachChild(door);
+    }      
+    
+    private <T extends Control> T findControl(Spatial s, Class<T> controlClass) {
+        T ctrl = s.getControl(controlClass);
+        if (ctrl != null) {
+            return ctrl;
+        }
+        if (s instanceof Node) {
+            Node n = (Node) s;
+            for (Spatial spatial : n.getChildren()) {
+                ctrl = findControl(spatial, controlClass);
+                if (ctrl != null) {
+                    return ctrl;
+                }
+            }
+        }
+        return null;
+    }
     
     private void loadJaime() {
         Node player = (Node) getAssetManager().loadModel("Models/Jaime/Jaime.j3o");

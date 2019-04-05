@@ -293,7 +293,7 @@ public class CrowdBuilderState extends BaseAppState {
         contFilters.setAlpha(1, false);
         contFilters.addChild(new Label("Query Filters"), "span 2"); 
         contFilters.addChild(new Label("Ability Flags"), "span 2");
-        contFilters.addChild(new Label("Inlude"));
+        contFilters.addChild(new Label("Include"));
         contFilters.addChild(new Label("Exclude"));
         contCrowd.addChild(contFilters, "growx, growy,top");
         

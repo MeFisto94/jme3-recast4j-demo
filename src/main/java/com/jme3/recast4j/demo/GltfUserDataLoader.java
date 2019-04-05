@@ -49,7 +49,9 @@ public class GltfUserDataLoader implements ExtrasLoader {
                 JsonObject ext = extras.getAsJsonObject();
                 for(Entry<String, JsonElement> element : ext.entrySet()) {
                     Spatial spatial = (Spatial) input;
-                    spatial.setUserData(element.getKey(), element.getValue().getAsString());
+                    if (element.getKey().equals("open")) {
+                        spatial.setUserData(element.getKey(), element.getValue().getAsBoolean());
+                    }
                 }
             }
         }
