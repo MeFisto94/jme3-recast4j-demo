@@ -40,35 +40,29 @@ import com.jme3.math.Ray;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.DetourUtils;
-import com.jme3.recast4j.Recast.GeometryProviderBuilder;
-import com.jme3.recast4j.Recast.NavMeshDataCreateParamsBuilder;
-import com.jme3.recast4j.Recast.RecastBuilderConfigBuilder;
-import com.jme3.recast4j.Recast.RecastConfigBuilder;
-import com.jme3.recast4j.Recast.RecastUtils;
-import com.jme3.recast4j.Recast.SampleAreaModifications;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_DOOR;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_GRASS;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_JUMP;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_ROAD;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_AREAMOD_WATER;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DISABLED;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_JUMP;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
+import com.jme3.recast4j.Recast.*;
+import com.jme3.recast4j.Recast.Utils.RecastUtils;
 import com.jme3.recast4j.demo.RecastBuilder;
-import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
-import com.jme3.scene.Geometry;
-import com.jme3.scene.Mesh;
+import com.jme3.scene.*;
 import com.jme3.scene.Node;
-import com.jme3.scene.SceneGraphVisitor;
-import com.jme3.scene.SceneGraphVisitorAdapter;
-import com.jme3.scene.Spatial;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Line;
 import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.MouseEventControl;
+import org.recast4j.detour.*;
+import org.recast4j.detour.io.MeshDataWriter;
+import org.recast4j.detour.io.MeshSetReader;
+import org.recast4j.detour.io.MeshSetWriter;
+import org.recast4j.recast.*;
+import org.recast4j.recast.RecastBuilder.RecastBuilderProgressListener;
+import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
+import org.recast4j.recast.RecastConstants.PartitionType;
+import org.recast4j.recast.geom.InputGeomProvider;
+import org.recast4j.recast.geom.TriMesh;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -77,47 +71,9 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.recast4j.detour.DefaultQueryFilter;
-import org.recast4j.detour.FindNearestPolyResult;
-import org.recast4j.detour.FindPolysAroundResult;
-import org.recast4j.detour.MeshData;
-import org.recast4j.detour.NavMesh;
-import org.recast4j.detour.NavMeshBuilder;
-import org.recast4j.detour.NavMeshDataCreateParams;
-import org.recast4j.detour.NavMeshParams;
-import org.recast4j.detour.NavMeshQuery;
-import org.recast4j.detour.QueryFilter;
-import org.recast4j.detour.Result;
-import org.recast4j.detour.Status;
-import org.recast4j.detour.StraightPathItem;
-import org.recast4j.detour.io.MeshDataWriter;
-import org.recast4j.detour.io.MeshSetReader;
-import org.recast4j.detour.io.MeshSetWriter;
-import org.recast4j.recast.AreaModification;
-import org.recast4j.recast.CompactHeightfield;
-import org.recast4j.recast.Context;
-import org.recast4j.recast.ContourSet;
-import org.recast4j.recast.Heightfield;
-import org.recast4j.recast.PolyMesh;
-import org.recast4j.recast.PolyMeshDetail;
-import org.recast4j.recast.Recast;
-import org.recast4j.recast.RecastArea;
-import org.recast4j.recast.RecastBuilder.RecastBuilderProgressListener;
-import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
-import org.recast4j.recast.RecastBuilderConfig;
-import org.recast4j.recast.RecastConfig;
-import org.recast4j.recast.RecastConstants;
-import org.recast4j.recast.RecastConstants.PartitionType;
-import org.recast4j.recast.RecastContour;
-import org.recast4j.recast.RecastFilter;
-import org.recast4j.recast.RecastMesh;
-import org.recast4j.recast.RecastMeshDetail;
-import org.recast4j.recast.RecastRasterization;
-import org.recast4j.recast.RecastRegion;
-import org.recast4j.recast.geom.InputGeomProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.recast4j.recast.geom.TriMesh;
+
+import static com.jme3.recast4j.Recast.SampleAreaModifications.*;
+import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import static org.recast4j.recast.RecastVectors.copy;
 
 /**
@@ -182,20 +138,21 @@ public class NavState extends BaseAppState {
                     
                     int includeFlags = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
                     filter.setIncludeFlags(includeFlags);
-                    
+
                     int excludeFlags = SAMPLE_POLYFLAGS_DISABLED;
                     filter.setExcludeFlags(excludeFlags);
                     
-                    FindNearestPolyResult startPoly = query.findNearestPoly(getCharacters().get(0).getWorldTranslation().toArray(null), new float[]{1.0f, 1.0f, 1.0f}, filter);
-                    FindNearestPolyResult endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{1.0f, 1.0f, 1.0f}, filter);
-                    if (startPoly.getNearestRef() == 0 || endPoly.getNearestRef() == 0) {
+                    Result<FindNearestPolyResult> startPoly = query.findNearestPoly(getCharacters().get(0).getWorldTranslation().toArray(null), new float[]{1.0f, 1.0f, 1.0f}, filter);
+                    Result<FindNearestPolyResult> endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{1.0f, 1.0f, 1.0f}, filter);
+                    // Note: not isFailure() here, because isSuccess guarantees us, that the result isn't "RUNNING", which it could be if we only check it's not failure.
+                    if (!startPoly.status.isSuccess() || !endPoly.status.isSuccess() || startPoly.result.getNearestRef() == 0 || endPoly.result.getNearestRef() == 0) {
                         LOG.info("Neither Start or End reference can be 0. startPoly [{}] endPoly [{}]", startPoly, endPoly);
                         pathGeometries.forEach(Geometry::removeFromParent);
                     } else {
                         if (event.getButtonIndex() == MouseInput.BUTTON_LEFT) {
-                            findPathImmediately(getCharacters().get(0), filter, startPoly, endPoly);
+                            findPathImmediately(getCharacters().get(0), filter, startPoly.result, endPoly.result);
                         } else if (event.getButtonIndex() == MouseInput.BUTTON_RIGHT) {
-                            findPathSlicedPartial(getCharacters().get(0), filter, startPoly, endPoly);
+                            findPathSlicedPartial(getCharacters().get(0), filter, startPoly.result, endPoly.result);
                         }
                     }
                 }
@@ -277,19 +234,19 @@ public class NavState extends BaseAppState {
                          */
                         BoundingBox bounds = (BoundingBox) target.getWorldBound();
                         float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
-                        FindNearestPolyResult findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
+                        Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
                         
                         //No obj, no go.
-                        if (findNearestPoly.getNearestRef() == 0) {
+                        if (!findNearestPoly.status.isSuccess() || findNearestPoly.result.getNearestRef() == 0) {
                             LOG.info("Reference 0. door findNearestPoly [{}]", findNearestPoly);
                             return;
                         }
 
-                        Result<FindPolysAroundResult> result = query.findPolysAroundCircle(findNearestPoly.getNearestRef(), findNearestPoly.getNearestPos(), maxXZ, filter);
+                        Result<FindPolysAroundResult> findPolysAroundCircle = query.findPolysAroundCircle(findNearestPoly.result.getNearestRef(), findNearestPoly.result.getNearestPos(), maxXZ, filter);
                         
                         //Success
-                        if (result.succeeded()) {
-                            List<Long> m_polys = result.result.getRefs();
+                        if (findPolysAroundCircle.status.isSuccess()) {
+                            List<Long> m_polys = findPolysAroundCircle.result.getRefs();
                             
 //                            //May need these for something else eventually.
 //                            List<Long> m_parent = result.result.getParentRefs();

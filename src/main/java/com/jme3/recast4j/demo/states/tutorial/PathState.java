@@ -99,17 +99,19 @@ public class PathState extends BaseAppState {
         float[] end = DetourUtils.toFloatArray(locOnMap);
         
         //Get closet poly for start position.
-        FindNearestPolyResult findPolyStart = query.findNearestPoly(start, extents, filter);
+        Result<FindNearestPolyResult> findPolyStart = query.findNearestPoly(start, extents, filter);
         //Get the closest poly for end position.
-        FindNearestPolyResult findPolyEnd = query.findNearestPoly(end, extents, filter);
+        Result<FindNearestPolyResult> findPolyEnd = query.findNearestPoly(end, extents, filter);
         
         //Get the references for the found polygons.
-        long startRef = findPolyStart.getNearestRef();
-        long endRef = findPolyEnd.getNearestRef();
+        long startRef = findPolyStart.result.getNearestRef();
+        long endRef = findPolyEnd.result.getNearestRef();
         
         //Get the points inside the polygon.
-        float[] startPos = findPolyStart.getNearestPos();
-        float[] endPos = findPolyEnd.getNearestPos();
+        float[] startPos = findPolyStart.result.getNearestPos();
+        float[] endPos = findPolyEnd.result.getNearestPos();
+
+        //@TODO: Check validity using findPolyStart.status.isSuccess()
 
         //Get list of polys along the path.
         Result<List<Long>> path = query.findPath(startRef, endRef, startPos, endPos, filter);

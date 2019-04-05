@@ -40,31 +40,15 @@ import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
 import com.jme3.recast4j.Detour.DetourUtils;
-import com.jme3.recast4j.Recast.GeometryProviderBuilder;
-import com.jme3.recast4j.Recast.NavMeshDataCreateParamsBuilder;
-import com.jme3.recast4j.Recast.RecastBuilderConfigBuilder;
-import com.jme3.recast4j.Recast.RecastConfigBuilder;
-import com.jme3.recast4j.Recast.RecastUtils;
-import com.jme3.recast4j.Recast.SampleAreaModifications;
+import com.jme3.recast4j.Recast.*;
+import com.jme3.recast4j.Recast.Utils.RecastUtils;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.states.CrowdBuilderState;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.shape.Box;
 import com.jme3.scene.shape.Torus;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.concurrent.TimeUnit;
-import org.recast4j.detour.FindNearestPolyResult;
-import org.recast4j.detour.MeshData;
-import org.recast4j.detour.NavMesh;
-import org.recast4j.detour.NavMeshBuilder;
-import org.recast4j.detour.NavMeshDataCreateParams;
-import org.recast4j.detour.NavMeshParams;
-import org.recast4j.detour.NavMeshQuery;
+import org.recast4j.detour.*;
 import org.recast4j.detour.crowd.CrowdAgent;
 import org.recast4j.detour.crowd.CrowdAgentParams;
 import org.recast4j.detour.crowd.ObstacleAvoidanceQuery.ObstacleAvoidanceParams;
@@ -72,16 +56,20 @@ import org.recast4j.detour.io.MeshDataReader;
 import org.recast4j.detour.io.MeshDataWriter;
 import org.recast4j.detour.io.MeshSetReader;
 import org.recast4j.detour.io.MeshSetWriter;
-import org.recast4j.recast.PolyMesh;
-import org.recast4j.recast.PolyMeshDetail;
-import org.recast4j.recast.RecastBuilder;
+import org.recast4j.recast.*;
 import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
-import org.recast4j.recast.RecastBuilderConfig;
-import org.recast4j.recast.RecastConfig;
-import static org.recast4j.recast.RecastVectors.copy;
 import org.recast4j.recast.geom.InputGeomProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.concurrent.TimeUnit;
+
+import static org.recast4j.recast.RecastVectors.copy;
 
 /**
  * A procedural example of creating a crowd. When running this state and the gui
@@ -388,18 +376,20 @@ public class CrowdState extends BaseAppState {
      */
     public void setTarget(Vector3f target) {
 
+        /*
         //Get the query extent for this crowd.
         float[] ext = crowd.getQueryExtents();
 
         //Locate the nearest poly ref/pos.
-        FindNearestPolyResult nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
+        Result<FindNearestPolyResult> nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
 
-        if (nearest.getNearestRef() == 0) {
-            LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.getNearestRef());
+        if (!nearest.status.isSuccess() || nearest.result.getNearestRef() == 0) {
+            LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.result.getNearestRef());
         } else {
             //Sets all agent targets at same time.
-            crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.getNearestPos()), nearest.getNearestRef());
-        }
+            crowd.requestMoveToTarget(DetourUtils.createVector3f(nearest.result.getNearestPos()), nearest.result.getNearestRef());
+        }*/
+        crowd.requestMoveToTarget(target);
     }
     
     private void addAgent(Vector3f location) {
