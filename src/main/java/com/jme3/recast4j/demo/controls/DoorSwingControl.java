@@ -44,7 +44,8 @@ import com.jme3.scene.control.Control;
 import java.io.IOException;
 
 /**
- *
+ * Controls the swing animation of doors.
+ * 
  * @author Robert
  */
 public class DoorSwingControl extends AbstractControl {
