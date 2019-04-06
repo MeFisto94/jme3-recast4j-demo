@@ -1319,5 +1319,5 @@ public class NavState extends BaseAppState {
         }
 
     }
-
+    
 }

@@ -30,6 +30,7 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
+import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
@@ -48,9 +49,12 @@ import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.recast4j.demo.layout.MigLayout;
 import com.jme3.recast4j.demo.states.AgentGridState.Grid;
 import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
+import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
+import com.simsilica.lemur.Button;
 import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
+import com.simsilica.lemur.Command;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.HAlignment;
@@ -61,7 +65,9 @@ import com.simsilica.lemur.TabbedPanel;
 import com.simsilica.lemur.TextField;
 import com.simsilica.lemur.core.VersionedReference;
 import com.simsilica.lemur.event.CursorEventControl;
+import com.simsilica.lemur.event.DefaultMouseListener;
 import com.simsilica.lemur.event.DragHandler;
+import com.simsilica.lemur.event.MouseEventControl;
 import com.simsilica.lemur.event.PopupState;
 import com.simsilica.lemur.list.DefaultCellRenderer;
 import com.simsilica.lemur.style.ElementId;
@@ -298,10 +304,28 @@ public class CrowdBuilderState extends BaseAppState {
         contCrowd.addChild(contFilters, "growx, growy,top");
         
         //Include-exclude
-        checkIncludeAll = contFilters.addChild(new Checkbox("ALL"));  
-        checkExcludeAll = contFilters.addChild(new Checkbox("ALL"));        
+        /**
+        * The purpose of adding MouseEventControl here is to only update the the 
+        * toggled Checkbox view, not the filter, in cases when they are just 
+        * toggling all or none for filters. 
+        * 
+        * We don't use a reference listener because there are other Versioned 
+        * References that set Checkboxes based on updating filters. These would 
+        * fire off again every time those references updated.
+        * 
+        * Preferred use would be to addClickCommands, but unfortunately the lemur 
+        * library is still outdated and uses type arguments that cause 
+        * "unchecked generic array creation for varargs" warnings. 
+        */        
+        checkIncludeAll = contFilters.addChild(new Checkbox("ALL")); 
+        MouseEventControl.addListenersToSpatial(checkIncludeAll, new CheckboxListen());
+        checkExcludeAll = contFilters.addChild(new Checkbox("ALL"));
+        MouseEventControl.addListenersToSpatial(checkExcludeAll, new CheckboxListen());
         checkIncludeNone = contFilters.addChild(new Checkbox("NONE"));
+        MouseEventControl.addListenersToSpatial(checkIncludeNone, new CheckboxListen());
         checkExcludeNone = contFilters.addChild(new Checkbox("NONE"));
+        MouseEventControl.addListenersToSpatial(checkExcludeNone, new CheckboxListen());
+        
         checkIncludeDisabled = contFilters.addChild(new Checkbox("DISABLED"));
         checkExcludeDisabled = contFilters.addChild(new Checkbox("DISABLED"));
         checkIncludeWalk = contFilters.addChild(new Checkbox("WALK"));
@@ -1414,8 +1438,8 @@ public class CrowdBuilderState extends BaseAppState {
             listBoxFilters.getModel().add((int) selected, filter);
         }
 
-        setCheckedFilters(listBoxFilters.getModel().get(selected).getIncludeFlags(), true);
-        setCheckedFilters(listBoxFilters.getModel().get(selected).getExcludeFlags(), false);
+        setCheckedFlags(listBoxFilters.getModel().get(selected).getIncludeFlags(), true);
+        setCheckedFlags(listBoxFilters.getModel().get(selected).getExcludeFlags(), false);
     }
     
     /**
@@ -1451,8 +1475,8 @@ public class CrowdBuilderState extends BaseAppState {
      */
     private void updateIncludeExclude() {
         Integer selection = listBoxFilters.getSelectionModel().getSelection();
-        setCheckedFilters(listBoxFilters.getModel().get(selection).getIncludeFlags(), true);
-        setCheckedFilters(listBoxFilters.getModel().get(selection).getExcludeFlags(), false);
+        setCheckedFlags(listBoxFilters.getModel().get(selection).getIncludeFlags(), true);
+        setCheckedFlags(listBoxFilters.getModel().get(selection).getExcludeFlags(), false);
     }
     
     /**
@@ -1461,26 +1485,25 @@ public class CrowdBuilderState extends BaseAppState {
      * @param filterFlags The filter flags to set.
      * @param includes If true, set include flags, false set exclude flags.
      */
-    private void setCheckedFilters(int filterFlags, boolean includes) {
+    public void setCheckedFlags(int filterFlags, boolean includes) {
         
         if (includes) {
             this.checkIncludeNone.setChecked(filterFlags == 0);
-            this.checkIncludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
             this.checkIncludeDisabled.setChecked(isBitSet(SAMPLE_POLYFLAGS_DISABLED, filterFlags));
             this.checkIncludeDoor.setChecked(isBitSet(SAMPLE_POLYFLAGS_DOOR, filterFlags));
             this.checkIncludeJump.setChecked(isBitSet(SAMPLE_POLYFLAGS_JUMP, filterFlags));
             this.checkIncludeSwim.setChecked(isBitSet(SAMPLE_POLYFLAGS_SWIM, filterFlags));
             this.checkIncludeWalk.setChecked(isBitSet(SAMPLE_POLYFLAGS_WALK, filterFlags));
+            this.checkIncludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
         } else {
             this.checkExcludeNone.setChecked(filterFlags == 0);
-            this.checkExcludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
             this.checkExcludeDisabled.setChecked(isBitSet(SAMPLE_POLYFLAGS_DISABLED, filterFlags));
             this.checkExcludeDoor.setChecked(isBitSet(SAMPLE_POLYFLAGS_DOOR, filterFlags));
             this.checkExcludeJump.setChecked(isBitSet(SAMPLE_POLYFLAGS_JUMP, filterFlags));
             this.checkExcludeSwim.setChecked(isBitSet(SAMPLE_POLYFLAGS_SWIM, filterFlags));
             this.checkExcludeWalk.setChecked(isBitSet(SAMPLE_POLYFLAGS_WALK, filterFlags));
+            this.checkExcludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
         }
-        
     }
     
     /**
@@ -1515,7 +1538,6 @@ public class CrowdBuilderState extends BaseAppState {
         if (checkIncludeJump.isChecked()) {
             includes |= SAMPLE_POLYFLAGS_JUMP;
         }
-        
         return includes;
     }
     
@@ -1660,4 +1682,38 @@ public class CrowdBuilderState extends BaseAppState {
         return -1;
     }
     
+    /**
+     * The purpose here is to only update the the toggled Checkbox view, not 
+     * the filter, in cases when they are just toggling all or none for filters. 
+     * 
+     * We don't use a reference listener because there are other Versioned 
+     * References that set Checkboxes based on updating filters. These would 
+     * fire off again every time those references updated.
+     * 
+     * Preferred use would be to addClickCommands, but unfortunately the lemur 
+     * library is still outdated and uses type arguments that cause 
+     * "unchecked generic array creation for varargs" warnings. 
+     */    
+    private class CheckboxListen extends DefaultMouseListener {
+        @Override
+        protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
+            if (target.equals(checkIncludeAll) ){
+                if (((Checkbox) target).isChecked()) {
+                    setCheckedFlags(SAMPLE_POLYFLAGS_ALL, true);
+                } 
+            } else if (target.equals(checkExcludeAll)) {
+                if (((Checkbox) target).isChecked()) {
+                    setCheckedFlags(SAMPLE_POLYFLAGS_ALL, false);
+                }                 
+            } else if (target.equals(checkIncludeNone)) {
+                if (((Checkbox) target).isChecked()) {
+                    setCheckedFlags(0, true);
+                }                
+            } else if (target.equals(checkExcludeNone)) {
+                if (((Checkbox) target).isChecked()) {
+                    setCheckedFlags(0, false);
+                }               
+            }
+        }
+    }
 }

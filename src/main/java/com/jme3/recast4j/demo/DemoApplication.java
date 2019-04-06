@@ -1,6 +1,5 @@
 package com.jme3.recast4j.demo;
 
-import com.jme3.anim.SkinningControl;
 import com.jme3.animation.SkeletonControl;
 import com.jme3.app.DebugKeysAppState;
 import com.jme3.app.LostFocusBehavior;
