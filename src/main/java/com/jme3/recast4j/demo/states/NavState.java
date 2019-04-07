@@ -612,7 +612,7 @@ public class NavState extends BaseAppState {
                 build(new RecastConfigBuilder()
                         .withAgentRadius(.3f)           // r
                         .withAgentHeight(1.7f)          // h
-                        //cs and ch should probably be .1 at hmin.
+                        //cs and ch should probably be .1 at min.
                         .withCellSize(.1f)              // cs=r/3
                         .withCellHeight(.1f)            // ch=cs 
                         .withAgentMaxClimb(.3f)         // > 2*ch
@@ -710,7 +710,7 @@ public class NavState extends BaseAppState {
         InputGeomProvider geomProvider = new GeometryProviderBuilder(
                 (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
 
-        //Get hmin/max bounds.
+        //Get min/max bounds.
         float[] bmin = geomProvider.getMeshBoundsMin();
         float[] bmax = geomProvider.getMeshBoundsMax();
         Context m_ctx = new Context();
@@ -720,7 +720,7 @@ public class NavState extends BaseAppState {
         RecastConfig cfg = builder
             .withAgentRadius(radius)            // r
             .withAgentHeight(height)            // h
-            //cs and ch should be .1 at hmin.
+            //cs and ch should be .1 at min.
             .withCellSize(0.1f)                 // cs=r/2
             .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
             .withAgentMaxClimb(maxClimb)        // > 2*ch
@@ -940,7 +940,7 @@ public class NavState extends BaseAppState {
                 build(new RecastConfigBuilder()
                         .withAgentRadius(.3f)           // r
                         .withAgentHeight(1.7f)          // h
-                        //cs and ch should probably be .1 at hmin.
+                        //cs and ch should probably be .1 at min.
                         .withCellSize(.1f)              // cs=r/3
                         .withCellHeight(.1f)            // ch=cs 
                         .withAgentMaxClimb(.3f)         // > 2*ch
@@ -1067,7 +1067,7 @@ public class NavState extends BaseAppState {
         RecastConfig cfg = builder
                 .withAgentRadius(.3f)       // r
                 .withAgentHeight(1.7f)       // h
-                //cs and ch should be .1 at hmin.
+                //cs and ch should be .1 at min.
                 .withCellSize(0.1f)                 // cs=r/2
                 .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
                 .withAgentMaxClimb(.3f)             // > 2*ch
