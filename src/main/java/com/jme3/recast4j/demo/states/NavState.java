@@ -146,7 +146,10 @@ public class NavState extends BaseAppState {
                     Result<FindNearestPolyResult> endPoly = query.findNearestPoly(DetourUtils.toFloatArray(locOnMap), new float[]{1.0f, 1.0f, 1.0f}, filter);
                     // Note: not isFailure() here, because isSuccess guarantees us, that the result isn't "RUNNING", which it could be if we only check it's not failure.
                     if (!startPoly.status.isSuccess() || !endPoly.status.isSuccess() || startPoly.result.getNearestRef() == 0 || endPoly.result.getNearestRef() == 0) {
-                        LOG.info("Neither Start or End reference can be 0. startPoly [{}] endPoly [{}]", startPoly, endPoly);
+                        LOG.error("Character findNearestPoly unsuccessful or getNearestRef is not > 0.");
+                        LOG.error("findNearestPoly startPoly [{}] getNearestRef [{}]", startPoly.status.isSuccess(), startPoly.result.getNearestRef());
+                        LOG.error("findNearestPoly endPoly [{}] getNearestRef [{}].", endPoly.status.isSuccess(), endPoly.result.getNearestRef());
+
                         pathGeometries.forEach(Geometry::removeFromParent);
                     } else {
                         if (event.getButtonIndex() == MouseInput.BUTTON_LEFT) {
@@ -236,9 +239,10 @@ public class NavState extends BaseAppState {
                         float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
                         Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
                         
-                        //No obj, no go.
+                        //No obj, no go. Fail most likely result of filter setting.
                         if (!findNearestPoly.status.isSuccess() || findNearestPoly.result.getNearestRef() == 0) {
-                            LOG.info("Reference 0. door findNearestPoly [{}]", findNearestPoly);
+                            LOG.error("Door findNearestPoly unsuccessful or getNearestRef is not > 0.");
+                            LOG.error("findNearestPoly [{}] getNearestRef [{}].", findNearestPoly.status, findNearestPoly.result.getNearestRef());
                             return;
                         }
 
@@ -301,13 +305,15 @@ public class NavState extends BaseAppState {
                              * checking if all polys had the same flag would 
                              * allow bypassing the blocking object flag setting. 
                              */
-                            boolean same = true;
+                            boolean same = false;
                             for (PolyAndFlag obj: listPolyAndFlag) {
                                 //If any flag does not match, were done.
                                 if (obj.getFlag() != listPolyAndFlag.get(0).getFlag()) {
+                                    LOG.info("All poly flags are not the same listPolyAndFlag.");
                                     same = false;
                                     break;
                                 }
+                                same = true;
                             }
 
                             //If all flags match set door open/closed.
@@ -606,7 +612,7 @@ public class NavState extends BaseAppState {
                 build(new RecastConfigBuilder()
                         .withAgentRadius(.3f)           // r
                         .withAgentHeight(1.7f)          // h
-                        //cs and ch should probably be .1 at min.
+                        //cs and ch should probably be .1 at hmin.
                         .withCellSize(.1f)              // cs=r/3
                         .withCellHeight(.1f)            // ch=cs 
                         .withAgentMaxClimb(.3f)         // > 2*ch
@@ -692,7 +698,7 @@ public class NavState extends BaseAppState {
                             areaMod.add(SAMPLE_AREAMOD_JUMP);
                             break;
                         default:
-                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
+                            areaMod.add(SAMPLE_AREAMOD_GROUND);
                     }
                 }
             }
@@ -704,7 +710,7 @@ public class NavState extends BaseAppState {
         InputGeomProvider geomProvider = new GeometryProviderBuilder(
                 (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
 
-        //Get min/max bounds.
+        //Get hmin/max bounds.
         float[] bmin = geomProvider.getMeshBoundsMin();
         float[] bmax = geomProvider.getMeshBoundsMax();
         Context m_ctx = new Context();
@@ -714,7 +720,7 @@ public class NavState extends BaseAppState {
         RecastConfig cfg = builder
             .withAgentRadius(radius)            // r
             .withAgentHeight(height)            // h
-            //cs and ch should be .1 at min.
+            //cs and ch should be .1 at hmin.
             .withCellSize(0.1f)                 // cs=r/2
             .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
             .withAgentMaxClimb(maxClimb)        // > 2*ch
@@ -723,7 +729,7 @@ public class NavState extends BaseAppState {
             .withEdgeMaxError(1.3f)             // 1.1 - 1.5
             .withDetailSampleDistance(8.0f)     // increase if exception
             .withDetailSampleMaxError(8.0f)     // increase if exception
-            .withWalkableAreaMod(SampleAreaModifications.SAMPLE_AREAMOD_GROUND)
+            .withWalkableAreaMod(SAMPLE_AREAMOD_GROUND)
             .withVertsPerPoly(3).build();
         
         RecastBuilderConfig bcfg = new RecastBuilderConfig(cfg, bmin, bmax);
@@ -773,7 +779,8 @@ public class NavState extends BaseAppState {
                 m_solid);
 
         RecastArea.erodeWalkableArea(m_ctx, cfg.walkableRadius, m_chf);
-
+ 
+        // (Optional) Mark areas.
         /*
          * ConvexVolume vols = m_geom->getConvexVolumes(); for (int i = 0; i < m_geom->getConvexVolumeCount(); ++i)
          * rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].nverts, vols[i].hmin, vols[i].hmax, (unsigned
@@ -803,15 +810,14 @@ public class NavState extends BaseAppState {
 
         //Set Ability flags.
         for (int i = 0; i < m_pmesh.npolys; ++i) {
-            if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
-              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
-              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
-            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
-            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                m_pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
-                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+            if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
+            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
+            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
+                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK;
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
+                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
+                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
             }
             if (m_pmesh.areas[i] > 0) {
                 m_pmesh.areas[i]--;
@@ -918,7 +924,7 @@ public class NavState extends BaseAppState {
                             areaMod.add(SAMPLE_AREAMOD_JUMP);
                             break;
                         default:
-                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
+                            areaMod.add(SAMPLE_AREAMOD_GROUND);
                     }
                 }
             }
@@ -934,7 +940,7 @@ public class NavState extends BaseAppState {
                 build(new RecastConfigBuilder()
                         .withAgentRadius(.3f)           // r
                         .withAgentHeight(1.7f)          // h
-                        //cs and ch should probably be .1 at min.
+                        //cs and ch should probably be .1 at hmin.
                         .withCellSize(.1f)              // cs=r/3
                         .withCellHeight(.1f)            // ch=cs 
                         .withAgentMaxClimb(.3f)         // > 2*ch
@@ -953,15 +959,14 @@ public class NavState extends BaseAppState {
         
         //Set Ability flags.
         for (int i = 0; i < m_pmesh.npolys; ++i) {
-            if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
-              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
-              || m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                navMeshDataCreateParamsBuilder.withPolyFlag(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK);
-            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                navMeshDataCreateParamsBuilder.withPolyFlag(i, SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM);
-            } else if (m_pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                navMeshDataCreateParamsBuilder.withPolyFlags(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
-                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR);
+            if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
+            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
+            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
+                navMeshDataCreateParamsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_WALK);
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
+                navMeshDataCreateParamsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_SWIM);
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
+                navMeshDataCreateParamsBuilder.withPolyFlags(i, SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
             }
             if (m_pmesh.areas[i] > 0) {
                 m_pmesh.areas[i]--;
@@ -1046,7 +1051,7 @@ public class NavState extends BaseAppState {
                             areaMod.add(SAMPLE_AREAMOD_JUMP);
                             break;
                         default:
-                            areaMod.add(SampleAreaModifications.SAMPLE_AREAMOD_GROUND);
+                            areaMod.add(SAMPLE_AREAMOD_GROUND);
                     }
                 }
             }
@@ -1062,7 +1067,7 @@ public class NavState extends BaseAppState {
         RecastConfig cfg = builder
                 .withAgentRadius(.3f)       // r
                 .withAgentHeight(1.7f)       // h
-                //cs and ch should be .1 at min.
+                //cs and ch should be .1 at hmin.
                 .withCellSize(0.1f)                 // cs=r/2
                 .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
                 .withAgentMaxClimb(.3f)             // > 2*ch
@@ -1096,15 +1101,14 @@ public class NavState extends BaseAppState {
                 }
                 // Update obj flags from areas.
                 for (int i = 0; i < pmesh.npolys; ++i) {
-                    if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
-                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
-                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
-                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
-                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
-                                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+                    if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
+                    ||  pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
+                    ||  pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
+                        pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK;
+                    } else if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
+                        pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
+                    } else if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
+                        pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
                     }
                     if (pmesh.areas[i] > 0) {
                         pmesh.areas[i]--;
@@ -1181,7 +1185,7 @@ public class NavState extends BaseAppState {
             triangles[i + 2] = indices[2];
         }
         return triangles;
-    }    
+    }  
     
     /**
      * Returns the first string after split "_" converted to lower case. 
