@@ -74,6 +74,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.jme3.recast4j.Recast.SampleAreaModifications.*;
 import com.jme3.recast4j.demo.controls.DoorSwingControl;
+import java.nio.FloatBuffer;
 import static org.recast4j.recast.RecastVectors.copy;
 
 /**
@@ -116,9 +117,9 @@ public class NavState extends BaseAppState {
     protected void onEnable() {
         worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
 //        buildSolo();
-        buildTiled();
+//        buildTiled();
 //        buildSoloRecast4j();
-//        buildSoloTest();
+        buildSoloTest();
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -817,10 +818,9 @@ public class NavState extends BaseAppState {
                 m_pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
                 m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
-            }
-            if (m_pmesh.areas[i] > 0) {
-                m_pmesh.areas[i]--;
-            }
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
+                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_JUMP;
+            }          
         }
 
         //Create detailed mesh for picking.
@@ -968,9 +968,8 @@ public class NavState extends BaseAppState {
                 paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_SWIM);
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
                 paramsBuilder.withPolyFlags(i, SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
-            }
-            if (m_pmesh.areas[i] > 0) {
-                m_pmesh.areas[i]--;
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
+                paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_JUMP);
             }
         }
         
@@ -1098,35 +1097,34 @@ public class NavState extends BaseAppState {
         
         for (int y = 0; y < th; y++) {
             for (int x = 0; x < tw; x++) {
-                PolyMesh pmesh = rcResult[x][y].getMesh();
-                if (pmesh.npolys == 0) {
+                PolyMesh m_pmesh = rcResult[x][y].getMesh();
+                if (m_pmesh.npolys == 0) {
                         continue;
                 }
                 // Update obj flags from areas. Including offmesh connections.
-                for (int i = 0; i < pmesh.npolys; ++i) {
-                    if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
-                    ||  pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
-                    ||  pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                        pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK;
-                    } else if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                        pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
-                    } else if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                        pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
-                    }
-                    if (pmesh.areas[i] > 0) {
-                        pmesh.areas[i]--;
+                for (int i = 0; i < m_pmesh.npolys; ++i) {
+                    if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
+                    ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
+                    ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
+                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK;
+                    } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
+                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
+                    } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
+                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
+                    } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
+                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_JUMP;
                     }
                 }
                 
                 NavMeshDataCreateParams params = new NavMeshDataCreateParams();
                 
-                params.verts = pmesh.verts;
-                params.vertCount = pmesh.nverts;
-                params.polys = pmesh.polys;
-                params.polyAreas = pmesh.areas;
-                params.polyFlags = pmesh.flags;
-                params.polyCount = pmesh.npolys;
-                params.nvp = pmesh.nvp;
+                params.verts = m_pmesh.verts;
+                params.vertCount = m_pmesh.nverts;
+                params.polys = m_pmesh.polys;
+                params.polyAreas = m_pmesh.areas;
+                params.polyFlags = m_pmesh.flags;
+                params.polyCount = m_pmesh.npolys;
+                params.nvp = m_pmesh.nvp;
                 PolyMeshDetail dmesh = rcResult[x][y].getMeshDetail();
                 params.detailMeshes = dmesh.meshes;
                 params.detailVerts = dmesh.verts;
@@ -1136,16 +1134,13 @@ public class NavState extends BaseAppState {
                 params.walkableHeight = height;
                 params.walkableRadius = radius;
                 params.walkableClimb = maxClimb;
-                params.bmin = pmesh.bmin;
-                params.bmax = pmesh.bmax;
+                params.bmin = m_pmesh.bmin;
+                params.bmax = m_pmesh.bmax;
                 params.cs = cfg.cs;
                 params.ch = cfg.ch;
                 params.tileX = x;
                 params.tileY = y;
                 params.buildBvTree = true;
-                
-                //Create offmesh connections here.
-
                 
                 navMesh.addTile(NavMeshBuilder.createNavMeshData(params), 0, 0);
             }
@@ -1164,17 +1159,16 @@ public class NavState extends BaseAppState {
 
             //Tile data can be null since maxTiles is not an exact science.
             for (int i = 0; i < maxTiles; i++) {
-                MeshData meshdata = navMeshFromSaved.getTile(i).data;
-
-                if (meshdata != null ) {
-                    showDebugMeshes(meshdata, true);
+                MeshData meshData = navMeshFromSaved.getTile(i).data;
+                if (meshData != null ) {
+                    showDebugMeshes(meshData, true);
                 }
             }
         }  catch (IOException ex) {
             LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
-    }    
-    
+    }  
+
     /**
      * Get all triangles from a mesh. Should open up jme3-recast4j existing 
      * GeometryProviderBuilder method.
