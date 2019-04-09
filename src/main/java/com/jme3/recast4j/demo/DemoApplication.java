@@ -88,9 +88,10 @@ public class DemoApplication extends SimpleApplication {
 //        loadNavMeshBox();
 //        loadNavMeshDune();
         loadJaime();
-        loadNavMeshLevel();
-//        loadPond();
-//        loadPondSurface();
+//        loadNavMeshLevel();
+        loadPond();
+        loadPondSurface();
+        loadCrate();
 //        getStateManager().getState(BulletAppState.class).setDebugEnabled(true);
     }
 
@@ -346,6 +347,13 @@ public class DemoApplication extends SimpleApplication {
         surface.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(surface);
         worldMap.attachChild(surface);
+    }
+    
+    private void loadCrate() {
+        Node Crate = (Node) getAssetManager().loadModel("Models/Crate/Crate.mesh.j3o");
+        Crate.setName("crate");
+        Crate.setLocalTranslation(4, 0f, 0);
+        worldMap.attachChild(Crate);
     }
     
     private ActionListener actionListener = new ActionListener() {

@@ -236,7 +236,9 @@ public class NavState extends BaseAppState {
                          * node which should be the same as the doors origin.
                          */
                         BoundingBox bounds = (BoundingBox) target.getWorldBound();
-                        float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
+//                        float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
+                        float maxXZ =30f;
+
                         Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
                         
                         //No obj, no go. Fail most likely result of filter setting.
@@ -775,17 +777,15 @@ public class NavState extends BaseAppState {
         RecastFilter.filterLedgeSpans(m_ctx, cfg.walkableHeight, cfg.walkableClimb, m_solid);
         RecastFilter.filterWalkableLowHeightSpans(m_ctx, cfg.walkableHeight, m_solid);
 
-        CompactHeightfield m_chf = Recast.buildCompactHeightfield(m_ctx, cfg.walkableHeight, cfg.walkableClimb,
-                m_solid);
+        CompactHeightfield m_chf = Recast.buildCompactHeightfield(m_ctx, cfg.walkableHeight, cfg.walkableClimb, m_solid);
 
         RecastArea.erodeWalkableArea(m_ctx, cfg.walkableRadius, m_chf);
  
-        // (Optional) Mark areas.
-        /*
-         * ConvexVolume vols = m_geom->getConvexVolumes(); for (int i = 0; i < m_geom->getConvexVolumeCount(); ++i)
-         * rcMarkConvexPolyArea(m_ctx, vols[i].verts, vols[i].nverts, vols[i].hmin, vols[i].hmax, (unsigned
-         * char)vols[i].area, *m_chf);
-         */
+//        // (Optional) Mark areas.
+//        List<ConvexVolume> vols = geomProvider.getConvexVolumes(); 
+//        for (ConvexVolume convexVolume: vols) { 
+//            RecastArea.markConvexPolyArea(m_ctx, convexVolume.verts, convexVolume.hmin, convexVolume.hmax, convexVolume.areaMod, m_chf);
+//        }
 
         if (m_partitionType == PartitionType.WATERSHED) {
             // Prepare for region partitioning, by calculating distance field
@@ -829,7 +829,7 @@ public class NavState extends BaseAppState {
                 cfg.detailSampleMaxError);
         
         NavMeshDataCreateParams params = new NavMeshDataCreateParams();
-
+        
         params.verts = m_pmesh.verts;
         params.vertCount = m_pmesh.nverts;
         params.polys = m_pmesh.polys;
@@ -850,6 +850,8 @@ public class NavState extends BaseAppState {
         params.cs = cfg.cs; 
         params.ch = cfg.ch;
         params.buildBvTree = true;
+        
+        //Create offmesh connections here.
         
         MeshData meshData = NavMeshBuilder.createNavMeshData(params);
         navMesh = new NavMesh(meshData, params.nvp, 0);
@@ -948,36 +950,38 @@ public class NavState extends BaseAppState {
                         .withEdgeMaxLen(2.4f)             // r*8
                         .withEdgeMaxError(1.3f)         // 1.1 - 1.5
                         .withDetailSampleDistance(1.0f) // increase to 8 if exception on level model
-                        .withDetailSampleMaxError(1.0f) // increase to 8 if exception on level model
+                        .withDetailSampleMaxError(8.0f) // increase to 8 if exception on level model
                         .withVertsPerPoly(3).build());
         
         //Split up for testing.
         RecastBuilderResult result = new RecastBuilder().build(geomProvider, bcfg, listTriLength, areaMod);
         
-        NavMeshDataCreateParamsBuilder navMeshDataCreateParamsBuilder = new NavMeshDataCreateParamsBuilder(result);
+        NavMeshDataCreateParamsBuilder paramsBuilder = new NavMeshDataCreateParamsBuilder(result);
         PolyMesh m_pmesh = result.getMesh();
         
-        //Set Ability flags.
+        //Set Ability flags. Includung offmesh connection flags.
         for (int i = 0; i < m_pmesh.npolys; ++i) {
             if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
             ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
             ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                navMeshDataCreateParamsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_WALK);
+                paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_WALK);
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                navMeshDataCreateParamsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_SWIM);
+                paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_SWIM);
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                navMeshDataCreateParamsBuilder.withPolyFlags(i, SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
+                paramsBuilder.withPolyFlags(i, SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
             }
             if (m_pmesh.areas[i] > 0) {
                 m_pmesh.areas[i]--;
             }
         }
         
+        //Create offmesh connections here.
+        NavMeshDataCreateParams params = paramsBuilder.build(bcfg);
+        
         /**
          * Must set variables for parameters walkableHeight, walkableRadius, 
          * walkableClimb manually for mesh data unless jme3-recast4j fixed.
          */
-        NavMeshDataCreateParams params = navMeshDataCreateParamsBuilder.build(bcfg);
         params.walkableClimb = maxClimb; //Should add getter for this.
         params.walkableHeight = height; //Should add getter for this.
         params.walkableRadius = radius; //Should add getter for this.
@@ -1099,7 +1103,7 @@ public class NavState extends BaseAppState {
                 if (pmesh.npolys == 0) {
                         continue;
                 }
-                // Update obj flags from areas.
+                // Update obj flags from areas. Including offmesh connections.
                 for (int i = 0; i < pmesh.npolys; ++i) {
                     if (pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
                     ||  pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
@@ -1116,6 +1120,7 @@ public class NavState extends BaseAppState {
                 }
                 
                 NavMeshDataCreateParams params = new NavMeshDataCreateParams();
+                
                 params.verts = pmesh.verts;
                 params.vertCount = pmesh.nverts;
                 params.polys = pmesh.polys;
@@ -1139,6 +1144,10 @@ public class NavState extends BaseAppState {
                 params.tileX = x;
                 params.tileY = y;
                 params.buildBvTree = true;
+                
+                //Create offmesh connections here.
+
+                
                 navMesh.addTile(NavMeshBuilder.createNavMeshData(params), 0, 0);
             }
         }
