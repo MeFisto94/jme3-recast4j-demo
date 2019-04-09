@@ -236,8 +236,7 @@ public class NavState extends BaseAppState {
                          * node which should be the same as the doors origin.
                          */
                         BoundingBox bounds = (BoundingBox) target.getWorldBound();
-//                        float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
-                        float maxXZ =30f;
+                        float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
 
                         Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
                         
@@ -959,7 +958,7 @@ public class NavState extends BaseAppState {
         NavMeshDataCreateParamsBuilder paramsBuilder = new NavMeshDataCreateParamsBuilder(result);
         PolyMesh m_pmesh = result.getMesh();
         
-        //Set Ability flags. Includung offmesh connection flags.
+        //Set Ability flags. Including offmesh connection flags.
         for (int i = 0; i < m_pmesh.npolys; ++i) {
             if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
             ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS

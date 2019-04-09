@@ -352,7 +352,7 @@ public class DemoApplication extends SimpleApplication {
     private void loadCrate() {
         Node Crate = (Node) getAssetManager().loadModel("Models/Crate/Crate.mesh.j3o");
         Crate.setName("crate");
-        Crate.setLocalTranslation(4, 0f, 0);
+        Crate.setLocalTranslation(4.0f, 0.0f, 0.0f);
         worldMap.attachChild(Crate);
     }
     
