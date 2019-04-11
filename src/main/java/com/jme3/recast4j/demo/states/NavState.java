@@ -1085,7 +1085,7 @@ public class NavState extends BaseAppState {
                 .withDetailSampleDistance(6.0f)     // increase if exception
                 .withDetailSampleMaxError(6.0f)     // increase if exception
                 .withVertsPerPoly(3)
-                .withTileSize(64).build(); 
+                .withTileSize(16).build(); 
         // Build all tiles
         RecastBuilder rb = new RecastBuilder(new ProgressListen());
         RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1, listTriLength, areaMod);
@@ -1202,9 +1202,14 @@ public class NavState extends BaseAppState {
         
         ArrayList<Float> listVerts = new ArrayList<>();
         
+        /**
+         * If the poly area type equals the supplied area type, add vertice to 
+         * listVerts. 
+         */
         for (Poly p: meshData.polys) {            
             if (p.getArea()== areaType) {
                 for (int idx: p.verts) {
+                    //Triangle so idx + 0-2.
                     float vertX = meshData.verts[idx * 3];
                     listVerts.add(vertX);
                     float vertY = meshData.verts[idx * 3 + 1];
@@ -1215,46 +1220,68 @@ public class NavState extends BaseAppState {
             }
         }
         
+        // If the list is empty, do nothing.
         if (!listVerts.isEmpty()) {
+            //Prepare to add found verts from listVerts.
             float[] verts = new float[listVerts.size()];
             
+            //Populate the verts array.
             for (int i = 0; i < verts.length; i++) {
                 verts[i] = listVerts.get(i);
             }
             
+            //Create the mesh FloatBuffer.
             FloatBuffer floatBuffer = BufferUtils.createFloatBuffer(verts);
 
+            /**
+             * As always, there are three vertices per triangle so set size 
+             * accordingly.
+             */
             int[] indexes = new int[verts.length/3];
+            
+            /**
+             * Since we populated the listVerts by order found, indices will be
+             * in order from 0 to verts.length -1. 
+             */
             for(int i = 0; i < indexes.length; i++) {
                 indexes[i] = i;
             }  
             
-            int colorIndex = 0;
-            float[] colorArray = new float[indexes.length * 4];             
+            //Create the index buffer.
             IntBuffer indexBuffer = BufferUtils.createIntBuffer(indexes);
 
-            for (Integer idx: indexes) {
-                indexBuffer.put(idx);
+            //Prepare to set vertex colors based off area type.
+            int colorIndex = 0;
+            //Create the float array for the color buffer.
+            float[] colorArray = new float[indexes.length * 4];             
+
+            //Populate the colorArray based off area type.
+            for (int i = 0; i < indexes.length; i++) {
                 colorArray[colorIndex++]= areaToCol(areaType).getRed();
                 colorArray[colorIndex++]= areaToCol(areaType).getGreen();
                 colorArray[colorIndex++]= areaToCol(areaType).getBlue();
                 colorArray[colorIndex++]= 1.0f;
             }
             
+            //Set the buffers for the mesh.
             Mesh mesh = new Mesh();
             mesh.setBuffer(VertexBuffer.Type.Position, 3, floatBuffer);
             mesh.setBuffer(VertexBuffer.Type.Index, 3, indexBuffer);
             mesh.setBuffer(VertexBuffer.Type.Color, 4, colorArray);
             mesh.updateBound();
 
+            //Build the geometry for the mesh.
             Geometry geo = new Geometry ("ColoredMesh", mesh); 
             Material mat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
             mat.setBoolean("VertexColor", true);
         
+            //Set wireframe or solid.
             mat.getAdditionalRenderState().setWireframe(wireFrame);
             geo.setMaterial(mat);
+            //Move to just above surface.
             geo.move(0f, 0.125f, 0f);
 
+            //Add to root node.
             ((SimpleApplication) getApplication()).getRootNode().attachChild(geo);
         } 
         
@@ -1268,31 +1295,31 @@ public class NavState extends BaseAppState {
      */
     private ColorRGBA areaToCol(int area) {
         
-        // Ground (0) : light blue
+        //Ground (1): light blue
         if (area == SAMPLE_POLYAREA_TYPE_GROUND) {
             return new ColorRGBA(0.0f, 0.75f, 1.0f, 1.0f);
         }
-        // Water : blue
+        //Water (2): blue
         else if (area == SAMPLE_POLYAREA_TYPE_WATER) {
             return ColorRGBA.Blue;
         }
-        // Road : brown
+        //Road (3): brown
         else if (area == SAMPLE_POLYAREA_TYPE_ROAD) {
             return new ColorRGBA(0.2f, 0.08f, 0.05f, 1);
         }
-        // Door : cyan
+        //Door (4): cyan
         else if (area == SAMPLE_POLYAREA_TYPE_DOOR) {
             return ColorRGBA.Magenta;
         }
-        // Grass : green
+        //Grass (5): green
         else if (area == SAMPLE_POLYAREA_TYPE_GRASS) {
             return ColorRGBA.Green;
         }
-        // Jump : yellow
+        //Jump (6): yellow
         else if (area == SAMPLE_POLYAREA_TYPE_JUMP) {
             return ColorRGBA.Yellow;
         }
-        // Unexpected : red
+        //Unexpected : red
         else {
             return ColorRGBA.Red;
         }
