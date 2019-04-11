@@ -74,7 +74,9 @@ import java.util.concurrent.TimeUnit;
 
 import static com.jme3.recast4j.Recast.SampleAreaModifications.*;
 import com.jme3.recast4j.demo.controls.DoorSwingControl;
+import com.jme3.util.BufferUtils;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import static org.recast4j.recast.RecastVectors.copy;
 
 /**
@@ -117,9 +119,9 @@ public class NavState extends BaseAppState {
     protected void onEnable() {
         worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
 //        buildSolo();
-//        buildTiled();
+        buildTiled();
 //        buildSoloRecast4j();
-        buildSoloTest();
+//        buildSoloTest();
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -867,7 +869,9 @@ public class NavState extends BaseAppState {
         }
 
         //Show wireframe. Helps with param tweaks. false = solid color.
-        showDebugMeshes(meshData, true);
+//        showDebugMeshes(meshData, true);
+        showDebugByArea(meshData, true);
+
     }
     
     /**
@@ -998,7 +1002,9 @@ public class NavState extends BaseAppState {
         }
 
         //Show wireframe. Helps with param tweaks. false = solid color.
-        showDebugMeshes(meshData, true);
+//        showDebugMeshes(meshData, true);
+        showDebugByArea(meshData, true);
+
     }
     
     //This example sets Area Type based off geometry of each individual mesh and 
@@ -1079,7 +1085,7 @@ public class NavState extends BaseAppState {
                 .withDetailSampleDistance(6.0f)     // increase if exception
                 .withDetailSampleMaxError(6.0f)     // increase if exception
                 .withVertsPerPoly(3)
-                .withTileSize(16).build(); 
+                .withTileSize(64).build(); 
         // Build all tiles
         RecastBuilder rb = new RecastBuilder(new ProgressListen());
         RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1, listTriLength, areaMod);
@@ -1093,7 +1099,7 @@ public class NavState extends BaseAppState {
         navMeshParams.tileHeight = cfg.tileSize * cfg.cs;
         navMeshParams.maxTiles = tw * th;
         navMeshParams.maxPolys = 32768;
-        navMesh = new NavMesh(navMeshParams, 3);
+        navMesh = new NavMesh(navMeshParams, cfg.maxVertsPerPoly);
         
         for (int y = 0; y < th; y++) {
             for (int x = 0; x < tw; x++) {
@@ -1154,20 +1160,143 @@ public class NavState extends BaseAppState {
             msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
             //Read in saved NavMesh.
             MeshSetReader msr = new MeshSetReader();
-            NavMesh navMeshFromSaved = msr.read(new FileInputStream("test.nm"), 3);
+            NavMesh navMeshFromSaved = msr.read(new FileInputStream("test.nm"), cfg.maxVertsPerPoly);
             int maxTiles = navMeshFromSaved.getMaxTiles();
 
             //Tile data can be null since maxTiles is not an exact science.
             for (int i = 0; i < maxTiles; i++) {
                 MeshData meshData = navMeshFromSaved.getTile(i).data;
                 if (meshData != null ) {
-                    showDebugMeshes(meshData, true);
+                    showDebugByArea(meshData, true);
                 }
             }
         }  catch (IOException ex) {
             LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
     }  
+    
+    /**
+     * Displays a debug mesh based off the area type of the poly.
+     * 
+     * @param meshData MeshData to process.
+     * @param wireFrame display as solid or wire frame. 
+     */
+    private void showDebugByArea(MeshData meshData, boolean wireFrame) {
+        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_GROUND, wireFrame);
+        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_WATER, wireFrame);
+        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_ROAD, wireFrame);        
+        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_DOOR, wireFrame);       
+        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_GRASS, wireFrame);       
+        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_JUMP, wireFrame);        
+    }
+    
+    /**
+     * Sorts the vertices of MeshData, based off the area type of a polygon, and 
+     * creates one mesh with geometry and material and adds it to the root node.
+     * 
+     * @param meshData MeshData to parse.
+     * @param areaType The are type to sort the vertices by.
+     * @param wireFrame Display mesh as solid or wire frame.
+     */
+    private void sortVertsByArea(MeshData meshData, int areaType, boolean wireFrame) {
+        
+        ArrayList<Float> listVerts = new ArrayList<>();
+        
+        for (Poly p: meshData.polys) {            
+            if (p.getArea()== areaType) {
+                for (int idx: p.verts) {
+                    float vertX = meshData.verts[idx * 3];
+                    listVerts.add(vertX);
+                    float vertY = meshData.verts[idx * 3 + 1];
+                    listVerts.add(vertY);
+                    float vertZ = meshData.verts[idx * 3 + 2];
+                    listVerts.add(vertZ);
+                }
+            }
+        }
+        
+        if (!listVerts.isEmpty()) {
+            float[] verts = new float[listVerts.size()];
+            
+            for (int i = 0; i < verts.length; i++) {
+                verts[i] = listVerts.get(i);
+            }
+            
+            FloatBuffer floatBuffer = BufferUtils.createFloatBuffer(verts);
+
+            int[] indexes = new int[verts.length/3];
+            for(int i = 0; i < indexes.length; i++) {
+                indexes[i] = i;
+            }  
+            
+            int colorIndex = 0;
+            float[] colorArray = new float[indexes.length * 4];             
+            IntBuffer indexBuffer = BufferUtils.createIntBuffer(indexes);
+
+            for (Integer idx: indexes) {
+                indexBuffer.put(idx);
+                colorArray[colorIndex++]= areaToCol(areaType).getRed();
+                colorArray[colorIndex++]= areaToCol(areaType).getGreen();
+                colorArray[colorIndex++]= areaToCol(areaType).getBlue();
+                colorArray[colorIndex++]= 1.0f;
+            }
+            
+            Mesh mesh = new Mesh();
+            mesh.setBuffer(VertexBuffer.Type.Position, 3, floatBuffer);
+            mesh.setBuffer(VertexBuffer.Type.Index, 3, indexBuffer);
+            mesh.setBuffer(VertexBuffer.Type.Color, 4, colorArray);
+            mesh.updateBound();
+
+            Geometry geo = new Geometry ("ColoredMesh", mesh); 
+            Material mat = new Material(getApplication().getAssetManager(), "Common/MatDefs/Misc/Unshaded.j3md");
+            mat.setBoolean("VertexColor", true);
+        
+            mat.getAdditionalRenderState().setWireframe(wireFrame);
+            geo.setMaterial(mat);
+            geo.move(0f, 0.125f, 0f);
+
+            ((SimpleApplication) getApplication()).getRootNode().attachChild(geo);
+        } 
+        
+    } 
+        
+    /**
+     * Creates a color based off the area type.
+     * 
+     * @param area The area color desired.
+     * @return A RGBA color based off the supplied area type.
+     */
+    private ColorRGBA areaToCol(int area) {
+        
+        // Ground (0) : light blue
+        if (area == SAMPLE_POLYAREA_TYPE_GROUND) {
+            return new ColorRGBA(0.0f, 0.75f, 1.0f, 1.0f);
+        }
+        // Water : blue
+        else if (area == SAMPLE_POLYAREA_TYPE_WATER) {
+            return ColorRGBA.Blue;
+        }
+        // Road : brown
+        else if (area == SAMPLE_POLYAREA_TYPE_ROAD) {
+            return new ColorRGBA(0.2f, 0.08f, 0.05f, 1);
+        }
+        // Door : cyan
+        else if (area == SAMPLE_POLYAREA_TYPE_DOOR) {
+            return ColorRGBA.Magenta;
+        }
+        // Grass : green
+        else if (area == SAMPLE_POLYAREA_TYPE_GRASS) {
+            return ColorRGBA.Green;
+        }
+        // Jump : yellow
+        else if (area == SAMPLE_POLYAREA_TYPE_JUMP) {
+            return ColorRGBA.Yellow;
+        }
+        // Unexpected : red
+        else {
+            return ColorRGBA.Red;
+        }
+    }
 
     /**
      * Get all triangles from a mesh. Should open up jme3-recast4j existing 
