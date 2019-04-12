@@ -28,16 +28,14 @@ import com.jme3.recast4j.demo.states.AgentGridState;
 import com.jme3.recast4j.demo.states.AgentParamState;
 import com.jme3.recast4j.demo.states.CrowdBuilderState;
 import com.jme3.recast4j.demo.states.tutorial.CrowdState;
-import com.jme3.recast4j.demo.states.GuiUtilState;
+import com.jme3.recast4j.demo.states.UtilState;
 import com.jme3.recast4j.demo.states.LemurConfigState;
 import com.jme3.recast4j.demo.states.NavState;
 import com.jme3.recast4j.demo.states.ThirdPersonCamState;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
-import com.jme3.scene.SceneGraphVisitorAdapter;
 import com.jme3.scene.Spatial;
-import com.jme3.scene.control.Control;
 import com.jme3.scene.shape.Box;
 import com.jme3.system.AppSettings;
 import com.jme3.texture.Texture2D;
@@ -53,15 +51,14 @@ public class DemoApplication extends SimpleApplication {
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     
     public DemoApplication() {
-        super( 
-                new StatsAppState(),
+        super(new StatsAppState(),
                 new AudioListenerState(),
                 new DebugKeysAppState(),
+                new UtilState(),
                 new NavState(),
                 new CrowdManagerAppstate(new CrowdManager()),
                 new LemurConfigState(),
                 /*new CrowdState(),*/
-                new GuiUtilState(),
                 new ThirdPersonCamState()
         );
     }
@@ -228,52 +225,47 @@ public class DemoApplication extends SimpleApplication {
         Node door = (Node) getAssetManager().loadModel("Models/Level/Door.mesh.j3o");
         door.setName("door");
         
+        SkeletonControl skelCont = getStateManager().getState(UtilState.class).findControl(door, SkeletonControl.class);
         /**
          * Couldn't get hardware skinning to turn off which would allow the 
          * bounding box to move with the door as it opens or closes so added
          * a hitBox to the root bone instead.
          */
-        door.depthFirstTraversal(new SceneGraphVisitorAdapter() {
-            @Override
-            public void visit(Node node) {
+        if (skelCont != null) {
+            //Create a box shape with the same dimensions as the door.
+            BoundingBox bounds = (BoundingBox) door.getWorldBound();
+            Box boxMesh = new Box(bounds.getXExtent(),bounds.getYExtent(),bounds.getZExtent()); 
 
-                if (node.getControl(SkeletonControl.class) != null) {
-                    
-                    SkeletonControl skelControl = node.getControl(SkeletonControl.class);
-                    
-                    //Create a box shape with the same dimensions as the door.
-                    BoundingBox bounds = (BoundingBox) door.getWorldBound();
-                    Box boxMesh = new Box(bounds.getXExtent(),bounds.getYExtent(),bounds.getZExtent()); 
-                    
-                    //The geometry for the door.
-                    Geometry boxGeo = new Geometry("hitBox", boxMesh); 
-                    
-                    //The material.
-                    Material boxMat = new Material(getAssetManager(), "Common/MatDefs/Light/Lighting.j3md"); 
-                    boxMat.setBoolean("UseMaterialColors", true); 
-                    boxMat.setColor("Ambient", ColorRGBA.Green); 
-                    boxMat.setColor("Diffuse", ColorRGBA.Green); 
-                    boxGeo.setMaterial(boxMat); 
-                    //Toggle visibility.
-                    boxGeo.setCullHint(Spatial.CullHint.Always);
-                    
-                    //Center hitBox to door.
-                    boxGeo.setLocalTranslation(bounds.getCenter());
-                    
-                    /**
-                     * Create a node that will use the same origin as the root
-                     * bone which has the same origin as the door. This will 
-                     * keep the searches in MouseEventControl localized to this 
-                     * door.
-                     */
-                    Node collisionNode = new Node("collisionNode");
-                    collisionNode.attachChild(boxGeo);
-                    
-                    //Our root bone for the animations.
-                    skelControl.getAttachmentsNode("Root").attachChild(collisionNode);
-                }
-            }
-        });
+            //The geometry for the door.
+            Geometry boxGeo = new Geometry("hitBox", boxMesh); 
+
+            //The material.
+            Material boxMat = new Material(getAssetManager(), "Common/MatDefs/Light/Lighting.j3md"); 
+            boxMat.setBoolean("UseMaterialColors", true); 
+            boxMat.setColor("Ambient", ColorRGBA.Green); 
+            boxMat.setColor("Diffuse", ColorRGBA.Green); 
+            boxGeo.setMaterial(boxMat); 
+            //Toggle visibility.
+            boxGeo.setCullHint(Spatial.CullHint.Always);
+
+            //Center hitBox to door.
+            boxGeo.setLocalTranslation(bounds.getCenter());
+
+            /**
+             * Create a node that will use the same origin as the root
+             * bone which has the same origin as the door. This will 
+             * keep the searches in MouseEventControl localized to this 
+             * door.
+             */
+            Node collisionNode = new Node("collisionNode");
+            collisionNode.attachChild(boxGeo);
+
+            String rootBone = skelCont.getSkeleton().getBone(0).getName();
+            //Our root bone for the animations.
+            skelCont.getAttachmentsNode(rootBone).attachChild(collisionNode);
+            //Add our animation swing control and attach to rootNode.
+            door.addControl(new DoorSwingControl());
+        }
         
         /**
          * Creating doors in blender with their origin at (0,0,0) is required.
@@ -288,29 +280,10 @@ public class DemoApplication extends SimpleApplication {
         if (rotation != null) {
             door.setLocalRotation(rotation);
         }
-        
-        //Add our animation swing control and attach to rootNode.
-        door.addControl(new DoorSwingControl());
+
         doorNode.attachChild(door);
     }      
-    
-    private <T extends Control> T findControl(Spatial s, Class<T> controlClass) {
-        T ctrl = s.getControl(controlClass);
-        if (ctrl != null) {
-            return ctrl;
-        }
-        if (s instanceof Node) {
-            Node n = (Node) s;
-            for (Spatial spatial : n.getChildren()) {
-                ctrl = findControl(spatial, controlClass);
-                if (ctrl != null) {
-                    return ctrl;
-                }
-            }
-        }
-        return null;
-    }
-    
+        
     private void loadJaime() {
         Node player = (Node) getAssetManager().loadModel("Models/Jaime/Jaime.j3o");
         player.setName("player");

@@ -465,7 +465,7 @@ public class AgentGridState extends BaseAppState {
         listScroll.setPreferredSize(new Vector3f(500, 400, 0));
         listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
-        getState(GuiUtilState.class).centerComp(window);
+        getState(UtilState.class).centerComp(window);
         //This assures clicking outside of the message should close the window 
         //but not activate underlying UI components.
         GuiGlobals.getInstance().getPopupState().showPopup(window, PopupState.ClickMode.ConsumeAndClose, null, null);
@@ -484,7 +484,7 @@ public class AgentGridState extends BaseAppState {
         if (checkRadius.isChecked()) {
             //The GridAgent radius. 
             if (fieldRadius.getText().isEmpty()
-            || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
+            || !getState(UtilState.class).isNumeric(fieldRadius.getText())) {
                 displayMessage("[ Agent Radius ] requires a valid float value.", 0);
                 return;
             } 
@@ -494,7 +494,7 @@ public class AgentGridState extends BaseAppState {
         if (checkHeight.isChecked()) {
             //The GridAgent height. 
             if (fieldHeight.getText().isEmpty()
-            || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
+            || !getState(UtilState.class).isNumeric(fieldHeight.getText())) {
                 displayMessage("[ Agent Height ] requires a valid float value.", 0);
                 return;
             }
@@ -505,14 +505,14 @@ public class AgentGridState extends BaseAppState {
         &&  checkWeight.isChecked()) {
             //The GridAgent weight. 
             if (fieldWeight.getText().isEmpty()
-            || !getState(GuiUtilState.class).isNumeric(fieldWeight.getText())) {
+            || !getState(UtilState.class).isNumeric(fieldWeight.getText())) {
                 displayMessage("[ Agent Weight ] requires a valid float value.", 0);
                 return;
             }
         }
          
         //Garbage in?, no grid.
-        if (!getState(GuiUtilState.class).isNumeric(fieldDistance.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldDistance.getText()) 
         ||  fieldDistance.getText().isEmpty()) {
             displayMessage("[ Agent Separation ] requires a valid float value.", 0);
             return;
@@ -544,9 +544,9 @@ public class AgentGridState extends BaseAppState {
         int size = listBoxSize.getSelectionModel().getSelection() + 1;
 
         //The starting position of the grid. Sanity check.
-        if (!getState(GuiUtilState.class).isNumeric(fieldPosX.getText()) || fieldPosX.getText().isEmpty() 
-        ||  !getState(GuiUtilState.class).isNumeric(fieldPosY.getText()) || fieldPosY.getText().isEmpty() 
-        ||  !getState(GuiUtilState.class).isNumeric(fieldPosZ.getText()) || fieldPosZ.getText().isEmpty()) {
+        if (!getState(UtilState.class).isNumeric(fieldPosX.getText()) || fieldPosX.getText().isEmpty() 
+        ||  !getState(UtilState.class).isNumeric(fieldPosY.getText()) || fieldPosY.getText().isEmpty() 
+        ||  !getState(UtilState.class).isNumeric(fieldPosZ.getText()) || fieldPosZ.getText().isEmpty()) {
             displayMessage("[ Start Position ] requires a valid float value.", 0);
             return;
         } else {
@@ -735,7 +735,7 @@ public class AgentGridState extends BaseAppState {
      */
     private void displayMessage(String txt, float width) {
         GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
+                    .showModalPopup(getState(UtilState.class)
                             .buildPopup(txt, width));
     }
     

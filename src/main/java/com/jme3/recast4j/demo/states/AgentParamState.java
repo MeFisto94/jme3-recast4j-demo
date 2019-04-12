@@ -398,7 +398,7 @@ public class AgentParamState extends BaseAppState {
         listScroll.setPreferredSize(new Vector3f(500, 400, 0));
         listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
-        getState(GuiUtilState.class).centerComp(window);
+        getState(UtilState.class).centerComp(window);
         //This assures clicking outside of the message should close the window 
         //but not activate underlying UI components.
         GuiGlobals.getInstance().getPopupState().showPopup(window, PopupState.ClickMode.ConsumeAndClose, null, null);
@@ -444,7 +444,7 @@ public class AgentParamState extends BaseAppState {
         //The CrowdAgent radius. 
         if (checkRadius.isChecked()) {
             if (fieldRadius.getText().isEmpty()
-            || !getState(GuiUtilState.class).isNumeric(fieldRadius.getText())) {
+            || !getState(UtilState.class).isNumeric(fieldRadius.getText())) {
                 displayMessage("[ Agent Radius ] requires a valid float value.", 0);
                 return;
             } 
@@ -454,14 +454,14 @@ public class AgentParamState extends BaseAppState {
         //gathered when the CrowdAgent was added to its grid in the Add Grid tab.
         if (checkHeight.isChecked()) {
             if (fieldHeight.getText().isEmpty()
-            || !getState(GuiUtilState.class).isNumeric(fieldHeight.getText())) {
+            || !getState(UtilState.class).isNumeric(fieldHeight.getText())) {
                 displayMessage("[ Agent Height ] requires a valid float value.", 0);
                 return;
             } 
         }
 
         //The max acceleration settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldMaxAccel.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldMaxAccel.getText()) 
         ||  fieldMaxAccel.getText().isEmpty()) {
             displayMessage("[ Max Acceleration ] requires a valid float value.", 0);
             return;
@@ -475,7 +475,7 @@ public class AgentParamState extends BaseAppState {
         }
 
         //The max speed settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldMaxSpeed.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldMaxSpeed.getText()) 
         ||  fieldMaxSpeed.getText().isEmpty()) {
             displayMessage("[ Max Speed ] requires a valid float value.", 0);
             return;
@@ -489,7 +489,7 @@ public class AgentParamState extends BaseAppState {
         }
 
         //The collision query range.
-        if (!getState(GuiUtilState.class).isNumeric(fieldColQueryRange.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldColQueryRange.getText()) 
         ||  fieldColQueryRange.getText().isEmpty()) {
             displayMessage("[ Collision Query Range ] requires a valid float value.", 0);
             return;
@@ -503,7 +503,7 @@ public class AgentParamState extends BaseAppState {
         }
 
         //The path optimize range.
-        if (!getState(GuiUtilState.class).isNumeric(fieldPathOptimizeRange.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldPathOptimizeRange.getText()) 
         ||  fieldPathOptimizeRange.getText().isEmpty()) {
             displayMessage("[ Path Optimize Range ] requires a valid float value.", 0);
             return;
@@ -517,10 +517,10 @@ public class AgentParamState extends BaseAppState {
         }
 
         //The separation weight settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldSeparationWeight.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldSeparationWeight.getText()) 
         ||  fieldSeparationWeight.getText().isEmpty()) {
             GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
+                    .showModalPopup(getState(UtilState.class)
                             .buildPopup("[ Separation Weight ] requires a valid float value.", 0));
             return;
         } else {
@@ -528,7 +528,7 @@ public class AgentParamState extends BaseAppState {
             //Stop negative input.
             if (separationWeight < 0.0f) {
                 GuiGlobals.getInstance().getPopupState()
-                        .showModalPopup(getState(GuiUtilState.class)
+                        .showModalPopup(getState(UtilState.class)
                                 .buildPopup("[ Separation Weight ] requires a float value >= 0.0f.", 0));
                 return;
             }
@@ -786,9 +786,9 @@ public class AgentParamState extends BaseAppState {
         } 
         
         //The target position of the grid. Sanity check.
-        if (!getState(GuiUtilState.class).isNumeric(fieldTargetX.getText()) || fieldTargetX.getText().isEmpty() 
-        ||  !getState(GuiUtilState.class).isNumeric(fieldTargetY.getText()) || fieldTargetY.getText().isEmpty() 
-        ||  !getState(GuiUtilState.class).isNumeric(fieldTargetZ.getText()) || fieldTargetZ.getText().isEmpty()) {
+        if (!getState(UtilState.class).isNumeric(fieldTargetX.getText()) || fieldTargetX.getText().isEmpty() 
+        ||  !getState(UtilState.class).isNumeric(fieldTargetY.getText()) || fieldTargetY.getText().isEmpty() 
+        ||  !getState(UtilState.class).isNumeric(fieldTargetZ.getText()) || fieldTargetZ.getText().isEmpty()) {
             displayMessage("[ Start Position ] requires a valid float value.", 0);
         } else {
             Float x = new Float(fieldTargetX.getText());
@@ -837,7 +837,7 @@ public class AgentParamState extends BaseAppState {
      */
     private void displayMessage(String txt, float width) {
         GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
+                    .showModalPopup(getState(UtilState.class)
                             .buildPopup(txt, width));
     }    
             

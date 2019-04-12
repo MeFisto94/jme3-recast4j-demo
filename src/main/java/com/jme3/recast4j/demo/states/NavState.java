@@ -27,6 +27,7 @@
 
 package com.jme3.recast4j.demo.states;
 
+import com.jme3.animation.SkeletonControl;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
 import com.jme3.app.state.BaseAppState;
@@ -170,10 +171,11 @@ public class NavState extends BaseAppState {
         
         /**
          * This check will set any doors found in the doorNode open/closed flags
-         * by adding a lemur MouseEventControl to each door found. The click 
-         * method for the MouseEventControl will determine when and which flags
-         * to set for the door. It will notify the DoorSwingControl of which 
-         * animation to play based off the determination.
+         * by adding a lemur MouseEventControl to each door found that has a 
+         * DoorSwingControl. The click method for the MouseEventControl will 
+         * determine when and which flags to set for the door. It will notify 
+         * the DoorSwingControl of which animation to play based off the 
+         * determination.
          * 
          * This is an all or none setting where either the door is open or 
          * closed. 
@@ -183,206 +185,181 @@ public class NavState extends BaseAppState {
             //Gather all doors from the doorNode.
             List<Spatial> children = doorNode.getChildren();
             
-            //Cycle through the list and add a MouseEventControl to each door.
+            /**
+             * Cycle through the list and add a MouseEventControl to each door
+             * with a DoorSwingControl.
+             */
             for (Spatial child: children) {
                 
-                /**
-                 * We are adding the MouseEventControl to the doors hitBox not 
-                 * the door. It would be easier to use the door by turning 
-                 * hardware skinning off but for some reason it always throws an 
-                 * exception when doing so.
-                 */
-                Spatial hitBox = ((Node) child).getChild("collisionNode");
+                DoorSwingControl swingControl = getState(UtilState.class).findControl(child, DoorSwingControl.class);
+                
+                if (swingControl != null) {
+                    /**
+                     * We are adding the MouseEventControl to the doors hitBox not 
+                     * the door. It would be easier to use the door by turning 
+                     * hardware skinning off but for some reason it always 
+                     * throws an exception when doing so. The hitBox is attached 
+                     * to the root bones attachment node. 
+                     */
+                    SkeletonControl skelCont = getState(UtilState.class).findControl(child, SkeletonControl.class);
+                    String name = skelCont.getSkeleton().getBone(0).getName();
+                    Spatial hitBox = skelCont.getAttachmentsNode(name).getChild(0);
 
-                MouseEventControl.addListenersToSpatial(hitBox, new DefaultMouseListener() {
+                    MouseEventControl.addListenersToSpatial(hitBox, new DefaultMouseListener() {
 
-                    @Override
-                    protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
-            
-                        LOG.info("<========== BEGIN Door MouseEventControl ==========>");
+                        @Override
+                        protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
 
-                        /**
-                         * We have the worldmap and the doors using 
-                         * MouseEventControl. In certain circumstances, usually
-                         * when moving and clicking, click will return target as 
-                         * worldmap so we have to then use capture to get the 
-                         * proper spatial.
-                         */
-                        if (!target.getName().equals("collisionNode")) {
-                            LOG.info("Wrong target found [{}] parentName [{}].", target.getName(), target.getParent().getName());
-                            LOG.info("Switching to capture [{}] capture parent [{}].",capture.getName(), capture.getParent().getName());
-                            target = capture;
-                        }
-                        
-                        //The filter to use for this search.
-                        DefaultQueryFilter filter = new BetterDefaultQueryFilter();
+                            LOG.info("<========== BEGIN Door MouseEventControl ==========>");
 
-                        //Limit the search to only door flags.
-                        int includeFlags = SAMPLE_POLYFLAGS_DOOR;
-                        filter.setIncludeFlags(includeFlags);
-
-                        //Include everything.
-                        int excludeFlags = 0;                   
-                        filter.setExcludeFlags(excludeFlags);
-
-                        /**
-                         * Look for the largest radius to search for. This will 
-                         * make it possible to grab only one of a double door. 
-                         * The width of the door is preferred over thickness. 
-                         * The idea is to only return polys within the width of 
-                         * the door so in cases where there are double doors, 
-                         * only the selected door will open/close. This means 
-                         * doors with large widths should not be in range of 
-                         * other doors or the other doors polys will be included.
-                         * 
-                         * Searches take place from the origin of the attachment
-                         * node which should be the same as the doors origin.
-                         */
-                        BoundingBox bounds = (BoundingBox) target.getWorldBound();
-                        float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
-
-                        Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
-                        
-                        //No obj, no go. Fail most likely result of filter setting.
-                        if (!findNearestPoly.status.isSuccess() || findNearestPoly.result.getNearestRef() == 0) {
-                            LOG.error("Door findNearestPoly unsuccessful or getNearestRef is not > 0.");
-                            LOG.error("findNearestPoly [{}] getNearestRef [{}].", findNearestPoly.status, findNearestPoly.result.getNearestRef());
-                            return;
-                        }
-
-                        Result<FindPolysAroundResult> findPolysAroundCircle = query.findPolysAroundCircle(findNearestPoly.result.getNearestRef(), findNearestPoly.result.getNearestPos(), maxXZ, filter);
-                        
-                        //Success
-                        if (findPolysAroundCircle.status.isSuccess()) {
-                            List<Long> m_polys = findPolysAroundCircle.result.getRefs();
-                            
-//                            //May need these for something else eventually.
-//                            List<Long> m_parent = result.result.getParentRefs();
-//                            List<Float> m_costs = result.result.getCosts();
-                            
                             /**
-                             * Store each poly and flag in a single object and 
-                             * add it to this list so we can later check they 
-                             * all have the same flag.
+                             * We have the worldmap and the doors using 
+                             * MouseEventControl. In certain circumstances, usually
+                             * when moving and clicking, click will return target as 
+                             * worldmap so we have to then use capture to get the 
+                             * proper spatial.
                              */
-                            List<PolyAndFlag> listPolyAndFlag = new ArrayList<>();
-                            
-                            //The flags that say this door is open.
-                            int open = SAMPLE_POLYFLAGS_DOOR | SAMPLE_POLYFLAGS_WALK;
-                            
-                            //The flags that say this door is closed, i.e. open
-                            // flags and SAMPLE_POLYFLAGS_DISABLED
-                            int closed = open | SAMPLE_POLYFLAGS_DISABLED;
-                            
-                            /**
-                             * We iterate through the polys looking for the open
-                             * or closed flags.
-                             */
-                            for (long poly: m_polys) {
-
-                                LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyFlags(poly).result);
-                                printFlags(poly);
-                                                                    
-                                /**
-                                 * We look for closed or open doors and add the 
-                                 * poly id and flag to set for the poly to the 
-                                 * list. We will later check to see if all poly 
-                                 * flags are the same and act accordingly. If 
-                                 * the door is closed, we add the open flags, if 
-                                 * open, add the closed flags. 
-                                 */
-                                if (isBitSet(closed, navMesh.getPolyFlags(poly).result)) {
-                                    listPolyAndFlag.add(new PolyAndFlag(poly, open));
-                                } else if (isBitSet(open, navMesh.getPolyFlags(poly).result)) {
-                                    listPolyAndFlag.add(new PolyAndFlag(poly, closed));
-                                }
-                            }
-                            
-                            /**
-                             * Check that all poly flags for the door are either 
-                             * all open or all closed. This prevents changing 
-                             * door flags in circumstances where a user may be 
-                             * allowed to block open or closed doors with in 
-                             * game objects through tile caching. If the object 
-                             * was placed in such a way that not all polys in a 
-                             * door opening were blocked by the object, not 
-                             * checking if all polys had the same flag would 
-                             * allow bypassing the blocking object flag setting. 
-                             */
-                            boolean same = false;
-                            for (PolyAndFlag obj: listPolyAndFlag) {
-                                //If any flag does not match, were done.
-                                if (obj.getFlag() != listPolyAndFlag.get(0).getFlag()) {
-                                    LOG.info("All poly flags are not the same listPolyAndFlag.");
-                                    same = false;
-                                    break;
-                                }
-                                same = true;
+                            if (!target.equals(hitBox)) {
+                                LOG.info("Wrong target found [{}] parentName [{}].", target.getName(), target.getParent().getName());
+                                LOG.info("Switching to capture [{}] capture parent [{}].",capture.getName(), capture.getParent().getName());
+                                target = capture;
                             }
 
-                            //If all flags match set door open/closed.
-                            if (same) {
-                                /**
-                                 * The door hit object is the child of a bone.
-                                 * We must find the top most parent to make sure 
-                                 * we find the DoorSwingControl. Stop the search 
-                                 * when we find that the parent is the doorNode.
-                                 * 
-                                 * With the way MouseEventControl works by 
-                                 * having target and capture spatials, sometimes
-                                 * the worldNode will be the target for an 
-                                 * unknown reason so if there is no check to 
-                                 * determine which node is target, this will 
-                                 * throw a null pointer exception because it 
-                                 * will travel up to the rootNode since that is 
-                                 * the parent of worldmap.
-                                 */
-                                Spatial door = target;
-                                while (door.getParent() != doorNode) {
-                                    door = door.getParent();
-                                }
-                                
-                                /**
-                                 * Assuming we have the top parent node for the 
-                                 * model, we then need to locate the 
-                                 * DoorSwingControl. If no control is found, we 
-                                 * do nothing.
-                                 */
-                                door.depthFirstTraversal(new SceneGraphVisitorAdapter() {
-                                    @Override
-                                    public void visit(Node node) {
-                                        if (node.getControl(DoorSwingControl.class) != null) {
-                                            //Set the doorControl control.
-                                            DoorSwingControl doorControl = node.getControl(DoorSwingControl.class);
-                                            
-                                            //Set all obj flags.
-                                            for (PolyAndFlag obj: listPolyAndFlag) {
-                                                navMesh.setPolyFlags(obj.getPoly(), obj.getFlag());
-                                                LOG.info("<========== POST flag set Poly ID [{}] Flags [{}] ==========>", obj.getPoly(), navMesh.getPolyFlags(obj.getPoly()).result);
-                                                printFlags(obj.getPoly());
-                                            }
-                                            
-                                            /**
-                                             * All flags are the same so we only 
-                                             * need the first object.
-                                             */
-                                            if (listPolyAndFlag.get(0).getFlag() == (open)) {
-                                                //Open doorControl.
-                                                doorControl.setOpen(true);
-                                            } else {
-                                                //Close doorControl.
-                                                doorControl.setOpen(false);
-                                            }
-                                        }
-                                    }       
-                                });
+                            //The filter to use for this search.
+                            DefaultQueryFilter filter = new BetterDefaultQueryFilter();
+
+                            //Limit the search to only door flags.
+                            int includeFlags = SAMPLE_POLYFLAGS_DOOR;
+                            filter.setIncludeFlags(includeFlags);
+
+                            //Include everything.
+                            int excludeFlags = 0;                   
+                            filter.setExcludeFlags(excludeFlags);
+
+                            /**
+                             * Look for the largest radius to search for. This will 
+                             * make it possible to grab only one of a double door. 
+                             * The width of the door is preferred over thickness. 
+                             * The idea is to only return polys within the width of 
+                             * the door so in cases where there are double doors, 
+                             * only the selected door will open/close. This means 
+                             * doors with large widths should not be in range of 
+                             * other doors or the other doors polys will be included.
+                             * 
+                             * Searches take place from the origin of the attachment
+                             * node which should be the same as the doors origin.
+                             */
+                            BoundingBox bounds = (BoundingBox) target.getWorldBound();
+                            float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
+
+                            Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
+
+                            //No obj, no go. Fail most likely result of filter setting.
+                            if (!findNearestPoly.status.isSuccess() || findNearestPoly.result.getNearestRef() == 0) {
+                                LOG.error("Door findNearestPoly unsuccessful or getNearestRef is not > 0.");
+                                LOG.error("findNearestPoly [{}] getNearestRef [{}].", findNearestPoly.status, findNearestPoly.result.getNearestRef());
+                                return;
                             }
+
+                            Result<FindPolysAroundResult> findPolysAroundCircle = query.findPolysAroundCircle(findNearestPoly.result.getNearestRef(), findNearestPoly.result.getNearestPos(), maxXZ, filter);
+
+                            //Success
+                            if (findPolysAroundCircle.status.isSuccess()) {
+                                List<Long> m_polys = findPolysAroundCircle.result.getRefs();
+
+    //                            //May need these for something else eventually.
+    //                            List<Long> m_parent = result.result.getParentRefs();
+    //                            List<Float> m_costs = result.result.getCosts();
+
+                                /**
+                                 * Store each poly and flag in a single object and 
+                                 * add it to this list so we can later check they 
+                                 * all have the same flag.
+                                 */
+                                List<PolyAndFlag> listPolyAndFlag = new ArrayList<>();
+
+                                //The flags that say this door is open.
+                                int open = SAMPLE_POLYFLAGS_DOOR | SAMPLE_POLYFLAGS_WALK;
+
+                                //The flags that say this door is closed, i.e. open
+                                // flags and SAMPLE_POLYFLAGS_DISABLED
+                                int closed = open | SAMPLE_POLYFLAGS_DISABLED;
+
+                                /**
+                                 * We iterate through the polys looking for the open
+                                 * or closed flags.
+                                 */
+                                for (long poly: m_polys) {
+
+                                    LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyFlags(poly).result);
+                                    printFlags(poly);
+
+                                    /**
+                                     * We look for closed or open doors and add the 
+                                     * poly id and flag to set for the poly to the 
+                                     * list. We will later check to see if all poly 
+                                     * flags are the same and act accordingly. If 
+                                     * the door is closed, we add the open flags, if 
+                                     * open, add the closed flags. 
+                                     */
+                                    if (isBitSet(closed, navMesh.getPolyFlags(poly).result)) {
+                                        listPolyAndFlag.add(new PolyAndFlag(poly, open));
+                                    } else if (isBitSet(open, navMesh.getPolyFlags(poly).result)) {
+                                        listPolyAndFlag.add(new PolyAndFlag(poly, closed));
+                                    }
+                                }
+
+                                /**
+                                 * Check that all poly flags for the door are either 
+                                 * all open or all closed. This prevents changing 
+                                 * door flags in circumstances where a user may be 
+                                 * allowed to block open or closed doors with in 
+                                 * game objects through tile caching. If the object 
+                                 * was placed in such a way that not all polys in a 
+                                 * door opening were blocked by the object, not 
+                                 * checking if all polys had the same flag would 
+                                 * allow bypassing the blocking object flag setting. 
+                                 */
+                                boolean same = false;
+                                for (PolyAndFlag obj: listPolyAndFlag) {
+                                    //If any flag does not match, were done.
+                                    if (obj.getFlag() != listPolyAndFlag.get(0).getFlag()) {
+                                        LOG.info("All poly flags are not the same listPolyAndFlag.");
+                                        same = false;
+                                        break;
+                                    }
+                                    same = true;
+                                }
+
+                                //If all flags match set door open/closed.
+                                if (same) {                                    
+                                    //Set all obj flags.
+                                    for (PolyAndFlag obj: listPolyAndFlag) {
+                                        navMesh.setPolyFlags(obj.getPoly(), obj.getFlag());
+                                        LOG.info("<========== POST flag set Poly ID [{}] Flags [{}] ==========>", obj.getPoly(), navMesh.getPolyFlags(obj.getPoly()).result);
+                                        printFlags(obj.getPoly());
+                                    }
+
+                                    /**
+                                     * All flags are the same so we only 
+                                     * need the first object.
+                                     */
+                                    if (listPolyAndFlag.get(0).getFlag() == (open)) {
+                                        //Open doorControl.
+                                        swingControl.setOpen(true);
+                                    } else {
+                                        //Close doorControl.
+                                        swingControl.setOpen(false);
+                                    }
+                                }
+                            }
+                            LOG.info("<========== END Door MouseEventControl Add ==========>");
                         }
-                        LOG.info("<========== END Door MouseEventControl Add ==========>");
-                    }
-                });
+                    });
+                }
             }
         }
+        
     }
         
     private void findPathImmediately(Node character, QueryFilter filter, FindNearestPolyResult startPoly, FindNearestPolyResult endPoly) {
@@ -1234,7 +1211,7 @@ public class NavState extends BaseAppState {
             FloatBuffer floatBuffer = BufferUtils.createFloatBuffer(verts);
 
             /**
-             * As always, there are three vertices per triangle so set size 
+             * As always, there are three vertices per index so set size 
              * accordingly.
              */
             int[] indexes = new int[verts.length/3];

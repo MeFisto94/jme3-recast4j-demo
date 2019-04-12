@@ -30,6 +30,9 @@ package com.jme3.recast4j.demo.states;
 import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.recast4j.demo.layout.MigLayout;
+import com.jme3.scene.Node;
+import com.jme3.scene.Spatial;
+import com.jme3.scene.control.Control;
 import com.simsilica.lemur.ActionButton;
 import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Container;
@@ -43,7 +46,7 @@ import java.text.ParsePosition;
  * 
  * @author Robert
  */
-public class GuiUtilState extends BaseAppState {
+public class UtilState extends BaseAppState {
     
     @Override
     protected void initialize(Application app) {
@@ -118,6 +121,23 @@ public class GuiUtilState extends BaseAppState {
         ParsePosition pos = new ParsePosition(0);
         formatter.parse(str, pos);
         return str.length() == pos.getIndex();
+    }
+    
+    public <T extends Control> T findControl(Spatial s, Class<T> controlClass) {
+        T ctrl = s.getControl(controlClass);
+        if (ctrl != null) {
+            return ctrl;
+        }
+        if (s instanceof Node) {
+            Node n = (Node) s;
+            for (Spatial spatial : n.getChildren()) {
+                ctrl = findControl(spatial, controlClass);
+                if (ctrl != null) {
+                    return ctrl;
+                }
+            }
+        }
+        return null;
     }
     
 }

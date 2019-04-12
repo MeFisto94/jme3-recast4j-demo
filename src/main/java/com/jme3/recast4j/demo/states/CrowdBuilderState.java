@@ -828,7 +828,7 @@ public class CrowdBuilderState extends BaseAppState {
         listScroll.setPreferredSize(new Vector3f(500, 400, 0));
         listScroll.setVisibleItems(20);
         window.addChild(new ActionButton(new CallMethodAction("Close", window, "removeFromParent")), "align 50%");
-        getState(GuiUtilState.class).centerComp(window);
+        getState(UtilState.class).centerComp(window);
         //This assures clicking outside of the message should close the window 
         //but not activate underlying UI components.
         GuiGlobals.getInstance().getPopupState().showPopup(window, PopupState.ClickMode.ConsumeAndClose, null, null);
@@ -964,7 +964,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
         
         //The max CrowdAgent radius for an agent in the crowd.
-        if (!getState(GuiUtilState.class).isNumeric(fieldMaxAgentRadius.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldMaxAgentRadius.getText()) 
         ||  fieldMaxAgentRadius.getText().isEmpty()) {
             displayMessage("[ Max Agent Radius ] requires a valid float value.", 0);
             return;
@@ -1060,7 +1060,7 @@ public class CrowdBuilderState extends BaseAppState {
         Integer selectedParam;
                 
         //The velocity bias settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldVelocityBias.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldVelocityBias.getText()) 
         ||  fieldVelocityBias.getText().isEmpty()) {
             displayMessage("[ velocityBias ] requires a valid float value.", 0);
             return;
@@ -1074,7 +1074,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
         
         //The weighted desired velocity settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldWeightDesVel.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldWeightDesVel.getText()) 
         ||  fieldWeightDesVel.getText().isEmpty()) {
             displayMessage("[ weightDesVel ] requires a valid float value.", 0);
             return;
@@ -1088,7 +1088,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
 
         //The weighted current velocity settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldWeightCurVel.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldWeightCurVel.getText()) 
         ||  fieldWeightCurVel.getText().isEmpty()) {
             displayMessage("[ fieldWeightCurVel ] requires a valid float value.", 0);
             return;
@@ -1102,7 +1102,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
         
         //The weighted side settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldWeightSide.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldWeightSide.getText()) 
         ||  fieldWeightSide.getText().isEmpty()) {
             displayMessage("[ fieldWeightSide ] requires a valid float value.", 0);
             return;
@@ -1116,7 +1116,7 @@ public class CrowdBuilderState extends BaseAppState {
         }
         
         //The weight to impact settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldWeightToi.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldWeightToi.getText()) 
         ||  fieldWeightToi.getText().isEmpty()) {
             displayMessage("[ fieldWeightToi ] requires a valid float value.", 0);
             return;
@@ -1130,7 +1130,7 @@ public class CrowdBuilderState extends BaseAppState {
         }        
                 
         //The horizon settings.
-        if (!getState(GuiUtilState.class).isNumeric(fieldHorizTime.getText()) 
+        if (!getState(UtilState.class).isNumeric(fieldHorizTime.getText()) 
         ||  fieldHorizTime.getText().isEmpty()) {
             displayMessage("[ fieldHorizTime ] requires a valid float value.", 0);
             return;
@@ -1386,7 +1386,7 @@ public class CrowdBuilderState extends BaseAppState {
 
             //All types must be in same order as those in SampleAreaModifications.
             if (!fieldCostGround.getText().isEmpty() 
-            &&   getState(GuiUtilState.class).isNumeric(fieldCostGround.getText()) ) {
+            &&   getState(UtilState.class).isNumeric(fieldCostGround.getText()) ) {
                 float cost = new Float(fieldCostGround.getText());
                 if (cost > 1.0f) {
                     areaCost[0] = cost;
@@ -1394,7 +1394,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
 
             if (!fieldCostWater.getText().isEmpty()
-            &&   getState(GuiUtilState.class).isNumeric(fieldCostWater.getText()) ) {
+            &&   getState(UtilState.class).isNumeric(fieldCostWater.getText()) ) {
                 float cost = new Float(fieldCostWater.getText());
                 if (cost > 1.0f) {
                     areaCost[1] = cost;
@@ -1402,7 +1402,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
 
             if (!fieldCostRoad.getText().isEmpty()
-            &&   getState(GuiUtilState.class).isNumeric(fieldCostRoad.getText()) ) {
+            &&   getState(UtilState.class).isNumeric(fieldCostRoad.getText()) ) {
                 float cost = new Float(fieldCostRoad.getText());
                 if (cost > 1.0f) {
                     areaCost[2] = cost;
@@ -1410,7 +1410,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
 
             if (!fieldCostGrass.getText().isEmpty()
-            &&   getState(GuiUtilState.class).isNumeric(fieldCostGrass.getText()) ) {
+            &&   getState(UtilState.class).isNumeric(fieldCostGrass.getText()) ) {
                 float cost = new Float(fieldCostGrass.getText());
                 if (cost > 1.0f) {
                     areaCost[3] = cost;
@@ -1418,7 +1418,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
 
             if (!fieldCostDoor.getText().isEmpty()
-            &&   getState(GuiUtilState.class).isNumeric(fieldCostDoor.getText()) ) {
+            &&   getState(UtilState.class).isNumeric(fieldCostDoor.getText()) ) {
                 float cost = new Float(fieldCostDoor.getText());
                 if (cost > 1.0f) {
                     areaCost[4] = cost;
@@ -1426,7 +1426,7 @@ public class CrowdBuilderState extends BaseAppState {
             }
 
             if (!fieldCostJump.getText().isEmpty()
-            &&   getState(GuiUtilState.class).isNumeric(fieldCostJump.getText()) ) {
+            &&   getState(UtilState.class).isNumeric(fieldCostJump.getText()) ) {
                 float cost = new Float(fieldCostJump.getText());
                 if (cost > 1.0f) {
                     areaCost[5] = cost;
@@ -1596,7 +1596,7 @@ public class CrowdBuilderState extends BaseAppState {
      */
     private void displayMessage(String txt, float width) {
         GuiGlobals.getInstance().getPopupState()
-                    .showModalPopup(getState(GuiUtilState.class)
+                    .showModalPopup(getState(UtilState.class)
                             .buildPopup(txt, width));
     }
     
