@@ -137,16 +137,12 @@ public class CrowdState extends BaseAppState {
             if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
               || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
               || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                paramBuilder.withPolyFlag(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK);
+                paramBuilder.withPolyFlag(pmesh.flags[i], SampleAreaModifications.SAMPLE_POLYFLAGS_WALK);
             } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                paramBuilder.withPolyFlag(i, SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM);
+                paramBuilder.withPolyFlag(pmesh.flags[i], SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM);
             } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                paramBuilder.withPolyFlags(i, SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
+                paramBuilder.withPolyFlags(pmesh.flags[i], SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
                 | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR);
-            }
-
-            if (pmesh.areas[i] > 0) {
-                pmesh.areas[i]--;
             }
         }
         //Build the parameter object. 

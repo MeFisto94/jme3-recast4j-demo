@@ -1,13 +1,13 @@
 <skeleton >
   <bones >
-    <bone name="offmesh.1.a" id="0" >
-      <position z="-1.076599" x="-0.636559" y="2.267532" />
+    <bone name="Bone" id="0" >
+      <position z="0.000000" x="0.000000" y="0.000000" />
       <rotation angle="0.000000" >
         <axis z="0.000000" x="1.000000" y="0.000000" />
       </rotation>
     </bone>
-    <bone name="offmesh.1.b" id="1" >
-      <position z="-1.422867" x="-0.841297" y="0.000000" />
+    <bone name="offmesh.pond.a" id="1" >
+      <position z="-0.365853" x="-7.682925" y="-0.816100" />
       <rotation angle="0.000000" >
         <axis z="0.000000" x="1.000000" y="0.000000" />
       </rotation>
@@ -17,7 +17,7 @@
   <animations >
     <animation name="my_animation" length="10.375" >
       <tracks >
-        <track bone="offmesh.1.a" >
+        <track bone="Bone" >
           <keyframes >
             <keyframe time="0.0" >
               <translate z="0.000000" x="0.000000" y="0.000000" />
@@ -1771,7 +1771,7 @@
             </keyframe>
           </keyframes>
         </track>
-        <track bone="offmesh.1.b" >
+        <track bone="offmesh.pond.a" >
           <keyframes >
             <keyframe time="0.0" >
               <translate z="0.000000" x="0.000000" y="0.000000" />

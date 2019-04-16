@@ -27,6 +27,7 @@
 
 package com.jme3.recast4j.demo.states;
 
+import com.jme3.animation.Bone;
 import com.jme3.animation.SkeletonControl;
 import com.jme3.app.Application;
 import com.jme3.app.SimpleApplication;
@@ -78,6 +79,15 @@ import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import com.jme3.util.BufferUtils;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.regex.Pattern;
+import org.recast4j.detour.extras.PolyUtils;
+import static org.recast4j.recast.RecastVectors.copy;
+import static org.recast4j.recast.RecastVectors.copy;
+import static org.recast4j.recast.RecastVectors.copy;
 import static org.recast4j.recast.RecastVectors.copy;
 
 /**
@@ -93,6 +103,7 @@ public class NavState extends BaseAppState {
     private NavMeshQuery query;
     private List<Node> characters;
     private List<Geometry> pathGeometries;
+    private Map<String, org.recast4j.detour.OffMeshConnection> mapOffMeshCon;
     private PartitionType m_partitionType = PartitionType.WATERSHED;   
     private float maxClimb = .3f; //Should add getter for this.
     private float radius = 0.4f; //Should add getter for this.
@@ -101,6 +112,7 @@ public class NavState extends BaseAppState {
     public NavState() {
         pathGeometries = new ArrayList<>(64);
         characters = new ArrayList<>(64);  
+        mapOffMeshCon = new HashMap<>();
     }
     
     @Override
@@ -140,7 +152,7 @@ public class NavState extends BaseAppState {
                 if (getCharacters().size() == 1) {
                     DefaultQueryFilter filter = new BetterDefaultQueryFilter();
                     
-                    int includeFlags = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
+                    int includeFlags = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR | SAMPLE_POLYFLAGS_SWIM | SAMPLE_POLYFLAGS_JUMP;
                     filter.setIncludeFlags(includeFlags);
 
                     int excludeFlags = SAMPLE_POLYFLAGS_DISABLED;
@@ -373,7 +385,7 @@ public class NavState extends BaseAppState {
                 for (StraightPathItem p: list.result) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
                     ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
-                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                    if (p.getRef() != 0) { // if ref is 0, it's the linkB.
                         ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
                     }
                     vector3fList.add(nu);
@@ -420,7 +432,7 @@ public class NavState extends BaseAppState {
                 for (StraightPathItem p: list.result) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
                     ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
-                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                    if (p.getRef() != 0) { // if ref is 0, it's the linkB.
                         ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
                     }
                     vector3fList.add(nu);
@@ -463,7 +475,7 @@ public class NavState extends BaseAppState {
                 for (StraightPathItem p: list.result) {
                     Vector3f nu = DetourUtils.createVector3f(p.getPos());
                     ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredLineBetween(ColorRGBA.Orange, oldPos.add(0f, 0.5f, 0f), nu.add(0f, 0.5f, 0f)));
-                    if (p.getRef() != 0) { // if ref is 0, it's the end.
+                    if (p.getRef() != 0) { // if ref is 0, it's the linkB.
                         ((SimpleApplication) getApplication()).getRootNode().attachChild(placeColoredBoxAt(ColorRGBA.Blue, nu.add(0f, 0.5f, 0f)));
                     }
                     vector3fList.add(nu);
@@ -659,9 +671,9 @@ public class NavState extends BaseAppState {
                      * that are flagged as same connection and set the off mesh 
                      * connections programmatically. 
                      */
-                    String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
+                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
                     
-                    switch (name) {
+                    switch (name[0]) {
                         
                         case "water":
                             areaMod.add(SAMPLE_AREAMOD_WATER);
@@ -886,9 +898,9 @@ public class NavState extends BaseAppState {
                      * that are flagged as same connection and set the off mesh 
                      * connections programmatically. 
                      */
-                    String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
+                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
                     
-                    switch (name) {
+                    switch (name[0]) {
                         
                         case "water":
                             areaMod.add(SAMPLE_AREAMOD_WATER);
@@ -944,13 +956,13 @@ public class NavState extends BaseAppState {
             if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
             ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
             ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_WALK);
+                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK);
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_SWIM);
+                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_SWIM);
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                paramsBuilder.withPolyFlags(i, SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
+                paramsBuilder.withPolyFlags(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
             } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
-                paramsBuilder.withPolyFlag(i, SAMPLE_POLYFLAGS_JUMP);
+                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_JUMP);
             }
         }
         
@@ -993,8 +1005,11 @@ public class NavState extends BaseAppState {
         //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
 
-        SceneGraphVisitor visitor = new SceneGraphVisitor() {
-
+        SceneGraphVisitor visitor;
+        visitor = new SceneGraphVisitor() {
+            //Id will be used for OffMeshConnections.
+            int id = 0;
+            
             @Override
             public void visit(Spatial spat) {
                 if (spat instanceof Geometry) {
@@ -1002,23 +1017,23 @@ public class NavState extends BaseAppState {
                     //TriMesh later.
                     listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
                     /**
-                     * Set Area Type based off materials in this case. UserData 
-                     * can be added as a optional way to do this. UserData would 
-                     * require separating the geometry in blender which is not 
-                     * any different really than using materials. 
-                     * 
-                     * Doors could work the same way, mark the path between the 
-                     * two rooms with a material or separate the door path 
-                     * geometry into a separate object so it can be picked out. 
-                     * 
-                     * Off mesh connections can use a similar format. We could 
-                     * parse the geometry looking for two connection geometry 
-                     * that are flagged as same connection and set the off mesh 
+                     * Set Area Type based off materials in this case. UserData
+                     * can be added as a optional way to do this. UserData would
+                     * require separating the geometry in blender which is not
+                     * any different really than using materials.
+                     *
+                     * Doors could work the same way, mark the path between the
+                     * two rooms with a material or separate the door path
+                     * geometry into a separate object so it can be picked out.
+                     *
+                     * Off mesh connections can use a similar format. We could
+                     * parse the geometry looking for two connection geometry
+                     * that are flagged as same connection and set the off mesh
                      * connections programmatically. 
                      */
-                    String name = getAreaTypeFromMaterial(((Geometry) spat).getMaterial().getName());
+                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
 
-                    switch (name) {
+                    switch (name[0]) {
                         
                         case "water":
                             areaMod.add(SAMPLE_AREAMOD_WATER);
@@ -1032,18 +1047,139 @@ public class NavState extends BaseAppState {
                         case "door":
                             areaMod.add(SAMPLE_AREAMOD_DOOR);
                             break;
-                        case "jump":
-                            areaMod.add(SAMPLE_AREAMOD_JUMP);
-                            break;
                         default:
                             areaMod.add(SAMPLE_AREAMOD_GROUND);
+                    }
+                }
+                
+                //Search for offMesh connections that use armature bone naming.
+                if (spat instanceof Node) {
+                    
+                    /**
+                     * worldmap has no skeleton and is instance of node so the 
+                     * search will include its children. This will return with a 
+                     * child SkeletonControl because of this. Add check to skip 
+                     * worldmap.
+                     */
+                    if (!spat.getName().equals("worldmap")) {
+                        
+                        SkeletonControl skelCont = getState(UtilState.class).findControl(spat, SkeletonControl.class);
+
+                        if (skelCont != null) {
+                            /**
+                            * Offmesh connections require a start/end vector3f. 
+                            * To attain these vector3f, you can use bones from 
+                            * an armature. The bones must be paired and use a 
+                            * naming convention. In our case, we use:
+                            * 
+                            * arg[0](delimiter)arg[1](delimiter)arg[2]
+                            * 
+                            * You set each bone origin to any vertices, in any 
+                            * mesh, as long as the same string for arg[0] and 
+                            * arg[1] are identical and they do not use the same 
+                            * vertices. 
+                            * 
+                            * Naming convention for two bones: 
+                            * 
+                            * Bone 1 naming: offmesh.anything.a
+                            * Bone 2 naming: offmesh.anything.b
+                            * 
+                            * arg[0]: offmesh   = same value all bones
+                            * arg[1]: anything  = same value paired bones
+                            * arg[2]: a or b    = one paired bone
+                            * 
+                            * The value of arg[0] applies to ALL bones and 
+                            * dictates these are link bones.
+                            * 
+                            * The value of arg[1] dictates these pair of bones 
+                            * belong together. 
+                            * 
+                            * The value of arg[2] distinguishes the paired bones 
+                            * from each other.
+                            * 
+                            * Examples: 
+                            * 
+                            * offmesh.pond.a
+                            * offmesh.pond.b
+                            * offmesh.1.a
+                            * offmesh.1.b
+                            */
+                            Bone[] roots = skelCont.getSkeleton().getRoots();
+                            for (Bone b: roots) {
+                                /**
+                                 * Split the name up using delimiter. 
+                                 */
+                                String[] arg = b.getName().split("\\.");
+
+                                if (arg[0].equals("offmesh")) {
+
+                                    //New connection.
+                                    org.recast4j.detour.OffMeshConnection linkA = new org.recast4j.detour.OffMeshConnection();
+                                    
+                                    /**
+                                     * The bones worldTranslation will be the 
+                                     * start Vector3f of the OffMeshConnection 
+                                     * object.
+                                     */
+                                    float[] startPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
+                                    
+                                    /**
+                                     * Prepare new position array. The endpoints 
+                                     * of the connection. 
+                                     *  startPos    endPos
+                                     * [ax, ay, az, bx, by, bz]
+                                     */
+                                    float[] pos = new float[6];
+                                    
+                                    //Copy linkA current postition to A.startPos. 
+                                    System.arraycopy(startPos, 0, pos, 0, 3);
+                                    
+                                    //Set linkA pos to new array.
+                                    linkA.pos = pos;
+
+                                    //Player (r)adius. Links fire at (r) * 2.25.
+                                    linkA.rad = radius;
+
+                                    /**
+                                     * We need to look for the bones mate. Based 
+                                     * off our naming convention, this will be 
+                                     * offmesh.anything."a" or "b" so we set the 
+                                     * search to whatever this bones arg[2] isn't.
+                                     */
+                                    String linkB = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
+
+                                    /**
+                                     * If the paired bone has already been added 
+                                     * to map, set endPos and give each an id.
+                                     */
+                                    if (mapOffMeshCon.containsKey(linkB)) {
+                                        //Copy A.startPos to B.endPos.
+                                        System.arraycopy(linkA.pos, 0, mapOffMeshCon.get(linkB).pos, 3, 3);
+                                        //Copy B.startPos to A.endPos.
+                                        System.arraycopy(mapOffMeshCon.get(linkB).pos, 0, linkA.pos, 3, 3);
+
+                                        /**
+                                         * OffMeshconnections with id of 0 don't 
+                                         * get processed later.
+                                         */
+                                        linkA.userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), linkA.userId);
+                                        mapOffMeshCon.get(linkB).userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id [{}]", linkB, mapOffMeshCon.get(linkB).userId);
+
+                                    }
+                                    //Add this bone to map.
+                                    mapOffMeshCon.put(b.getName(), linkA);
+                                }
+                            }
+                        }
                     }
                 }
             }
         };
         
-        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
-
+        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);        
+        
         //Step 1. Gather our geometry.
         InputGeomProvider geomProvider = new GeometryProviderBuilder(worldMap).build();
         //Step 2. Create a Recast configuration object.
@@ -1084,6 +1220,7 @@ public class NavState extends BaseAppState {
                 if (m_pmesh.npolys == 0) {
                         continue;
                 }
+                
                 // Update obj flags from areas. Including offmesh connections.
                 for (int i = 0; i < m_pmesh.npolys; ++i) {
                     if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
@@ -1094,9 +1231,7 @@ public class NavState extends BaseAppState {
                         m_pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
                     } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
                         m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
-                    } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
-                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_JUMP;
-                    }
+                    }                     
                 }
                 
                 NavMeshDataCreateParams params = new NavMeshDataCreateParams();
@@ -1130,19 +1265,139 @@ public class NavState extends BaseAppState {
         }
         
         query = new NavMeshQuery(navMesh);
+        
+        /**
+         * Process OffMeshConnections. 
+         * Basic flow: 
+         * Check each mapOffMeshConnection for an index > 0. 
+         * findNearestPoly() for the start/end positions of the link.
+         * getTileAndPolyByRef() using the returned poly reference.
+         * If both start and end are good values, set the connection properties.
+         */
+        Iterator<Map.Entry<String, org.recast4j.detour.OffMeshConnection>> itOffMesh = mapOffMeshCon.entrySet().iterator();
+        while (itOffMesh.hasNext()) {
+            Map.Entry<String, org.recast4j.detour.OffMeshConnection> next = itOffMesh.next();
 
+            /**
+             * If the OffMeshConnection id is 0, there is no paired bone for the
+             * link so skip.
+             */            
+            if (next.getValue().userId > 0) {
+                //Create a new filter for findNearestPoly
+                DefaultQueryFilter filter = new DefaultQueryFilter();
+
+                //In our case, we only need swim or walk flags.
+                int include = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_SWIM;
+                filter.setIncludeFlags(include);
+
+                //No excludes.
+                int exclude = 0;
+                filter.setExcludeFlags(exclude);
+
+                //Get the start position for the link.
+                float[] startPos = new float[3];
+                System.arraycopy(next.getValue().pos, 0, startPos, 0, 3);
+                //Get the end position for the link.
+                float[] endPos = new float[3];
+                System.arraycopy(next.getValue().pos, 3, endPos, 0, 3);
+
+                //Find the nearest polys to start/end.
+                Result<FindNearestPolyResult> startPoly = query.findNearestPoly(startPos, new float[] {1,1,1}, filter);
+                Result<FindNearestPolyResult> endPoly = query.findNearestPoly(endPos, new float[] {1,1,1}, filter);
+
+                /**
+                 * Note: not isFailure() here, because isSuccess guarantees us, 
+                 * that the result isn't "RUNNING", which it could be if we only 
+                 * check it's not failure.
+                 */
+                if (!startPoly.status.isSuccess() 
+                ||  !endPoly.status.isSuccess() 
+                ||   startPoly.result.getNearestRef() == 0 
+                ||   endPoly.result.getNearestRef() == 0) {
+                    LOG.error("offmeshCon findNearestPoly unsuccessful or getNearestRef is not > 0.");
+                    LOG.error("Link [{}] pos {} id [{}]", next.getKey(), Arrays.toString(next.getValue().pos), next.getValue().userId);
+                    LOG.error("findNearestPoly startPoly [{}] getNearestRef [{}]", startPoly.status.isSuccess(), startPoly.result.getNearestRef());
+                    LOG.error("findNearestPoly endPoly [{}] getNearestRef [{}].", endPoly.status.isSuccess(), endPoly.result.getNearestRef());
+                } else {
+                    //Get the tile and poly from reference.
+                    Result<Tupple2<MeshTile, Poly>> startTileByRef = navMesh.getTileAndPolyByRef(startPoly.result.getNearestRef());
+                    Result<Tupple2<MeshTile, Poly>> endTileByRef = navMesh.getTileAndPolyByRef(endPoly.result.getNearestRef());
+
+                    //Mesh data for the start/end tile.
+                    MeshData startTile = startTileByRef.result.first.data;
+                    MeshData endTile = endTileByRef.result.first.data;
+
+                    //Both start and end poly must be vailid.
+                    if (startTileByRef.result.second != null && endTileByRef.result.second != null) {
+                        //We will add a new poly that will become our "link" 
+                        //between start and end points so make room for it.
+                        startTile.polys = Arrays.copyOf(startTile.polys, startTile.polys.length + 1);
+                        //We shifted everything but haven't incremented polyCount 
+                        //yet so this will become our new poly's index.
+                        int poly = startTile.header.polyCount;
+                        //Jme requires 3 vetetice per poly.
+                        startTile.polys[poly] = new Poly(poly, 3);
+                        //Must add/create our new indices for start and end.
+                        startTile.polys[poly].verts[0] = startTile.header.vertCount;
+                        startTile.polys[poly].verts[1] = startTile.header.vertCount + 1;
+                        //Set the poly's type to DT_POLYTYPE_OFFMESH_CONNECTION
+                        //so it is not seen as a regular poly when linking.
+                        startTile.polys[poly].setType(Poly.DT_POLYTYPE_OFFMESH_CONNECTION);
+                        //Make room for our start/end verts.
+                        startTile.verts = Arrays.copyOf(startTile.verts, startTile.verts.length + 6);
+                        //Increment our poly and vert counts.
+                        startTile.header.polyCount++;
+                        startTile.header.vertCount += 2;
+                        //Set our OffMeshLinks poly to this new poly.
+                        next.getValue().poly = poly;
+                        //Shorten names and make readable. Could just call directly.
+                        float[] start = startPoly.result.getNearestPos();
+                        float[] end = endPoly.result.getNearestPos();
+                        //Set the links position array values to nearest.
+                        next.getValue().pos = new float[] { start[0], start[1], start[2], end[0], end[1], end[2] };
+                        //Determine what side of the tile the vertx is on.
+                        next.getValue().side = startTile == endTile ? 0xFF
+                                : NavMeshBuilder.classifyOffMeshPoint(new VectorPtr(next.getValue().pos, 3),
+                                        startTile.header.bmin, startTile.header.bmax);
+                        //Create new OffMeshConnection array.
+                        if (startTile.offMeshCons == null) {
+                                startTile.offMeshCons = new org.recast4j.detour.OffMeshConnection[1];
+                        } else {
+                                startTile.offMeshCons = Arrays.copyOf(startTile.offMeshCons, startTile.offMeshCons.length + 1);
+                        }
+                        
+                        //Add this connection.
+                        startTile.offMeshCons[startTile.offMeshCons.length - 1] = next.getValue();
+                        startTile.header.offMeshConCount++;
+
+                        //Set the polys area type and flags.
+                        startTile.polys[poly].flags = SAMPLE_POLYFLAGS_JUMP;
+                        startTile.polys[poly].setArea(SAMPLE_POLYAREA_TYPE_JUMP);
+
+                        /**
+                         * Removing and adding the tile will rebuild all the 
+                         * links for the tile automatically. The number of links 
+                         * is : edges + portals * 2 + off-mesh con * 2.
+                         */
+                        MeshData removeTile = navMesh.removeTile(navMesh.getTileRef(startTileByRef.result.first));
+                        navMesh.addTile(removeTile, 0, navMesh.getTileRef(startTileByRef.result.first));
+                    }
+                }       
+            }
+        }
+        
         try {
             //Native format using tiles.
             MeshSetWriter msw = new MeshSetWriter();
             msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
             //Read in saved NavMesh.
             MeshSetReader msr = new MeshSetReader();
-            NavMesh navMeshFromSaved = msr.read(new FileInputStream("test.nm"), cfg.maxVertsPerPoly);
-            int maxTiles = navMeshFromSaved.getMaxTiles();
+            navMesh = msr.read(new FileInputStream("test.nm"), cfg.maxVertsPerPoly);
+            int maxTiles = navMesh.getMaxTiles();
 
             //Tile data can be null since maxTiles is not an exact science.
             for (int i = 0; i < maxTiles; i++) {
-                MeshData meshData = navMeshFromSaved.getTile(i).data;
+                MeshData meshData = navMesh.getTile(i).data;
                 if (meshData != null ) {
                     showDebugByArea(meshData, true);
                 }
@@ -1151,7 +1406,7 @@ public class NavState extends BaseAppState {
             LOG.info("{} {}", CrowdBuilderState.class.getName(), ex);
         }
     }  
-    
+ 
     /**
      * Displays a debug mesh based off the area type of the poly.
      * 
@@ -1321,24 +1576,7 @@ public class NavState extends BaseAppState {
         }
         return triangles;
     }  
-    
-    /**
-     * Returns the first string after split "_" converted to lower case. 
-     * Expected use is for material names.
-     * 
-     * Example: 
-     *      road_asphalt = road
-     *      water_blue   = water
-     *      grass_green  = grass
-     * 
-     * @param str Material name to parse. 
-     * @return First returned string of split converted to lower case.
-     */
-    private String getAreaTypeFromMaterial(String str) {
-        String[] split = str.toLowerCase().split("_");
-        return split[0];
-    }
-    
+        
     /**
      * Prints any polygons found flags to the log.
      * 

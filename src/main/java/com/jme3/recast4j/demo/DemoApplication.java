@@ -306,14 +306,15 @@ public class DemoApplication extends SimpleApplication {
     }
     
     private void loadPond() {
-        Node pond = (Node) getAssetManager().loadModel("Models/Pond/pond_ground.j3o"); 
+        Node pond = (Node) getAssetManager().loadModel("Models/Pond/pond.mesh.j3o"); 
+        pond.setName("pond");
         pond.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(pond);
         worldMap.attachChild(pond);
     }
 
     private void loadPondSurface() {
-        Node surface = (Node) getAssetManager().loadModel("Models/Pond/pond_surface.j3o");
+        Node surface = (Node) getAssetManager().loadModel("Models/Pond/water_surface.mesh.j3o");
         surface.setName("water");
         Vector3f localTranslation = surface.getLocalTranslation();
         surface.setLocalTranslation(localTranslation.x, 4f, localTranslation.z);
@@ -323,7 +324,7 @@ public class DemoApplication extends SimpleApplication {
     }
     
     private void loadCrate() {
-        Node Crate = (Node) getAssetManager().loadModel("Models/Crate/Crate.mesh.j3o");
+        Node Crate = (Node) getAssetManager().loadModel("Models/Pond/crate.mesh.j3o");
         Crate.setName("crate");
         Crate.setLocalTranslation(4.0f, 0.0f, 0.0f);
         worldMap.attachChild(Crate);

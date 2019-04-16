@@ -14,19 +14,19 @@ material _missing_material_
     }
 }
 
-// box_mat genrated by blender2ogre 0.6.0
+// ground genrated by blender2ogre 0.6.0
 
-material box_mat 
+material ground 
 {
     receive_shadows on 
 
     technique
     {
-        pass box_mat
+        pass ground
         {
             ambient 0.800000011920929 0.800000011920929 0.800000011920929 1.0
-            diffuse 0.800000011920929 0.800000011920929 0.800000011920929 1.0
-            specular 0.0 0.0 0.0 1.0 12.5
+            diffuse 0.6400000190734865 0.6400000190734865 0.6400000190734865 1.0
+            specular 0.5 0.5 0.5 1.0 12.5
             emissive 0.0 0.0 0.0 1.0
 
             alpha_to_coverage off
@@ -48,52 +48,27 @@ material box_mat
 
             texture_unit 
             {
-                texture box.jpg
+                texture brown_diff.png
                 tex_address_mode wrap
                 scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_NRM.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_OCC.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_SPEC.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
                 colour_op modulate
             }
         }
     }
 }
-// jump_box_mat genrated by blender2ogre 0.6.0
+// water_bottom genrated by blender2ogre 0.6.0
 
-material jump_box_mat 
+material water_bottom 
 {
     receive_shadows on 
 
     technique
     {
-        pass jump_box_mat
+        pass water_bottom
         {
             ambient 0.800000011920929 0.800000011920929 0.800000011920929 1.0
-            diffuse 0.800000011920929 0.800000011920929 0.800000011920929 1.0
-            specular 0.0 0.0 0.0 1.0 12.5
+            diffuse 0.6400000190734865 0.6400000190734865 0.6400000190734865 1.0
+            specular 0.5 0.5 0.5 1.0 12.5
             emissive 0.0 0.0 0.0 1.0
 
             alpha_to_coverage off
@@ -115,34 +90,9 @@ material jump_box_mat
 
             texture_unit 
             {
-                texture box.jpg
+                texture brown2_diff.png
                 tex_address_mode wrap
                 scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_NRM.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_OCC.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_SPEC.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
                 colour_op modulate
             }
         }
