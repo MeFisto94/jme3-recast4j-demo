@@ -1346,9 +1346,25 @@ public class NavState extends BaseAppState {
                         //We shifted everything but haven't incremented polyCount 
                         //yet so this will become our new poly's index.
                         int poly = startTile.header.polyCount;
-                        //Jme requires 3 vetetice per poly.
+                        /**
+                         * Off-mesh connections are stored in the navigation 
+                         * mesh as special 2-vertex polygons with a single edge. 
+                         * At least one of the vertices is expected to be inside 
+                         * a normal polygon. So an off-mesh connection is 
+                         * "entered" from a normal polygon at one of its 
+                         * endpoints. Jme requires 3 vertices per poly to 
+                         * compile so we have to create a 3-vertex polygon. The 
+                         * extra vertex position will be connected automatically 
+                         * when we add the tile back to the navmesh.
+                         * 
+                         * See: https://github.com/ppiastucki/recast4j/blob/3c532068d79fe0306fedf035e50216008c306cdf/detour/src/main/java/org/recast4j/detour/NavMesh.java#L406
+                         */
                         startTile.polys[poly] = new Poly(poly, 3);
-                        //Must add/create our new indices for start and end.
+                        /**
+                         * Must add/create our new indices for start and end.
+                         * When we add the tile, the third vert will be 
+                         * generated for us. 
+                         */
                         startTile.polys[poly].verts[0] = startTile.header.vertCount;
                         startTile.polys[poly].verts[1] = startTile.header.vertCount + 1;
                         //Set the poly's type to DT_POLYTYPE_OFFMESH_CONNECTION
