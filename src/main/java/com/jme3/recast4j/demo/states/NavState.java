@@ -654,57 +654,50 @@ public class NavState extends BaseAppState {
         //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
        
-        SceneGraphVisitor visitor = new SceneGraphVisitor() {
-
+        //Set area types and flags.
+        worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+            
             @Override
-            public void visit(Spatial spat) {
-                if (spat instanceof Geometry) {
-                    //Load triangle lengths so we can pick them out from the 
-                    //TriMesh later.
-                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                    
-                    /**
-                     * Set Area Type based off materials in this case. UserData 
-                     * can be added as a optional way to do this. UserData would 
-                     * require separating the geometry in blender which is not 
-                     * any different really than using materials. 
-                     * 
-                     * Doors could work the same way, mark the path between the 
-                     * two rooms with a material or separate the door path 
-                     * geometry into a separate object so it can be picked out. 
-                     * 
-                     * Off mesh connections can use a similar format. We could 
-                     * parse the geometry looking for two connection geometry 
-                     * that are flagged as same connection and set the off mesh 
-                     * connections programmatically. 
-                     */
-                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
-                    
-                    switch (name[0]) {
-                        
-                        case "water":
-                            areaMod.add(SAMPLE_AREAMOD_WATER);
-                            break;
-                        case "road":
-                            areaMod.add(SAMPLE_AREAMOD_ROAD);
-                            break;
-                        case "grass":
-                            areaMod.add(SAMPLE_AREAMOD_GRASS);
-                            break;
-                        case "door":
-                            areaMod.add(SAMPLE_AREAMOD_DOOR);
-                            break;
-                        case "jump":
-                            areaMod.add(SAMPLE_AREAMOD_JUMP);
-                            break;
-                        default:
-                            areaMod.add(SAMPLE_AREAMOD_GROUND);
-                    }
+            public void visit(Geometry spat) {
+                //Load triangle lengths so we can pick them out from the 
+                //TriMesh later.
+                listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                /**
+                 * Set Area Type based off materials in this case. UserData
+                 * can be added as a optional way to do this. UserData would
+                 * require separating the geometry in blender which is not
+                 * any different really than using materials.
+                 *
+                 * Doors could work the same way, mark the path between the
+                 * two rooms with a material or separate the door path
+                 * geometry into a separate object so it can be picked out.
+                 *
+                 * Off mesh connections can use a similar format. We could
+                 * parse the geometry looking for two connection geometry
+                 * that are flagged as same connection and set the off mesh
+                 * connections programmatically. 
+                 */
+                String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
+
+                switch (name[0]) {
+
+                    case "water":
+                        areaMod.add(SAMPLE_AREAMOD_WATER);
+                        break;
+                    case "road":
+                        areaMod.add(SAMPLE_AREAMOD_ROAD);
+                        break;
+                    case "grass":
+                        areaMod.add(SAMPLE_AREAMOD_GRASS);
+                        break;
+                    case "door":
+                        areaMod.add(SAMPLE_AREAMOD_DOOR);
+                        break;
+                    default:
+                        areaMod.add(SAMPLE_AREAMOD_GROUND);
                 }
             }
-        };
-        
-        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
+        });
 
         //Build merged mesh.
         InputGeomProvider geomProvider = new GeometryProviderBuilder(
@@ -788,57 +781,50 @@ public class NavState extends BaseAppState {
         //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
         
-        SceneGraphVisitor visitor = new SceneGraphVisitor() {
-
+        //Set area types and flags.
+        worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+            
             @Override
-            public void visit(Spatial spat) {
-                if (spat instanceof Geometry) {
-                    //Load triangle lengths so we can pick them out from the 
-                    //TriMesh later.
-                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                    
-                    /**
-                     * Set Area Type based off materials in this case. UserData 
-                     * can be added as a optional way to do this. UserData would 
-                     * require separating the geometry in blender which is not 
-                     * any different really than using materials. 
-                     * 
-                     * Doors could work the same way, mark the path between the 
-                     * two rooms with a material or separate the door path 
-                     * geometry into a separate object so it can be picked out. 
-                     * 
-                     * Off mesh connections can use a similar format. We could 
-                     * parse the geometry looking for two connection geometry 
-                     * that are flagged as same connection and set the off mesh 
-                     * connections programmatically. 
-                     */
-                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
-                    
-                    switch (name[0]) {
-                        
-                        case "water":
-                            areaMod.add(SAMPLE_AREAMOD_WATER);
-                            break;
-                        case "road":
-                            areaMod.add(SAMPLE_AREAMOD_ROAD);
-                            break;
-                        case "grass":
-                            areaMod.add(SAMPLE_AREAMOD_GRASS);
-                            break;
-                        case "door":
-                            areaMod.add(SAMPLE_AREAMOD_DOOR);
-                            break;
-                        case "jump":
-                            areaMod.add(SAMPLE_AREAMOD_JUMP);
-                            break;
-                        default:
-                            areaMod.add(SAMPLE_AREAMOD_GROUND);
-                    }
+            public void visit(Geometry spat) {
+                //Load triangle lengths so we can pick them out from the 
+                //TriMesh later.
+                listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                /**
+                 * Set Area Type based off materials in this case. UserData
+                 * can be added as a optional way to do this. UserData would
+                 * require separating the geometry in blender which is not
+                 * any different really than using materials.
+                 *
+                 * Doors could work the same way, mark the path between the
+                 * two rooms with a material or separate the door path
+                 * geometry into a separate object so it can be picked out.
+                 *
+                 * Off mesh connections can use a similar format. We could
+                 * parse the geometry looking for two connection geometry
+                 * that are flagged as same connection and set the off mesh
+                 * connections programmatically. 
+                 */
+                String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
+
+                switch (name[0]) {
+
+                    case "water":
+                        areaMod.add(SAMPLE_AREAMOD_WATER);
+                        break;
+                    case "road":
+                        areaMod.add(SAMPLE_AREAMOD_ROAD);
+                        break;
+                    case "grass":
+                        areaMod.add(SAMPLE_AREAMOD_GRASS);
+                        break;
+                    case "door":
+                        areaMod.add(SAMPLE_AREAMOD_DOOR);
+                        break;
+                    default:
+                        areaMod.add(SAMPLE_AREAMOD_GROUND);
                 }
             }
-        };
-        
-        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
+        });
 
         //Build merged mesh.
         InputGeomProvider geomProvider = new GeometryProviderBuilder(
@@ -1069,10 +1055,10 @@ public class NavState extends BaseAppState {
             @Override
             public void visit(Node spat) { 
                 /**
-                 * offMeshConnections has no skeleton and is instance of node so the 
+                 * offMeshCon has no skeleton and is instance of node so the 
                  * search will include its children. This will return with a 
                  * child SkeletonControl because of this. Add check to skip 
-                 * offMeshConnections.
+                 * offMeshCon.
                  */
                 if (!spat.getName().equals(offMeshCon.getName())) {
 
