@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class DemoApplication extends SimpleApplication {
     
     private final Quaternion YAW180 = new Quaternion().fromAngleAxis(FastMath.PI, new Vector3f(0,1,0));
-    private Node worldMap, doorNode;
+    private Node worldMap, doorNode, offMeshCon;
     Logger LOG = LoggerFactory.getLogger(DemoApplication.class.getName());
     
     public DemoApplication() {
@@ -78,7 +78,7 @@ public class DemoApplication extends SimpleApplication {
     }
 
     @Override
-    public void simpleInitApp() {    
+    public void simpleInitApp() {  
         initKeys();
         //Set the atmosphere of the world, lights, camera, post processing, physics.
         setupWorld();
@@ -95,6 +95,10 @@ public class DemoApplication extends SimpleApplication {
     private void setupWorld() {
         worldMap = new Node("worldmap");
         getRootNode().attachChild(worldMap);
+
+        offMeshCon = new Node("offMeshCon");
+        getRootNode().attachChild(offMeshCon);
+
         
         BulletAppState bullet = new BulletAppState();
         // Performance is better when threading in parallel
@@ -311,23 +315,37 @@ public class DemoApplication extends SimpleApplication {
         pond.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(pond);
         worldMap.attachChild(pond);
+        
+        //Add offmesh connection
+        Node pond_offmesh = (Node) getAssetManager().loadModel("Models/Pond/offmesh/pond_offmesh.mesh.j3o");
+        offMeshCon.attachChild(pond_offmesh);
     }
 
     private void loadPondSurface() {
-        Node surface = (Node) getAssetManager().loadModel("Models/Pond/water_surface.mesh.j3o");
+        Node surface = (Node) getAssetManager().loadModel("Models/Pond/Water/water_surface.mesh.j3o");
         surface.setName("water");
         Vector3f localTranslation = surface.getLocalTranslation();
         surface.setLocalTranslation(localTranslation.x, 4f, localTranslation.z);
         surface.addControl(new RigidBodyControl(0));
         getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(surface);
         worldMap.attachChild(surface);
+        
+        //Add water offmesh connection.
+        Node water_offmesh = (Node) getAssetManager().loadModel("Models/Pond/Water/offmesh/water_offmesh.mesh.j3o");
+        water_offmesh.setLocalTranslation(surface.getLocalTranslation());
+        offMeshCon.attachChild(water_offmesh);
     }
     
     private void loadCrate() {
-        Node Crate = (Node) getAssetManager().loadModel("Models/Pond/crate.mesh.j3o");
-        Crate.setName("crate");
-        Crate.setLocalTranslation(4.0f, 0.0f, 0.0f);
-        worldMap.attachChild(Crate);
+        Node crate = (Node) getAssetManager().loadModel("Models/Crate/crate.mesh.j3o");
+        crate.setName("crate");
+        crate.setLocalTranslation(4.0f, 0.0f, 0.0f);
+        worldMap.attachChild(crate);
+        
+        //Add crate offmesh connection.
+        Node crate_offmesh = (Node) getAssetManager().loadModel("Models/Crate/offmesh/crate_offmesh.mesh.j3o");
+        crate_offmesh.setLocalTranslation(crate.getLocalTranslation());
+        offMeshCon.attachChild(crate_offmesh);
     }
     
     private ActionListener actionListener = new ActionListener() {

@@ -93,7 +93,7 @@ public class NavState extends BaseAppState {
 
     private static final Logger LOG = LoggerFactory.getLogger(NavState.class.getName());
     
-    private Node worldMap, doorNode;
+    private Node worldMap, doorNode, offMeshCon;
     private NavMesh navMesh;
     private NavMeshQuery query;
     private List<Node> characters;
@@ -126,6 +126,7 @@ public class NavState extends BaseAppState {
     @Override
     protected void onEnable() {
         worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
+        offMeshCon = (Node)((SimpleApplication) getApplication()).getRootNode().getChild("offMeshCon");
 //        //Original implementation using jme3-recast4j methods.
 //        buildSolo();
 //        //Solo build using jme3-recast4j methods. Implements area and flag types.
@@ -135,7 +136,6 @@ public class NavState extends BaseAppState {
         //Tile build using recast4j methods. Implements area and flag types plus
         //offmesh connections.
         buildTiledRecast4j();
-
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -1016,180 +1016,182 @@ public class NavState extends BaseAppState {
         //Collect area modifications based off geometry material or userData.
         List<AreaModification> areaMod = new ArrayList<>();
 
-        SceneGraphVisitor visitor;
-        visitor = new SceneGraphVisitor() {
+        //Set area types and flags.
+        worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+            
+            @Override
+            public void visit(Geometry spat) {
+                //Load triangle lengths so we can pick them out from the 
+                //TriMesh later.
+                listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                /**
+                 * Set Area Type based off materials in this case. UserData
+                 * can be added as a optional way to do this. UserData would
+                 * require separating the geometry in blender which is not
+                 * any different really than using materials.
+                 *
+                 * Doors could work the same way, mark the path between the
+                 * two rooms with a material or separate the door path
+                 * geometry into a separate object so it can be picked out.
+                 *
+                 * Off mesh connections can use a similar format. We could
+                 * parse the geometry looking for two connection geometry
+                 * that are flagged as same connection and set the off mesh
+                 * connections programmatically. 
+                 */
+                String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
+
+                switch (name[0]) {
+
+                    case "water":
+                        areaMod.add(SAMPLE_AREAMOD_WATER);
+                        break;
+                    case "road":
+                        areaMod.add(SAMPLE_AREAMOD_ROAD);
+                        break;
+                    case "grass":
+                        areaMod.add(SAMPLE_AREAMOD_GRASS);
+                        break;
+                    case "door":
+                        areaMod.add(SAMPLE_AREAMOD_DOOR);
+                        break;
+                    default:
+                        areaMod.add(SAMPLE_AREAMOD_GROUND);
+                }
+            }
+        });
+        
+        //Set offmesh connections.
+        offMeshCon.depthFirstTraversal(new SceneGraphVisitorAdapter() {
             //Id will be used for OffMeshConnections.
             int id = 0;
             
             @Override
-            public void visit(Spatial spat) {
-                if (spat instanceof Geometry) {
-                    //Load triangle lengths so we can pick them out from the 
-                    //TriMesh later.
-                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                    /**
-                     * Set Area Type based off materials in this case. UserData
-                     * can be added as a optional way to do this. UserData would
-                     * require separating the geometry in blender which is not
-                     * any different really than using materials.
-                     *
-                     * Doors could work the same way, mark the path between the
-                     * two rooms with a material or separate the door path
-                     * geometry into a separate object so it can be picked out.
-                     *
-                     * Off mesh connections can use a similar format. We could
-                     * parse the geometry looking for two connection geometry
-                     * that are flagged as same connection and set the off mesh
-                     * connections programmatically. 
-                     */
-                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
+            public void visit(Node spat) { 
+                /**
+                 * offMeshConnections has no skeleton and is instance of node so the 
+                 * search will include its children. This will return with a 
+                 * child SkeletonControl because of this. Add check to skip 
+                 * offMeshConnections.
+                 */
+                if (!spat.getName().equals(offMeshCon.getName())) {
 
-                    switch (name[0]) {
-                        
-                        case "water":
-                            areaMod.add(SAMPLE_AREAMOD_WATER);
-                            break;
-                        case "road":
-                            areaMod.add(SAMPLE_AREAMOD_ROAD);
-                            break;
-                        case "grass":
-                            areaMod.add(SAMPLE_AREAMOD_GRASS);
-                            break;
-                        case "door":
-                            areaMod.add(SAMPLE_AREAMOD_DOOR);
-                            break;
-                        default:
-                            areaMod.add(SAMPLE_AREAMOD_GROUND);
-                    }
-                }
-                
-                //Search for offMesh connections that use armature bone naming.
-                if (spat instanceof Node) {
-                    
-                    /**
-                     * worldmap has no skeleton and is instance of node so the 
-                     * search will include its children. This will return with a 
-                     * child SkeletonControl because of this. Add check to skip 
-                     * worldmap.
-                     */
-                    if (!spat.getName().equals("worldmap")) {
-                        
-                        SkeletonControl skelCont = getState(UtilState.class).findControl(spat, SkeletonControl.class);
+                    SkeletonControl skelCont = getState(UtilState.class).findControl(spat, SkeletonControl.class);
 
-                        if (skelCont != null) {
+                    if (skelCont != null) {
+                        /**
+                        * Offmesh connections require a start/end vector3f. 
+                        * To attain these vector3f, you can use bones from 
+                        * an armature. The bones must be paired and use a 
+                        * naming convention. In our case, we use:
+                        * 
+                        * arg[0](delimiter)arg[1](delimiter)arg[2]
+                        * 
+                        * You set each bone origin to any vertices, in any 
+                        * mesh, as long as the same string for arg[0] and 
+                        * arg[1] are identical and they do not use the same 
+                        * vertices. 
+                        * 
+                        * Naming convention for two bones: 
+                        * 
+                        * Bone 1 naming: offmesh.anything.a
+                        * Bone 2 naming: offmesh.anything.b
+                        * 
+                        * arg[0]: offmesh   = same value all bones
+                        * arg[1]: anything  = same value paired bones
+                        * arg[2]: a or b    = one paired bone
+                        * 
+                        * The value of arg[0] applies to ALL bones and 
+                        * dictates these are link bones.
+                        * 
+                        * The value of arg[1] dictates these pair of bones 
+                        * belong together. 
+                        * 
+                        * The value of arg[2] distinguishes the paired bones 
+                        * from each other.
+                        * 
+                        * Examples: 
+                        * 
+                        * offmesh.pond.a
+                        * offmesh.pond.b
+                        * offmesh.1.a
+                        * offmesh.1.b
+                        */
+                        Bone[] roots = skelCont.getSkeleton().getRoots();
+                        for (Bone b: roots) {
                             /**
-                            * Offmesh connections require a start/end vector3f. 
-                            * To attain these vector3f, you can use bones from 
-                            * an armature. The bones must be paired and use a 
-                            * naming convention. In our case, we use:
-                            * 
-                            * arg[0](delimiter)arg[1](delimiter)arg[2]
-                            * 
-                            * You set each bone origin to any vertices, in any 
-                            * mesh, as long as the same string for arg[0] and 
-                            * arg[1] are identical and they do not use the same 
-                            * vertices. 
-                            * 
-                            * Naming convention for two bones: 
-                            * 
-                            * Bone 1 naming: offmesh.anything.a
-                            * Bone 2 naming: offmesh.anything.b
-                            * 
-                            * arg[0]: offmesh   = same value all bones
-                            * arg[1]: anything  = same value paired bones
-                            * arg[2]: a or b    = one paired bone
-                            * 
-                            * The value of arg[0] applies to ALL bones and 
-                            * dictates these are link bones.
-                            * 
-                            * The value of arg[1] dictates these pair of bones 
-                            * belong together. 
-                            * 
-                            * The value of arg[2] distinguishes the paired bones 
-                            * from each other.
-                            * 
-                            * Examples: 
-                            * 
-                            * offmesh.pond.a
-                            * offmesh.pond.b
-                            * offmesh.1.a
-                            * offmesh.1.b
-                            */
-                            Bone[] roots = skelCont.getSkeleton().getRoots();
-                            for (Bone b: roots) {
+                             * Split the name up using delimiter. 
+                             */
+                            String[] arg = b.getName().split("\\.");
+
+                            if (arg[0].equals("offmesh")) {
+
+                                //New connection.
+                                org.recast4j.detour.OffMeshConnection linkA = new org.recast4j.detour.OffMeshConnection();
+
                                 /**
-                                 * Split the name up using delimiter. 
+                                 * The bones worldTranslation will be the 
+                                 * start Vector3f of the OffMeshConnection 
+                                 * object.
                                  */
-                                String[] arg = b.getName().split("\\.");
+                                float[] startPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
 
-                                if (arg[0].equals("offmesh")) {
+                                /**
+                                 * Prepare new position array. The endpoints 
+                                 * of the connection. 
+                                 *  startPos    endPos
+                                 * [ax, ay, az, bx, by, bz]
+                                 */
+                                float[] pos = new float[6];
 
-                                    //New connection.
-                                    org.recast4j.detour.OffMeshConnection linkA = new org.recast4j.detour.OffMeshConnection();
-                                    
-                                    /**
-                                     * The bones worldTranslation will be the 
-                                     * start Vector3f of the OffMeshConnection 
-                                     * object.
-                                     */
-                                    float[] startPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
-                                    
-                                    /**
-                                     * Prepare new position array. The endpoints 
-                                     * of the connection. 
-                                     *  startPos    endPos
-                                     * [ax, ay, az, bx, by, bz]
-                                     */
-                                    float[] pos = new float[6];
-                                    
-                                    //Copy linkA current postition to A.startPos. 
-                                    System.arraycopy(startPos, 0, pos, 0, 3);
-                                    
-                                    //Set linkA pos to new array.
-                                    linkA.pos = pos;
+                                //Copy linkA current postition to A.startPos. 
+                                System.arraycopy(startPos, 0, pos, 0, 3);
 
-                                    //Player (r)adius. Links fire at (r) * 2.25.
-                                    linkA.rad = radius;
+                                //Set linkA pos to new array.
+                                linkA.pos = pos;
 
-                                    /**
-                                     * We need to look for the bones mate. Based 
-                                     * off our naming convention, this will be 
-                                     * offmesh.anything."a" or "b" so we set the 
-                                     * search to whatever this bones arg[2] isn't.
-                                     */
-                                    String linkB = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
+                                //Player (r)adius. Links fire at (r) * 2.25.
+                                linkA.rad = radius;
+
+                                /**
+                                 * We need to look for the bones mate. Based 
+                                 * off our naming convention, this will be 
+                                 * offmesh.anything."a" or "b" so we set the 
+                                 * search to whatever this bones arg[2] isn't.
+                                 */
+                                String linkB = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
+
+                                /**
+                                 * If the paired bone has already been added 
+                                 * to map, set endPos and give each an id.
+                                 */
+                                if (mapOffMeshCon.containsKey(linkB)) {
+                                    //Copy A.startPos to B.endPos.
+                                    System.arraycopy(linkA.pos, 0, mapOffMeshCon.get(linkB).pos, 3, 3);
+                                    //Copy B.startPos to A.endPos.
+                                    System.arraycopy(mapOffMeshCon.get(linkB).pos, 0, linkA.pos, 3, 3);
 
                                     /**
-                                     * If the paired bone has already been added 
-                                     * to map, set endPos and give each an id.
+                                     * OffMeshconnections with id of 0 don't 
+                                     * get processed later.
                                      */
-                                    if (mapOffMeshCon.containsKey(linkB)) {
-                                        //Copy A.startPos to B.endPos.
-                                        System.arraycopy(linkA.pos, 0, mapOffMeshCon.get(linkB).pos, 3, 3);
-                                        //Copy B.startPos to A.endPos.
-                                        System.arraycopy(mapOffMeshCon.get(linkB).pos, 0, linkA.pos, 3, 3);
+                                    linkA.userId = ++id;
+                                    LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), linkA.userId);
+                                    mapOffMeshCon.get(linkB).userId = ++id;
+                                    LOG.info("OffMeshConnection [{}] id [{}]", linkB, mapOffMeshCon.get(linkB).userId);
 
-                                        /**
-                                         * OffMeshconnections with id of 0 don't 
-                                         * get processed later.
-                                         */
-                                        linkA.userId = ++id;
-                                        LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), linkA.userId);
-                                        mapOffMeshCon.get(linkB).userId = ++id;
-                                        LOG.info("OffMeshConnection [{}] id [{}]", linkB, mapOffMeshCon.get(linkB).userId);
-
-                                    }
-                                    //Add this bone to map.
-                                    mapOffMeshCon.put(b.getName(), linkA);
                                 }
+                                //Add this bone to map.
+                                mapOffMeshCon.put(b.getName(), linkA);
                             }
                         }
                     }
                 }
             }
-        };
+        });        
         
-        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);        
+        //Clean up offMesh connections.
+        offMeshCon.detachAllChildren();
         
         //Step 1. Gather our geometry.
         InputGeomProvider geomProvider = new GeometryProviderBuilder(worldMap).build();

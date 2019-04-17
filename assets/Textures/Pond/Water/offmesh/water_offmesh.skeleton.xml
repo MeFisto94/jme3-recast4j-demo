@@ -1,6 +1,6 @@
 <skeleton >
   <bones >
-    <bone name="Bone" id="0" >
+    <bone name="root" id="0" >
       <position z="0.000000" x="0.000000" y="0.000000" />
       <rotation angle="0.000000" >
         <axis z="0.000000" x="1.000000" y="0.000000" />
@@ -17,7 +17,7 @@
   <animations >
     <animation name="my_animation" length="10.375" >
       <tracks >
-        <track bone="Bone" >
+        <track bone="root" >
           <keyframes >
             <keyframe time="0.0" >
               <translate z="0.000000" x="0.000000" y="0.000000" />
