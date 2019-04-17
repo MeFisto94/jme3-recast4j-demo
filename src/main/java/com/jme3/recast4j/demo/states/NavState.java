@@ -83,11 +83,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.regex.Pattern;
-import org.recast4j.detour.extras.PolyUtils;
-import static org.recast4j.recast.RecastVectors.copy;
-import static org.recast4j.recast.RecastVectors.copy;
-import static org.recast4j.recast.RecastVectors.copy;
 import static org.recast4j.recast.RecastVectors.copy;
 
 /**
@@ -131,10 +126,16 @@ public class NavState extends BaseAppState {
     @Override
     protected void onEnable() {
         worldMap = (Node) ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap");
+//        //Original implementation using jme3-recast4j methods.
 //        buildSolo();
-        buildTiled();
+//        //Solo build using jme3-recast4j methods. Implements area and flag types.
+//        buildSoloModified();
+//        //Solo build using recast4j methods. Implements area and flag types.
 //        buildSoloRecast4j();
-//        buildSoloTest();
+        //Tile build using recast4j methods. Implements area and flag types plus
+        //offmesh connections.
+        buildTiledRecast4j();
+
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -598,6 +599,9 @@ public class NavState extends BaseAppState {
         return characters;
     }
     
+    /**
+     * Original implementation using jme3-recast4j methods and custom recastBuilder.
+     */
     private void buildSolo() {
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
@@ -637,9 +641,146 @@ public class NavState extends BaseAppState {
         
         System.out.println("Building succeeded after " + (System.currentTimeMillis() - time) + " ms");
     }
+    
+    /**
+     * This example sets area type and flags based off geometry of each 
+     * individual mesh and uses the custom RecastBuilder class with 
+     * jme3-recast4j wrapper methods. 
+     */
+    private void buildSoloModified() {
         
-    //This example builds the mesh manually by skipping recastBuilder and most 
-    //jme3-recast4j methods.
+        //Collect each geometry length of triangles to pass to buildTile.
+        List<Integer> listTriLength = new ArrayList<>();
+        //Collect area modifications based off geometry material or userData.
+        List<AreaModification> areaMod = new ArrayList<>();
+       
+        SceneGraphVisitor visitor = new SceneGraphVisitor() {
+
+            @Override
+            public void visit(Spatial spat) {
+                if (spat instanceof Geometry) {
+                    //Load triangle lengths so we can pick them out from the 
+                    //TriMesh later.
+                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
+                    
+                    /**
+                     * Set Area Type based off materials in this case. UserData 
+                     * can be added as a optional way to do this. UserData would 
+                     * require separating the geometry in blender which is not 
+                     * any different really than using materials. 
+                     * 
+                     * Doors could work the same way, mark the path between the 
+                     * two rooms with a material or separate the door path 
+                     * geometry into a separate object so it can be picked out. 
+                     * 
+                     * Off mesh connections can use a similar format. We could 
+                     * parse the geometry looking for two connection geometry 
+                     * that are flagged as same connection and set the off mesh 
+                     * connections programmatically. 
+                     */
+                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
+                    
+                    switch (name[0]) {
+                        
+                        case "water":
+                            areaMod.add(SAMPLE_AREAMOD_WATER);
+                            break;
+                        case "road":
+                            areaMod.add(SAMPLE_AREAMOD_ROAD);
+                            break;
+                        case "grass":
+                            areaMod.add(SAMPLE_AREAMOD_GRASS);
+                            break;
+                        case "door":
+                            areaMod.add(SAMPLE_AREAMOD_DOOR);
+                            break;
+                        case "jump":
+                            areaMod.add(SAMPLE_AREAMOD_JUMP);
+                            break;
+                        default:
+                            areaMod.add(SAMPLE_AREAMOD_GROUND);
+                    }
+                }
+            }
+        };
+        
+        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
+
+        //Build merged mesh.
+        InputGeomProvider geomProvider = new GeometryProviderBuilder(
+                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
+        
+        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).withDetailMesh(true).
+                build(new RecastConfigBuilder()
+                        .withAgentRadius(.3f)           // r
+                        .withAgentHeight(1.7f)          // h
+                        //cs and ch should probably be .1 at min.
+                        .withCellSize(.1f)              // cs=r/3
+                        .withCellHeight(.1f)            // ch=cs 
+                        .withAgentMaxClimb(.3f)         // > 2*ch
+                        .withAgentMaxSlope(45f)         
+                        .withEdgeMaxLen(2.4f)             // r*8
+                        .withEdgeMaxError(1.3f)         // 1.1 - 1.5
+                        .withDetailSampleDistance(1.0f) // increase to 8 if exception on level model
+                        .withDetailSampleMaxError(8.0f) // increase to 8 if exception on level model
+                        .withVertsPerPoly(3).build());
+        
+        //Split up for testing.
+        RecastBuilderResult result = new RecastBuilder().build(geomProvider, bcfg, listTriLength, areaMod);
+        
+        NavMeshDataCreateParamsBuilder paramsBuilder = new NavMeshDataCreateParamsBuilder(result);
+        PolyMesh m_pmesh = result.getMesh();
+        
+        //Set Ability flags. Including offmesh connection flags.
+        for (int i = 0; i < m_pmesh.npolys; ++i) {
+            if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
+            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
+            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
+                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK);
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
+                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_SWIM);
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
+                paramsBuilder.withPolyFlags(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
+            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
+                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_JUMP);
+            }
+        }
+        
+        NavMeshDataCreateParams params = paramsBuilder.build(bcfg);
+        
+        /**
+         * Must set variables for parameters walkableHeight, walkableRadius, 
+         * walkableClimb manually for mesh data unless jme3-recast4j fixed.
+         */
+        params.walkableClimb = maxClimb; //Should add getter for this.
+        params.walkableHeight = height; //Should add getter for this.
+        params.walkableRadius = radius; //Should add getter for this.
+            
+        MeshData meshData = NavMeshBuilder.createNavMeshData(params);
+        navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
+        query = new NavMeshQuery(navMesh);
+        
+        //Create offmesh connections here.
+
+        try {
+            MeshDataWriter mdw = new MeshDataWriter();
+            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
+            MeshSetWriter msw = new MeshSetWriter();
+            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
+        } catch (Exception ex) {
+            LOG.error("[{}]", ex);
+        }
+
+        //Show wireframe. Helps with param tweaks. false = solid color.
+//        showDebugMeshes(meshData, true);
+        showDebugByArea(meshData, true);
+
+    }
+    
+    /**
+     * This example builds the mesh manually by using recast4j methods. 
+     * Implements area type and flag setting.
+     */
     private void buildSoloRecast4j() {
         
         //Collect each geometry length of triangles to pass to buildTile.
@@ -840,147 +981,14 @@ public class NavState extends BaseAppState {
         params.cs = cfg.cs; 
         params.ch = cfg.ch;
         params.buildBvTree = true;
-        
-        //Create offmesh connections here.
-        
+                
         MeshData meshData = NavMeshBuilder.createNavMeshData(params);
         navMesh = new NavMesh(meshData, params.nvp, 0);
         
         query = new NavMeshQuery(navMesh);
         
-        try {
-            MeshDataWriter mdw = new MeshDataWriter();
-            mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
-            MeshSetWriter msw = new MeshSetWriter();
-            msw.write(new FileOutputStream(new File("test.nm")), navMesh, ByteOrder.BIG_ENDIAN, false);
-        } catch (Exception ex) {
-            LOG.error("[{}]", ex);
-        }
-
-        //Show wireframe. Helps with param tweaks. false = solid color.
-//        showDebugMeshes(meshData, true);
-        showDebugByArea(meshData, true);
-
-    }
-    
-    /**
-     * This example sets Area Type based off geometry of each individual mesh 
-     * and uses the custom RecastBuilder class with jme3-recast4j wrapper methods.
-     */
-    private void buildSoloTest() {
-        
-        //Collect each geometry length of triangles to pass to buildTile.
-        List<Integer> listTriLength = new ArrayList<>();
-        //Collect area modifications based off geometry material or userData.
-        List<AreaModification> areaMod = new ArrayList<>();
-       
-        SceneGraphVisitor visitor = new SceneGraphVisitor() {
-
-            @Override
-            public void visit(Spatial spat) {
-                if (spat instanceof Geometry) {
-                    //Load triangle lengths so we can pick them out from the 
-                    //TriMesh later.
-                    listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                    
-                    /**
-                     * Set Area Type based off materials in this case. UserData 
-                     * can be added as a optional way to do this. UserData would 
-                     * require separating the geometry in blender which is not 
-                     * any different really than using materials. 
-                     * 
-                     * Doors could work the same way, mark the path between the 
-                     * two rooms with a material or separate the door path 
-                     * geometry into a separate object so it can be picked out. 
-                     * 
-                     * Off mesh connections can use a similar format. We could 
-                     * parse the geometry looking for two connection geometry 
-                     * that are flagged as same connection and set the off mesh 
-                     * connections programmatically. 
-                     */
-                    String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
-                    
-                    switch (name[0]) {
-                        
-                        case "water":
-                            areaMod.add(SAMPLE_AREAMOD_WATER);
-                            break;
-                        case "road":
-                            areaMod.add(SAMPLE_AREAMOD_ROAD);
-                            break;
-                        case "grass":
-                            areaMod.add(SAMPLE_AREAMOD_GRASS);
-                            break;
-                        case "door":
-                            areaMod.add(SAMPLE_AREAMOD_DOOR);
-                            break;
-                        case "jump":
-                            areaMod.add(SAMPLE_AREAMOD_JUMP);
-                            break;
-                        default:
-                            areaMod.add(SAMPLE_AREAMOD_GROUND);
-                    }
-                }
-            }
-        };
-        
-        ((SimpleApplication) getApplication()).getRootNode().getChild("worldmap").depthFirstTraversal(visitor);
-
-        //Build merged mesh.
-        InputGeomProvider geomProvider = new GeometryProviderBuilder(
-                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
-        
-        RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).withDetailMesh(true).
-                build(new RecastConfigBuilder()
-                        .withAgentRadius(.3f)           // r
-                        .withAgentHeight(1.7f)          // h
-                        //cs and ch should probably be .1 at min.
-                        .withCellSize(.1f)              // cs=r/3
-                        .withCellHeight(.1f)            // ch=cs 
-                        .withAgentMaxClimb(.3f)         // > 2*ch
-                        .withAgentMaxSlope(45f)         
-                        .withEdgeMaxLen(2.4f)             // r*8
-                        .withEdgeMaxError(1.3f)         // 1.1 - 1.5
-                        .withDetailSampleDistance(1.0f) // increase to 8 if exception on level model
-                        .withDetailSampleMaxError(8.0f) // increase to 8 if exception on level model
-                        .withVertsPerPoly(3).build());
-        
-        //Split up for testing.
-        RecastBuilderResult result = new RecastBuilder().build(geomProvider, bcfg, listTriLength, areaMod);
-        
-        NavMeshDataCreateParamsBuilder paramsBuilder = new NavMeshDataCreateParamsBuilder(result);
-        PolyMesh m_pmesh = result.getMesh();
-        
-        //Set Ability flags. Including offmesh connection flags.
-        for (int i = 0; i < m_pmesh.npolys; ++i) {
-            if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
-            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
-            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK);
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_SWIM);
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                paramsBuilder.withPolyFlags(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
-                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_JUMP);
-            }
-        }
-        
         //Create offmesh connections here.
-        NavMeshDataCreateParams params = paramsBuilder.build(bcfg);
-        
-        /**
-         * Must set variables for parameters walkableHeight, walkableRadius, 
-         * walkableClimb manually for mesh data unless jme3-recast4j fixed.
-         */
-        params.walkableClimb = maxClimb; //Should add getter for this.
-        params.walkableHeight = height; //Should add getter for this.
-        params.walkableRadius = radius; //Should add getter for this.
-            
-        MeshData meshData = NavMeshBuilder.createNavMeshData(params);
-        navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
-        query = new NavMeshQuery(navMesh);
-        
+
         try {
             MeshDataWriter mdw = new MeshDataWriter();
             mdw.write(new FileOutputStream(new File("test.md")),  meshData, ByteOrder.BIG_ENDIAN, false);
@@ -995,10 +1003,13 @@ public class NavState extends BaseAppState {
         showDebugByArea(meshData, true);
 
     }
-    
-    //This example sets Area Type based off geometry of each individual mesh and 
-    //uses the custom RecastBuilder class.
-    private void buildTiled() {
+       
+    /**
+     * This example sets area type and flags based off geometry of each 
+     * individual mesh and uses the custom RecastBuilder class. Implements 
+     * offmesh connections. Uses recast4j methods for building.
+     */
+    private void buildTiledRecast4j() {
         
         //Collect each geometry length of triangles to pass to buildTile.
         List<Integer> listTriLength = new ArrayList<>();
@@ -1670,7 +1681,7 @@ public class NavState extends BaseAppState {
     
     /**
      * Class to hold the obj id and flags for the MouseEventControl check that 
- assures all flags are the same.
+     * assures all flags are the same.
      */
     private class PolyAndFlag {
         private long poly;
