@@ -35,7 +35,7 @@
         </vertexbuffer>
     </sharedgeometry>
     <submeshes>
-        <submesh usesharedvertices="true" operationtype="triangle_list" use32bitindexes="False" material="box_mat">
+        <submesh usesharedvertices="true" operationtype="triangle_list" use32bitindexes="False" material="box_mat.001">
             <faces count="2">
                 <face v3="2" v2="1" v1="0"/>
                 <face v3="5" v2="4" v1="3"/>
@@ -43,21 +43,17 @@
         </submesh>
     </submeshes>
     <submeshnames>
-        <submesh index="0" name="box_mat">
+        <submesh index="0" name="box_mat.001">
         </submesh>
     </submeshnames>
     <skeletonlink name="crate_offmesh.skeleton"/>
     <boneassignments>
-        <vertexboneassignment weight="0.8160526156425476" vertexindex="0" boneindex="2"/>
-        <vertexboneassignment weight="0.8160526156425476" vertexindex="0" boneindex="2"/>
         <vertexboneassignment weight="0.1839469075202942" vertexindex="0" boneindex="0"/>
+        <vertexboneassignment weight="0.8160526156425476" vertexindex="0" boneindex="2"/>
         <vertexboneassignment weight="0.9801087379455566" vertexindex="1" boneindex="2"/>
-        <vertexboneassignment weight="0.9801087379455566" vertexindex="1" boneindex="2"/>
-        <vertexboneassignment weight="1.0" vertexindex="2" boneindex="2"/>
         <vertexboneassignment weight="1.0" vertexindex="2" boneindex="2"/>
         <vertexboneassignment weight="0.6308727860450745" vertexindex="3" boneindex="0"/>
         <vertexboneassignment weight="0.4973161518573761" vertexindex="4" boneindex="0"/>
-        <vertexboneassignment weight="1.0" vertexindex="5" boneindex="1"/>
         <vertexboneassignment weight="1.0" vertexindex="5" boneindex="1"/>
     </boneassignments>
 </mesh>

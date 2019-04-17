@@ -51,23 +51,6 @@ material box_mat
                 texture box.jpg
                 tex_address_mode wrap
                 scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_NRM.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
-                colour_op modulate
-            }
-            texture_unit 
-            {
-                texture box_OCC.png
-                tex_address_mode wrap
-                scale 1.0 1.0
-                tex_coord_set 0
                 colour_op modulate
             }
             texture_unit 
@@ -75,7 +58,13 @@ material box_mat
                 texture box_SPEC.png
                 tex_address_mode wrap
                 scale 1.0 1.0
-                tex_coord_set 0
+                colour_op modulate
+            }
+            texture_unit 
+            {
+                texture box_NRM.png
+                tex_address_mode wrap
+                scale 1.0 1.0
                 colour_op modulate
             }
         }
