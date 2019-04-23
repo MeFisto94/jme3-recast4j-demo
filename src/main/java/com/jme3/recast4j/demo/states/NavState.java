@@ -350,7 +350,7 @@ public class NavState extends BaseAppState {
                                  */
                                 for (long poly: m_polys) {
 
-                                    LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyArea(poly).result);
+                                    LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyFlags(poly).result);
                                     printFlags(poly);
 
                                     /**
