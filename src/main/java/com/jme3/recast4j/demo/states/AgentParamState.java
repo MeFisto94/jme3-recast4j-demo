@@ -811,12 +811,12 @@ public class AgentParamState extends BaseAppState {
             }
 
             LOG.info("<========== BEGIN AgentParamState setTarget ==========>");
-            LOG.info("queryExt              [{}]", ext);
-            LOG.info("setTarget             [{}]", target);
+            LOG.info("queryExt              {}", ext);
+            LOG.info("setTarget             {}", target);
             
             //Locate the nearest poly ref/pos.
             Result<FindNearestPolyResult> nearest = query.findNearestPoly(DetourUtils.toFloatArray(target), ext, new BetterDefaultQueryFilter());
-            LOG.info("nearestPos            [{}] nearestRef [{}]", nearest.result.getNearestPos(), nearest.result.getNearestRef());
+            LOG.info("nearestPos            [{}] nearestRef {}", nearest.result.getNearestPos(), nearest.result.getNearestRef());
             if (!nearest.status.isSuccess() || nearest.result.getNearestRef() == 0) {
                 LOG.info("getNearestRef() can't be 0. ref [{}]", nearest.result.getNearestRef());
             } else {

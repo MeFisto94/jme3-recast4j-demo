@@ -290,7 +290,8 @@ public class DemoApplication extends SimpleApplication {
         
     private void loadJaime() {
         Node player = (Node) getAssetManager().loadModel("Models/Jaime/Jaime.j3o");
-        player.setName("player");
+        player.setName("jaime");
+//        player.setLocalTranslation(-5f, 5,0);
         player.addControl(new BetterCharacterControl(0.3f, 1.5f, 20f)); // values taken from recast defaults
 //        player.addControl(new CrowdBCC(0.3f, 1.5f, 20f)); // values taken from recast defaults
         player.addControl(new PhysicsAgentControl());
@@ -340,6 +341,8 @@ public class DemoApplication extends SimpleApplication {
         Node crate = (Node) getAssetManager().loadModel("Models/Crate/crate.mesh.j3o");
         crate.setName("crate");
         crate.setLocalTranslation(4.0f, 0.0f, 0.0f);
+        crate.addControl(new RigidBodyControl(0));
+        getStateManager().getState(BulletAppState.class).getPhysicsSpace().add(crate);
         worldMap.attachChild(crate);
         
         //Add crate offmesh connection.

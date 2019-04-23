@@ -37,12 +37,7 @@ import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_ALL;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DISABLED;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_JUMP;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
+import static com.jme3.recast4j.demo.AreaModifications.*;
 import com.jme3.recast4j.demo.controls.CrowdChangeControl;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
@@ -51,10 +46,8 @@ import com.jme3.recast4j.demo.states.AgentGridState.Grid;
 import com.jme3.recast4j.demo.states.AgentGridState.GridAgent;
 import com.jme3.scene.Spatial;
 import com.simsilica.lemur.ActionButton;
-import com.simsilica.lemur.Button;
 import com.simsilica.lemur.CallMethodAction;
 import com.simsilica.lemur.Checkbox;
-import com.simsilica.lemur.Command;
 import com.simsilica.lemur.Container;
 import com.simsilica.lemur.GuiGlobals;
 import com.simsilica.lemur.HAlignment;
@@ -1361,7 +1354,7 @@ public class CrowdBuilderState extends BaseAppState {
      * 
      * For all other situations, a new filter will be created using the 
      * includes/excludes flags and any valid area cost above 1.0f. Any cost 
-     * field that is not valid or <= 1.0f will be set to one.
+     * field that is not valid or < 1.0f will be set to one.
      */
     private void updateFilter() {
 
@@ -1489,20 +1482,20 @@ public class CrowdBuilderState extends BaseAppState {
         
         if (includes) {
             this.checkIncludeNone.setChecked(filterFlags == 0);
-            this.checkIncludeDisabled.setChecked(isBitSet(SAMPLE_POLYFLAGS_DISABLED, filterFlags));
-            this.checkIncludeDoor.setChecked(isBitSet(SAMPLE_POLYFLAGS_DOOR, filterFlags));
-            this.checkIncludeJump.setChecked(isBitSet(SAMPLE_POLYFLAGS_JUMP, filterFlags));
-            this.checkIncludeSwim.setChecked(isBitSet(SAMPLE_POLYFLAGS_SWIM, filterFlags));
-            this.checkIncludeWalk.setChecked(isBitSet(SAMPLE_POLYFLAGS_WALK, filterFlags));
-            this.checkIncludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
+            this.checkIncludeDisabled.setChecked(isBitSet(POLYFLAGS_DISABLED, filterFlags));
+            this.checkIncludeDoor.setChecked(isBitSet(POLYFLAGS_DOOR, filterFlags));
+            this.checkIncludeJump.setChecked(isBitSet(POLYFLAGS_JUMP, filterFlags));
+            this.checkIncludeSwim.setChecked(isBitSet(POLYFLAGS_SWIM, filterFlags));
+            this.checkIncludeWalk.setChecked(isBitSet(POLYFLAGS_WALK, filterFlags));
+            this.checkIncludeAll.setChecked(isBitSet(POLYFLAGS_ALL, filterFlags));
         } else {
             this.checkExcludeNone.setChecked(filterFlags == 0);
-            this.checkExcludeDisabled.setChecked(isBitSet(SAMPLE_POLYFLAGS_DISABLED, filterFlags));
-            this.checkExcludeDoor.setChecked(isBitSet(SAMPLE_POLYFLAGS_DOOR, filterFlags));
-            this.checkExcludeJump.setChecked(isBitSet(SAMPLE_POLYFLAGS_JUMP, filterFlags));
-            this.checkExcludeSwim.setChecked(isBitSet(SAMPLE_POLYFLAGS_SWIM, filterFlags));
-            this.checkExcludeWalk.setChecked(isBitSet(SAMPLE_POLYFLAGS_WALK, filterFlags));
-            this.checkExcludeAll.setChecked(isBitSet(SAMPLE_POLYFLAGS_ALL, filterFlags));
+            this.checkExcludeDisabled.setChecked(isBitSet(POLYFLAGS_DISABLED, filterFlags));
+            this.checkExcludeDoor.setChecked(isBitSet(POLYFLAGS_DOOR, filterFlags));
+            this.checkExcludeJump.setChecked(isBitSet(POLYFLAGS_JUMP, filterFlags));
+            this.checkExcludeSwim.setChecked(isBitSet(POLYFLAGS_SWIM, filterFlags));
+            this.checkExcludeWalk.setChecked(isBitSet(POLYFLAGS_WALK, filterFlags));
+            this.checkExcludeAll.setChecked(isBitSet(POLYFLAGS_ALL, filterFlags));
         }
     }
     
@@ -1516,27 +1509,27 @@ public class CrowdBuilderState extends BaseAppState {
         int includes = 0;
         
         if (checkIncludeAll.isChecked()) {
-            includes |= SAMPLE_POLYFLAGS_ALL;
+            includes |= POLYFLAGS_ALL;
         } 
         
         if (checkIncludeDisabled.isChecked()) {
-            includes |= SAMPLE_POLYFLAGS_DISABLED;
+            includes |= POLYFLAGS_DISABLED;
         }
         
         if (checkIncludeWalk.isChecked()) {
-            includes |= SAMPLE_POLYFLAGS_WALK;
+            includes |= POLYFLAGS_WALK;
         }
         
         if (checkIncludeSwim.isChecked()) {
-            includes |= SAMPLE_POLYFLAGS_SWIM;
+            includes |= POLYFLAGS_SWIM;
         }
         
         if (checkIncludeDoor.isChecked()) {
-            includes |= SAMPLE_POLYFLAGS_DOOR;
+            includes |= POLYFLAGS_DOOR;
         }
         
         if (checkIncludeJump.isChecked()) {
-            includes |= SAMPLE_POLYFLAGS_JUMP;
+            includes |= POLYFLAGS_JUMP;
         }
         return includes;
     }
@@ -1551,27 +1544,27 @@ public class CrowdBuilderState extends BaseAppState {
         int excludes = 0;
         
         if (checkExcludeAll.isChecked()) {
-            excludes |= SAMPLE_POLYFLAGS_ALL;
+            excludes |= POLYFLAGS_ALL;
         }
 
         if (checkExcludeDisabled.isChecked()) {
-            excludes |= SAMPLE_POLYFLAGS_DISABLED;
+            excludes |= POLYFLAGS_DISABLED;
         }
         
         if (checkExcludeWalk.isChecked()) {
-            excludes |= SAMPLE_POLYFLAGS_WALK;
+            excludes |= POLYFLAGS_WALK;
         }
         
         if (checkExcludeSwim.isChecked()) {
-            excludes |= SAMPLE_POLYFLAGS_SWIM;
+            excludes |= POLYFLAGS_SWIM;
         }
         
         if (checkExcludeDoor.isChecked()) {
-            excludes |= SAMPLE_POLYFLAGS_DOOR;
+            excludes |= POLYFLAGS_DOOR;
         }
         
         if (checkExcludeJump.isChecked()) {
-            excludes |= SAMPLE_POLYFLAGS_JUMP;
+            excludes |= POLYFLAGS_JUMP;
         }
         
         return excludes;
@@ -1699,11 +1692,11 @@ public class CrowdBuilderState extends BaseAppState {
         protected void click(MouseButtonEvent event, Spatial target, Spatial capture) {
             if (target.equals(checkIncludeAll) ){
                 if (((Checkbox) target).isChecked()) {
-                    setCheckedFlags(SAMPLE_POLYFLAGS_ALL, true);
+                    setCheckedFlags(POLYFLAGS_ALL, true);
                 } 
             } else if (target.equals(checkExcludeAll)) {
                 if (((Checkbox) target).isChecked()) {
-                    setCheckedFlags(SAMPLE_POLYFLAGS_ALL, false);
+                    setCheckedFlags(POLYFLAGS_ALL, false);
                 }                 
             } else if (target.equals(checkIncludeNone)) {
                 if (((Checkbox) target).isChecked()) {

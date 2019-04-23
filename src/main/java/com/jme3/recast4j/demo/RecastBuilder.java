@@ -59,11 +59,18 @@ import org.recast4j.recast.RecastMeshDetail;
 import org.recast4j.recast.RecastRasterization;
 import org.recast4j.recast.RecastRegion;
 import org.recast4j.recast.geom.ChunkyTriMesh.ChunkyTriMeshNode;
-import org.recast4j.recast.geom.InputGeomProvider;
 import org.recast4j.recast.geom.TriMesh;
 
 /**
  * Extends the Recast4j RecastBuilder class to allow for Area Type flag setting.
+ * Works with any InputGeomProvider but is designed for use with the 
+ * JmeInputGeomProvider which has the ability to store the geometry lengths and 
+ * AreaModifications. If the provider has the AreaModifications, it will set the
+ * Areas Type based off the geometry length and AreaModification. Otherwise,
+ * it will just set the AreaType to what is supplied by the RecastConfig object 
+ * which is the current behavior of the Recast4j implementation.
+ * 
+ * See the buildSolidHeightfield method for details.
  * 
  * @author Robert
  */
@@ -84,7 +91,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
      * @param progressListener The listener to set for the job.
      */
     public RecastBuilder(RecastBuilderProgressListener progressListener) {
-        super(progressListener);
+        super();
         this.progressListener = progressListener;
     }
 
@@ -94,15 +101,9 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
      * @param geom The geometry to be used for constructing the meshes.
      * @param cfg The configuration parameters to be used for constructing the meshes.
      * @param threads The number of threads to use for this build job.
-     * @param listTriLength The listUnmarkedTris of triangle lengths to be used for 
- separating the geometry into areas.
-     * @param areaMod The listUnmarkedTris of Area Modifications for each Area Type that is
- derived from the geometry. Expected to be in the same order as the 
- individual geometry to match area modification to triangles in the area.
      * @return The build results.
      */
-    public RecastBuilderResult[][] buildTiles(InputGeomProvider geom, RecastConfig cfg, int threads, 
-            List<Integer> listTriLength, List<AreaModification> areaMod) {
+    public RecastBuilderResult[][] buildTiles(JmeInputGeomProvider geom, RecastConfig cfg, int threads) {
         float[] bmin = geom.getMeshBoundsMin();
         float[] bmax = geom.getMeshBoundsMax();
         int[] twh = Recast.calcTileCount(bmin, bmax, cfg.cs, cfg.tileSize);
@@ -110,28 +111,28 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
         int th = twh[1];
         RecastBuilderResult[][] result = null;
         if (threads == 1) {
-            result = buildSingleThread(geom, cfg, bmin, bmax, tw, th, listTriLength, areaMod);
+            result = buildSingleThread(geom, cfg, bmin, bmax, tw, th);
         } else {
-            result = buildMultiThread(geom, cfg, bmin, bmax, tw, th, threads, listTriLength, areaMod);
+            result = buildMultiThread(geom, cfg, bmin, bmax, tw, th, threads);
         }
         return result;
     }
     
-    private RecastBuilderResult[][] buildSingleThread(InputGeomProvider geom, RecastConfig cfg, float[] bmin,
-            float[] bmax, int tw, int th, List<Integer> listTriLength, List<AreaModification> areaMod) {
+    private RecastBuilderResult[][] buildSingleThread(JmeInputGeomProvider geom, RecastConfig cfg, float[] bmin,
+            float[] bmax, int tw, int th) {
         RecastBuilderResult[][] result = new RecastBuilderResult[tw][th];
         AtomicInteger counter = new AtomicInteger();
         for (int x = 0; x < tw; ++x) {
             for (int y = 0; y < th; ++y) {
-                result[x][y] = buildTile(geom, cfg, bmin, bmax, x, y, counter, tw * th, listTriLength, areaMod);
+                result[x][y] = buildTile(geom, cfg, bmin, bmax, x, y, counter, tw * th);
             }
         }
         return result;
     }
 
 
-    private RecastBuilderResult[][] buildMultiThread(InputGeomProvider geom, RecastConfig cfg, float[] bmin,
-            float[] bmax, int tw, int th, int threads, List<Integer> listTriLength, List<AreaModification> areaMod) {
+    private RecastBuilderResult[][] buildMultiThread(JmeInputGeomProvider geom, RecastConfig cfg, float[] bmin,
+            float[] bmax, int tw, int th, int threads) {
         ExecutorService ec = Executors.newFixedThreadPool(threads);
         RecastBuilderResult[][] result = new RecastBuilderResult[tw][th];
         AtomicInteger counter = new AtomicInteger();
@@ -140,7 +141,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                 final int tx = x;
                 final int ty = y;
                 ec.submit((Runnable) () -> {
-                    result[tx][ty] = buildTile(geom, cfg, bmin, bmax, tx, ty, counter, tw * th, listTriLength, areaMod);
+                    result[tx][ty] = buildTile(geom, cfg, bmin, bmax, tx, ty, counter, tw * th);
                 });
             }
         }
@@ -152,21 +153,20 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
         return result;
     }
 
-    private RecastBuilderResult buildTile(InputGeomProvider geom, RecastConfig cfg, float[] bmin, float[] bmax,
-            final int tx, final int ty, AtomicInteger counter, int total, List<Integer> listTriLength, List<AreaModification> areaMod) {
-        RecastBuilderResult result = build(geom, new RecastBuilderConfig(cfg, bmin, bmax, tx, ty, true), listTriLength, areaMod);
+    private RecastBuilderResult buildTile(JmeInputGeomProvider geom, RecastConfig cfg, float[] bmin, float[] bmax,
+            final int tx, final int ty, AtomicInteger counter, int total) {
+        RecastBuilderResult result = build(geom, new RecastBuilderConfig(cfg, bmin, bmax, tx, ty, true));
         if (this.progressListener != null) {
             this.progressListener.onProgress(counter.incrementAndGet(), total);
         }
         return result;
     }
     
-    public RecastBuilderResult build(InputGeomProvider geom, RecastBuilderConfig builderCfg, 
-            List<Integer> listTriLength, List<AreaModification> areaMod) {
+    public RecastBuilderResult build(JmeInputGeomProvider geom, RecastBuilderConfig builderCfg) {
 
         RecastConfig cfg = builderCfg.cfg;
         Context ctx = new Context();
-        Heightfield solid = buildSolidHeightfield(geom, builderCfg, ctx, listTriLength, areaMod);
+        Heightfield solid = buildSolidHeightfield(geom, builderCfg, ctx);
         CompactHeightfield chf = buildCompactHeightfield(geom, cfg, ctx, solid);
 
         // Partition the heightfield so that we can use simple algorithm later
@@ -247,8 +247,8 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
     }
     
     
-    private Heightfield buildSolidHeightfield(InputGeomProvider geomProvider, RecastBuilderConfig builderCfg,
-            Context ctx, List<Integer> listTriLength, List<AreaModification> areaMod) {
+    private Heightfield buildSolidHeightfield(JmeInputGeomProvider geomProvider, RecastBuilderConfig builderCfg,
+            Context ctx) {
         RecastConfig cfg = builderCfg.cfg;
         //
         // Step 2. Rasterize input polygon soup.
@@ -275,20 +275,24 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
             boolean tiled = cfg.tileSize > 0;
             
             /**
-             * Sort triangles into group arrays using the supplied triangle 
-             * lengths so we can mark Area Type.
+             * Sort triangle indices into group arrays using the supplied 
+             * Modification geometry length so we can mark Area Type.
              * 
-             * This list will hold each areas triangles as a separate element,
-             * with each element matching the order of the Area Types in the 
-             * areaMod list.
-             */
-            List<int[]> listAreaTris = new ArrayList<>();
+             * This listAreaTris will hold a copy of each areas indices as a 
+             * separate array.
+             * 
+             * Each array has a AreaModification that can be accessed from the
+             * Modification getMod() method using the index of the array held
+             * in listAreaTris.
+             */            
+            List<int[]> listTriIndices = new ArrayList<>();
             int fromIndex = 0;
-            for(int length: listTriLength) {
-                int[] triangles = new int[length];
-                System.arraycopy(tris, fromIndex, triangles, 0, length);
-                listAreaTris.add(triangles);
-                fromIndex += length;
+
+            for (Modification mod: geomProvider.getListMods()) {
+                int[] triangles = new int[mod.getGeomLength()];
+                System.arraycopy(tris, fromIndex, triangles, 0, mod.getGeomLength());
+                listTriIndices.add(triangles);
+                fromIndex += mod.getGeomLength();
             }
             
             if (tiled) {
@@ -300,147 +304,189 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                 tbmax[1] = builderCfg.bmax[2];
                 
                 List<ChunkyTriMeshNode> nodes = geom.getChunksOverlappingRect(tbmin, tbmax);
+                
                 for (ChunkyTriMeshNode node : nodes) {
                     int[] node_tris = node.tris;
                     int node_ntris = node_tris.length / 3;
                     
-                /**
-                 * With listAreaTris we have triangle groups that match the 
-                 * areaMod lists Area Modifications order. 
-                 * 
-                 * We cycle through each nodes triangles, in the same order they 
-                 * are found, looking for a matching triangle in one of the 
-                 * geometry groups.
-                 *
-                 * We mark any triangle found immediately and add it to listMarkedTris.
-                 * 
-                 * Last, we merge all marked triangles into one array for 
-                 * Rasterisation.
-                 */
-                List<Integer> listMarkedTris = new ArrayList<>();
-                int[] nodeTri = new int[3];
-                int[] areaTri = new int[3];
+                    if (!listTriIndices.isEmpty()) {
+                        /**
+                         * With listTriIndices we have arrays of indices whose 
+                         * position/index in listTriIndices matches the index of 
+                         * geomProviders list of Modifications position/index. 
+                         * 
+                         * We cycle through each nodes triangles, in the same 
+                         * order they are found, looking for a matching triangle 
+                         * in one of the arrays.
+                         *
+                         * We mark any found triangles area using the index of 
+                         * the array found in listTriIndices and add them to the
+                         * list of marked triangles.
+                         * 
+                         * Last, we merge all marked triangles into one array for 
+                         * Rasterisation.
+                         */
+                        List<Integer> listMarkedTris = new ArrayList<>();
+                        int[] nodeTri = new int[3];
+                        int[] areaTri = new int[3];
 
-                for (int i = 0; i < node_ntris; i++) {
-                    
-                    //Create a triangle from the node.
-                    nodeTri[0] = node_tris[i*3];
-                    nodeTri[1] = node_tris[i*3+1];
-                    nodeTri[2] = node_tris[i*3+2];
+                        for (int i = 0; i < node_ntris; i++) {
 
-                    //Cycle through each area.
-                    for (int[] areaTris: listAreaTris) {
-                        //If no triangle is found in this group of triangles, 
-                        //we will move onto the next group, and the next, 
-                        //until we find a match.
-                        boolean found = false;
+                            //Create a triangle from the node.
+                            nodeTri[0] = node_tris[i*3];
+                            nodeTri[1] = node_tris[i*3+1];
+                            nodeTri[2] = node_tris[i*3+2];
 
-                        //Cycle through each areas triangles.
-                        for (int j = 0; j < areaTris.length/3; j++) {
+                            //Cycle through each array.
+                            for (int[] areaTris: listTriIndices) {
+                                /**
+                                 * If no triangle is found in this array of 
+                                 * indices we will move onto the next array, and 
+                                 * the next, until we find a match.
+                                 */
+                                boolean found = false;
 
-                            //Create triangle from the area.
-                            areaTri[0] = areaTris[j*3];
-                            areaTri[1] = areaTris[j*3+1];
-                            areaTri[2] = areaTris[j*3+2];
+                                //Cycle through each areas indices.
+                                for (int j = 0; j < areaTris.length/3; j++) {
 
-                            //If we find a matching triangle in this area, 
-                            //we are done with this group.
-                            if (Arrays.equals(nodeTri, areaTri)) {
-                                found = true;
-                                break;
+                                    //Create triangle from the array.
+                                    areaTri[0] = areaTris[j*3];
+                                    areaTri[1] = areaTris[j*3+1];
+                                    areaTri[2] = areaTris[j*3+2];
+
+                                    /**
+                                     * If we find a matching triangle in this 
+                                     * array, we are done.
+                                     */
+                                    if (Arrays.equals(nodeTri, areaTri)) {
+                                        found = true;
+                                        break;
+                                    }
+                                }
+
+                                /**
+                                 * We found that nodeTri matched areaTri so mark 
+                                 * Area Type which is represented by its 
+                                 * areaTris index. 
+                                 * 
+                                 * This is a single triangle we are passing to 
+                                 * markWalkableTriangles. 
+                                 * 
+                                 * We then break out of the loop to advance to 
+                                 * the next node triangle to check. If no match 
+                                 * was found for this group, we check the next 
+                                 * array and continue the search. 
+                                 */
+                                if (found) {
+                                    //Mark single triangle.
+                                    int[] m_triareas = Recast.markWalkableTriangles(
+                                            ctx, 
+                                            cfg.walkableSlopeAngle, 
+                                            verts, 
+                                            nodeTri, 
+                                            nodeTri.length/3,
+                                            geomProvider.getListMods().get(listTriIndices.indexOf(areaTris)).getMod());
+
+                                    /**
+                                     * Add marked triangle to the listMarkedTris.
+                                     * We passed in a single triangle so there 
+                                     * is only one element in the array.
+                                     */
+                                    listMarkedTris.add(m_triareas[0]);
+                                    break;
+                                }
                             }
                         }
 
+                        //Prepare a new array to combine all marked triangles.
+                        int[] mergeArea = new int[node_ntris];
+                        //Copy each marked triangle into the new array.
+                        for (int i = 0; i < mergeArea.length; i++) {
+                            mergeArea[i] = listMarkedTris.get(i);
+                        }   
+
+                        RecastRasterization.rasterizeTriangles(ctx, verts, node_tris, mergeArea, node_ntris, solid, cfg.walkableClimb);
+                        
+                        //========== TESTING STUFF ==========
                         /**
-                         * We found that nodeTri matched areaTri so mark 
-                         * Area Type which is represented by its areaTris 
-                         * index. This is a single triangle we are passing to 
-                         * markWalkableTriangles. We then break out of the loop 
-                         * to advance to the next node triangle to check. If no
-                         * match was found for this group, we check the next 
-                         * area and continue the search. 
+                         * Test each area types merged array for perfect match. 
+                         * The control group is populated from Recast4j normal 
+                         * build method where there is only one mesh and all 
+                         * Area Types are set to one. 
+                         * 
+                         * You can compare the control group alignment to the 
+                         * other two outputs to see if the changed area types 
+                         * are identical. 
+                         * 
+                         * Tests that run perfect will match the changes of the 
+                         * control group where all zeros will be at the same 
+                         * index for all arrays with the only difference being 
+                         * the flags that are changed.
+                         * 
+                         * The test sends a fail message to the log for any 
+                         * array that fails to match, excluding the control 
+                         * group obviously. 
+                         * 
+                         * You can search the log output for the "TEST FAILED" 
+                         * message to quickly identify fails. There should never 
+                         * be one.
                          */
-                        if (found) {
-                            //Mark single triangle.
-                            int[] m_triareas = Recast.markWalkableTriangles(
-                                    ctx, cfg.walkableSlopeAngle, verts, nodeTri, nodeTri.length/3,areaMod.get(listAreaTris.indexOf(areaTris)));
-                            
-                            /**
-                             * Add marked triangle area to the listMarkedTris.
-                             * We passed in a single triangle so there is only
-                             * one element in the array.
-                             */
-                            listMarkedTris.add(m_triareas[0]);
-                            break;
-                        }
+//                        List<AreaModification> areaMod = new ArrayList<>();
+//                        for (Modification mod: geomProvider.getListMods()) {
+//                            areaMod.add(mod.getMod());
+//                        }
+//                        if (!Arrays.equals(mergeArea, testAreaTypes(ctx, cfg, verts, node_tris, listTriIndices, areaMod ))) {
+//                            System.out.println("TEST FAILED");
+//                        }
+//
+//                        System.out.println("flagWhenFound " + Arrays.toString(mergeArea) 
+//                                + " length " + mergeArea.length + "\n");
+                    } else {
+                        //Mark all triangles  with a single AreaModification 
+                        //from cfg.
+                        int[] m_triareas = Recast.markWalkableTriangles(ctx, cfg.walkableSlopeAngle, verts, node_tris, node_ntris, cfg.walkableAreaMod);
+                        RecastRasterization.rasterizeTriangles(ctx, verts, node_tris, m_triareas, node_ntris, solid, cfg.walkableClimb);
                     }
-
-                }
-
-                //Prepare a new array to combine all marked triangles.
-                int[] mergeArea = new int[node_ntris];
-                //Copy each marked triangle into the new array.
-                for (int i = 0; i < mergeArea.length; i++) {
-                    mergeArea[i] = listMarkedTris.get(i);
-                }   
-                                        
-                RecastRasterization.rasterizeTriangles(ctx, verts, node_tris, mergeArea, node_ntris, solid, cfg.walkableClimb);
-                    //========== TESTING STUFF ==========
-                    /**
-                     * Test each area types merged array for perfect match. The
-                     * control group is Recast4j normal build method where there
-                     * is only one mesh and all Area Types are set to one. You 
-                     * can compare the control group alignment to the other two 
-                     * outputs to see if the changed area types are identical. 
-                     * 
-                     * Tests that run perfect will match the changes of the 
-                     * control group where all zeros will be same for all groups
-                     * with the only difference being the flags that are changed 
-                     * for multiple mesh builds.
-                     * 
-                     * The test sends a fail message to the log for any area that 
-                     * fails to match, excluding the control group obviously. 
-                     * 
-                     * You can search the log output for the "TEST FAILED" 
-                     * message to quickly identify fails. There should never be 
-                     * one.
-                     */
-//                    if (!Arrays.equals(mergeArea, testAreaTypes(ctx, cfg, verts, node_tris, listAreaTris, areaMod ))) {
-//                        System.out.println("TEST FAILED");
-//                    }
-                    
-//                    System.out.println("flagWhenFound " + Arrays.toString(mergeArea) 
-//                            + " length " + mergeArea.length + "\n");
                 }
             } else {
 
-                /**
-                 * Set the Area Type for each triangle. We could use separate cfg 
-                 * instead. Would give minor ability to fine tune navMeshes but the 
-                 * only benefit would be from cfg.walkableClimb.
-                 */
-                List<int[]> listMarkedTris = new ArrayList<>();
-                for (int i = 0; i < areaMod.size(); i++) {
-                    int[] m_triareas = Recast.markWalkableTriangles(ctx, cfg.walkableSlopeAngle, verts, listAreaTris.get(i), listAreaTris.get(i).length/3, areaMod.get(i));
-                    listMarkedTris.add(m_triareas);
-                }
+                if (!listTriIndices.isEmpty()) {
+                    /**
+                     * Set the Area Type for each triangle. Since this is one 
+                     * mesh, the AreaModification can be applied directly to the 
+                     * array found in listTriIndices.
+                     */
+                    List<int[]> listMarkedTris = new ArrayList<>();
+                    for (Modification mod: geomProvider.getListMods()) {
+                        int[] m_triareas = Recast.markWalkableTriangles(ctx, 
+                                cfg.walkableSlopeAngle, 
+                                verts, 
+                                listTriIndices.get(geomProvider.getListMods().indexOf(mod)), 
+                                listTriIndices.get(geomProvider.getListMods().indexOf(mod)).length/3, 
+                                mod.getMod());
+                        listMarkedTris.add(m_triareas);
+                    }                 
 
-                //Prepare a new array to combine all marked triangles.
-                int[] mergeArea = new int[ntris];
-                int length = 0;
-                //Copy each marked triangle into the new array.
-                for (int[] area: listMarkedTris) {
-                    System.arraycopy(area, 0, mergeArea, length, area.length);
-                    length += area.length;
-                }
-                
-//                System.out.println("mergeArea " + Arrays.toString(mergeArea) + " length " + mergeArea.length + "\n");
-                
-                RecastRasterization.rasterizeTriangles(ctx, verts, tris, mergeArea, ntris, solid, cfg.walkableClimb);
-                
-//                int[] controlGroup = Recast.markWalkableTriangles(ctx, cfg.walkableSlopeAngle, verts, tris, ntris,cfg.walkableAreaMod);
-//                System.out.println("controlGroup " + Arrays.toString(controlGroup) + " length " + controlGroup.length + "\n");
-                
+                    //Prepare a new array to combine all marked triangles.
+                    int[] mergeArea = new int[ntris];
+                    int length = 0;
+                    //Copy each marked triangle into the new array.
+                    for (int[] area: listMarkedTris) {
+                        System.arraycopy(area, 0, mergeArea, length, area.length);
+                        length += area.length;
+                    }
+
+//                    System.out.println("mergeArea " + Arrays.toString(mergeArea) + " length " + mergeArea.length + "\n");
+
+                    RecastRasterization.rasterizeTriangles(ctx, verts, tris, mergeArea, ntris, solid, cfg.walkableClimb);
+
+//                    int[] controlGroup = Recast.markWalkableTriangles(ctx, cfg.walkableSlopeAngle, verts, tris, ntris,cfg.walkableAreaMod);
+//                    System.out.println("controlGroup " + Arrays.toString(controlGroup) + " length " + controlGroup.length + "\n");
+                } else {
+                    //Mark all triangles  with a single AreaModification from cfg.                    
+                    int[] m_triareas = Recast.markWalkableTriangles(ctx, cfg.walkableSlopeAngle, verts, tris, ntris, cfg.walkableAreaMod);
+                    RecastRasterization.rasterizeTriangles(ctx, verts, tris, m_triareas, ntris, solid, cfg.walkableClimb);
+                }   
             }
         }
         //
@@ -584,8 +630,8 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
 
 //                        System.out.println("FOUND nodeIndex " + nodeIndex 
 //                                + " areaIndex " + j 
-//                                +  " area " + listAreaTris.indexOf(areaTris) 
-//                                + " area mod " + areaMod.get(listAreaTris.indexOf(areaTris)).getMaskedValue());
+//                                +  " area " + listTriIndices.indexOf(areaTris) 
+//                                + " area mod " + areaMod.get(listTriIndices.indexOf(areaTris)).getMaskedValue());
 
                         //Add found triangle to the unmarked list.
                         listUnmarkedTris.add(nodeTri[0]);
@@ -613,8 +659,8 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
                         array[idx] = listUnmarkedTris.get(idx);
                     }
 
-//                    System.out.println("MARK AREA " + listAreaTris.indexOf(areaTris) 
-//                            + " area mod " + areaMod.get(listAreaTris.indexOf(areaTris)).getMaskedValue());
+//                    System.out.println("MARK AREA " + listTriIndices.indexOf(areaTris) 
+//                            + " area mod " + areaMod.get(listTriIndices.indexOf(areaTris)).getMaskedValue());
 
                     /**
                      * Mark the Area Type based on current area since we have 
@@ -658,7 +704,7 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
         return mergeArea;
     }
 
-    private CompactHeightfield buildCompactHeightfield(InputGeomProvider geomProvider, RecastConfig cfg, Context ctx,
+    private CompactHeightfield buildCompactHeightfield(JmeInputGeomProvider geomProvider, RecastConfig cfg, Context ctx,
             Heightfield solid) {
         //
         // Step 4. Partition walkable surface to simple regions.
@@ -678,12 +724,10 @@ public class RecastBuilder extends org.recast4j.recast.RecastBuilder {
         return chf;
     }
 
-    public HeightfieldLayerSet buildLayers(InputGeomProvider geom, RecastBuilderConfig builderCfg, 
-            List<Integer> listTriLength, List<AreaModification> areaMod) {
+    public HeightfieldLayerSet buildLayers(JmeInputGeomProvider geom, RecastBuilderConfig builderCfg) {
         Context ctx = new Context();
-        Heightfield solid = buildSolidHeightfield(geom, builderCfg, ctx, listTriLength, areaMod);
+        Heightfield solid = buildSolidHeightfield(geom, builderCfg, ctx);
         CompactHeightfield chf = buildCompactHeightfield(geom, builderCfg.cfg, ctx, solid);
         return RecastLayers.buildHeightfieldLayers(ctx, chf, builderCfg.borderSize, builderCfg.cfg.walkableHeight);
     }
-
 }

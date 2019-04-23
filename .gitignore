@@ -21,3 +21,4 @@ gradle-app.setting
 assets/out
 /.nb-gradle-properties
 /test.md
+/test.tc

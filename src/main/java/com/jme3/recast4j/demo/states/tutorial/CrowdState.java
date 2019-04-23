@@ -35,13 +35,12 @@ import com.jme3.math.ColorRGBA;
 import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
-import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
 import com.jme3.recast4j.Detour.Crowd.MovementApplicationType;
-import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.Recast.Utils.RecastUtils;
+import static com.jme3.recast4j.demo.AreaModifications.*;
 import com.jme3.recast4j.demo.controls.CrowdDebugControl;
 import com.jme3.recast4j.demo.states.CrowdBuilderState;
 import com.jme3.scene.Geometry;
@@ -134,15 +133,14 @@ public class CrowdState extends BaseAppState {
         //Update poly flags from areas. Set any flags here.
         PolyMesh pmesh = paramBuilder.getPolyMesh();
         for (int i = 0; i < pmesh.npolys; ++i) {
-            if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
-              || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
-              || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                paramBuilder.withPolyFlag(pmesh.flags[i], SampleAreaModifications.SAMPLE_POLYFLAGS_WALK);
-            } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                paramBuilder.withPolyFlag(pmesh.flags[i], SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM);
-            } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                paramBuilder.withPolyFlags(pmesh.flags[i], SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
-                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR);
+            if (pmesh.areas[i] == POLYAREA_TYPE_GROUND
+              || pmesh.areas[i] == POLYAREA_TYPE_GRASS
+              || pmesh.areas[i] == POLYAREA_TYPE_ROAD) {
+                paramBuilder.withPolyFlag(i, POLYFLAGS_WALK);
+            } else if (pmesh.areas[i] == POLYAREA_TYPE_WATER) {
+                paramBuilder.withPolyFlag(i, POLYFLAGS_SWIM);
+            } else if (pmesh.areas[i] == POLYAREA_TYPE_DOOR) {
+                paramBuilder.withPolyFlags(i, POLYFLAGS_WALK | POLYFLAGS_DOOR);
             }
         }
         //Build the parameter object. 
@@ -226,15 +224,14 @@ public class CrowdState extends BaseAppState {
 
                 //Update poly flags from areas.
                 for (int i = 0; i < pmesh.npolys; ++i) {
-                    if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GROUND
-                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_GRASS
-                            || pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_ROAD) {
-                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
-                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_WATER) {
-                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_SWIM;
-                    } else if (pmesh.areas[i] == SampleAreaModifications.SAMPLE_POLYAREA_TYPE_DOOR) {
-                        pmesh.flags[i] = SampleAreaModifications.SAMPLE_POLYFLAGS_WALK
-                                | SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
+                    if (pmesh.areas[i] == POLYAREA_TYPE_GROUND
+                            || pmesh.areas[i] == POLYAREA_TYPE_GRASS
+                            || pmesh.areas[i] == POLYAREA_TYPE_ROAD) {
+                        pmesh.flags[i] = POLYFLAGS_WALK;
+                    } else if (pmesh.areas[i] == POLYAREA_TYPE_WATER) {
+                        pmesh.flags[i] = POLYFLAGS_SWIM;
+                    } else if (pmesh.areas[i] == POLYAREA_TYPE_DOOR) {
+                        pmesh.flags[i] = POLYFLAGS_WALK | POLYFLAGS_DOOR;
                     }
                     if (pmesh.areas[i] > 0) {
                         pmesh.areas[i]--;

@@ -51,7 +51,7 @@ public class ThirdPersonCamState extends BaseAppState {
 
     @Override
     protected void initialize(Application app) {
-        addHeadNode((Node) ((SimpleApplication) app).getRootNode().getChild("player"));
+        addHeadNode(getState(NavState.class).getCharacters().get(0));
     }
 
     @Override

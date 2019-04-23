@@ -44,7 +44,6 @@ import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
 import com.jme3.recast4j.Detour.DetourUtils;
 import com.jme3.recast4j.Recast.*;
 import com.jme3.recast4j.Recast.Utils.RecastUtils;
-import com.jme3.recast4j.demo.RecastBuilder;
 import com.jme3.recast4j.demo.controls.PhysicsAgentControl;
 import com.jme3.scene.*;
 import com.jme3.scene.Node;
@@ -56,9 +55,6 @@ import org.recast4j.detour.*;
 import org.recast4j.detour.io.MeshDataWriter;
 import org.recast4j.detour.io.MeshSetReader;
 import org.recast4j.detour.io.MeshSetWriter;
-import org.recast4j.recast.*;
-import org.recast4j.recast.RecastBuilder.RecastBuilderProgressListener;
-import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
 import org.recast4j.recast.RecastConstants.PartitionType;
 import org.recast4j.recast.geom.InputGeomProvider;
 import org.recast4j.recast.geom.TriMesh;
@@ -72,17 +68,56 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
-import static com.jme3.recast4j.Recast.SampleAreaModifications.*;
+import com.jme3.recast4j.demo.Modification;
+import static com.jme3.recast4j.demo.AreaModifications.*;
+import com.jme3.recast4j.demo.GeometryProviderBuilder2;
+import com.jme3.recast4j.demo.JmeInputGeomProvider;
+import com.jme3.recast4j.demo.ProgressListen;
+import com.jme3.recast4j.demo.RecastBuilder;
+import com.jme3.recast4j.demo.TileLayerBuilder;
 import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import com.jme3.util.BufferUtils;
+import java.lang.reflect.Field;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import org.recast4j.detour.tilecache.TileCache;
+import org.recast4j.detour.tilecache.TileCacheBuilder;
+import org.recast4j.detour.tilecache.TileCacheMeshProcess;
+import org.recast4j.detour.tilecache.TileCacheParams;
+import org.recast4j.detour.tilecache.TileCacheStorageParams;
+import org.recast4j.detour.tilecache.io.compress.TileCacheCompressorFactory;
+import org.recast4j.detour.tilecache.io.TileCacheReader;
+import org.recast4j.detour.tilecache.io.TileCacheWriter;
+import org.recast4j.recast.CompactHeightfield;
+import org.recast4j.recast.Context;
+import org.recast4j.recast.ContourSet;
+import org.recast4j.recast.Heightfield;
+import org.recast4j.recast.PolyMesh;
+import org.recast4j.recast.PolyMeshDetail;
+import org.recast4j.recast.Recast;
+import org.recast4j.recast.RecastArea;
+import org.recast4j.recast.RecastBuilder.RecastBuilderResult;
+import org.recast4j.recast.RecastBuilderConfig;
+import org.recast4j.recast.RecastConfig;
+import org.recast4j.recast.RecastConstants;
+import org.recast4j.recast.RecastContour;
+import org.recast4j.recast.RecastFilter;
+import org.recast4j.recast.RecastMesh;
+import org.recast4j.recast.RecastMeshDetail;
+import org.recast4j.recast.RecastRasterization;
+import org.recast4j.recast.RecastRegion;
+import static org.recast4j.detour.DetourCommon.vCopy;
+import static org.recast4j.recast.RecastVectors.copy;
+import static org.recast4j.detour.DetourCommon.vCopy;
+import static org.recast4j.recast.RecastVectors.copy;
+import static org.recast4j.detour.DetourCommon.vCopy;
+import static org.recast4j.recast.RecastVectors.copy;
+import static org.recast4j.detour.DetourCommon.vCopy;
 import static org.recast4j.recast.RecastVectors.copy;
 
 /**
@@ -103,11 +138,20 @@ public class NavState extends BaseAppState {
     private float maxClimb = .3f; //Should add getter for this.
     private float radius = 0.4f; //Should add getter for this.
     private float height = 1.7f; //Should add getter for this.
+    private int DT_TILECACHE_WALKABLE_AREA;
     
     public NavState() {
         pathGeometries = new ArrayList<>(64);
         characters = new ArrayList<>(64);  
         mapOffMeshCon = new HashMap<>();
+        TileCacheBuilder builder = new TileCacheBuilder();
+        try {
+            Field tcWalkableArea = builder.getClass().getDeclaredField("DT_TILECACHE_WALKABLE_AREA");
+            tcWalkableArea.setAccessible(true);
+            DT_TILECACHE_WALKABLE_AREA = tcWalkableArea.getInt(builder);
+        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException ex) {
+            LOG.error("{} {}", NavState.class.getName(),ex);
+        }
     }
     
     @Override
@@ -133,9 +177,10 @@ public class NavState extends BaseAppState {
 //        buildSoloModified();
 //        //Solo build using recast4j methods. Implements area and flag types.
 //        buildSoloRecast4j();
-        //Tile build using recast4j methods. Implements area and flag types plus
-        //offmesh connections.
-        buildTiledRecast4j();
+//        //Tile build using recast4j methods. Implements area and flag types plus
+//        //offmesh connections.
+//        buildTiledRecast4j();
+        buildTileCache();
         
         MouseEventControl.addListenersToSpatial(worldMap, new DefaultMouseListener() {
             @Override
@@ -153,10 +198,10 @@ public class NavState extends BaseAppState {
                 if (getCharacters().size() == 1) {
                     DefaultQueryFilter filter = new BetterDefaultQueryFilter();
                     
-                    int includeFlags = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR | SAMPLE_POLYFLAGS_SWIM | SAMPLE_POLYFLAGS_JUMP;
+                    int includeFlags = POLYFLAGS_WALK | POLYFLAGS_DOOR | POLYFLAGS_SWIM | POLYFLAGS_JUMP;
                     filter.setIncludeFlags(includeFlags);
 
-                    int excludeFlags = SAMPLE_POLYFLAGS_DISABLED;
+                    int excludeFlags = POLYFLAGS_DISABLED;
                     filter.setExcludeFlags(excludeFlags);
                     
                     Result<FindNearestPolyResult> startPoly = query.findNearestPoly(getCharacters().get(0).getWorldTranslation().toArray(null), new float[]{1.0f, 1.0f, 1.0f}, filter);
@@ -203,7 +248,7 @@ public class NavState extends BaseAppState {
              * with a DoorSwingControl.
              */
             for (Spatial child: children) {
-                
+
                 DoorSwingControl swingControl = getState(UtilState.class).findControl(child, DoorSwingControl.class);
                 
                 if (swingControl != null) {
@@ -242,7 +287,7 @@ public class NavState extends BaseAppState {
                             DefaultQueryFilter filter = new BetterDefaultQueryFilter();
 
                             //Limit the search to only door flags.
-                            int includeFlags = SAMPLE_POLYFLAGS_DOOR;
+                            int includeFlags = POLYFLAGS_DOOR;
                             filter.setIncludeFlags(includeFlags);
 
                             //Include everything.
@@ -263,17 +308,18 @@ public class NavState extends BaseAppState {
                              * node which should be the same as the doors origin.
                              */
                             BoundingBox bounds = (BoundingBox) target.getWorldBound();
-                            float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent());
+                            //Width of door opening.
+                            float maxXZ = Math.max(bounds.getXExtent(), bounds.getZExtent()) * 2;
 
                             Result<FindNearestPolyResult> findNearestPoly = query.findNearestPoly(target.getWorldTranslation().toArray(null), new float[] {maxXZ, maxXZ, maxXZ}, filter);
-
+                            
                             //No obj, no go. Fail most likely result of filter setting.
                             if (!findNearestPoly.status.isSuccess() || findNearestPoly.result.getNearestRef() == 0) {
                                 LOG.error("Door findNearestPoly unsuccessful or getNearestRef is not > 0.");
                                 LOG.error("findNearestPoly [{}] getNearestRef [{}].", findNearestPoly.status, findNearestPoly.result.getNearestRef());
                                 return;
                             }
-
+                            
                             Result<FindPolysAroundResult> findPolysAroundCircle = query.findPolysAroundCircle(findNearestPoly.result.getNearestRef(), findNearestPoly.result.getNearestPos(), maxXZ, filter);
 
                             //Success
@@ -292,11 +338,11 @@ public class NavState extends BaseAppState {
                                 List<PolyAndFlag> listPolyAndFlag = new ArrayList<>();
 
                                 //The flags that say this door is open.
-                                int open = SAMPLE_POLYFLAGS_DOOR | SAMPLE_POLYFLAGS_WALK;
+                                int open = POLYFLAGS_WALK | POLYFLAGS_DOOR ;
 
                                 //The flags that say this door is closed, i.e. open
-                                // flags and SAMPLE_POLYFLAGS_DISABLED
-                                int closed = open | SAMPLE_POLYFLAGS_DISABLED;
+                                // flags and POLYFLAGS_DISABLED
+                                int closed = open | POLYFLAGS_DISABLED;
 
                                 /**
                                  * We iterate through the polys looking for the open
@@ -304,7 +350,7 @@ public class NavState extends BaseAppState {
                                  */
                                 for (long poly: m_polys) {
 
-                                    LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyFlags(poly).result);
+                                    LOG.info("<========== PRE flag set Poly ID [{}] Flags [{}] ==========>", poly, navMesh.getPolyArea(poly).result);
                                     printFlags(poly);
 
                                     /**
@@ -603,6 +649,9 @@ public class NavState extends BaseAppState {
      * Original implementation using jme3-recast4j methods and custom recastBuilder.
      */
     private void buildSolo() {
+        //Clean up offMesh connections.
+        offMeshCon.detachAllChildren();
+        
         System.out.println("Building Nav Mesh, this may freeze your computer for a few seconds, please stand by");
         long time = System.currentTimeMillis(); // Never do real benchmarking with currentTimeMillis!
         RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).
@@ -622,7 +671,7 @@ public class NavState extends BaseAppState {
         
         //Split up for testing.
         NavMeshDataCreateParams build = new NavMeshDataCreateParamsBuilder(
-                new RecastBuilder().build(new GeometryProviderBuilder(worldMap).build(), bcfg)).build(bcfg);
+                new RecastBuilder().build(new GeometryProviderBuilder2(worldMap).build(), bcfg)).build(bcfg);
         MeshData meshData = NavMeshBuilder.createNavMeshData(build);
         navMesh = new NavMesh(meshData, bcfg.cfg.maxVertsPerPoly, 0);
         query = new NavMeshQuery(navMesh);
@@ -648,60 +697,39 @@ public class NavState extends BaseAppState {
      * jme3-recast4j wrapper methods. 
      */
     private void buildSoloModified() {
+
+        //Build merged mesh.
+        JmeInputGeomProvider geomProvider = new GeometryProviderBuilder2(worldMap).build();
         
-        //Collect each geometry length of triangles to pass to buildTile.
-        List<Integer> listTriLength = new ArrayList<>();
-        //Collect area modifications based off geometry material or userData.
-        List<AreaModification> areaMod = new ArrayList<>();
-       
-        //Set area types and flags.
         worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
-            
             @Override
             public void visit(Geometry spat) {
-                //Load triangle lengths so we can pick them out from the 
-                //TriMesh later.
-                listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                /**
-                 * Set Area Type based off materials in this case. UserData
-                 * can be added as a optional way to do this. UserData would
-                 * require separating the geometry in blender which is not
-                 * any different really than using materials.
-                 *
-                 * Doors could work the same way, mark the path between the
-                 * two rooms with a material or separate the door path
-                 * geometry into a separate object so it can be picked out.
-                 *
-                 * Off mesh connections can use a similar format. We could
-                 * parse the geometry looking for two connection geometry
-                 * that are flagged as same connection and set the off mesh
-                 * connections programmatically. 
-                 */
-                String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
-
+                int geomLength = spat.getMesh().getTriangleCount() *3;
+                
+                String[] name = spat.getMaterial().getName().split("_");
+                
                 switch (name[0]) {
 
                     case "water":
-                        areaMod.add(SAMPLE_AREAMOD_WATER);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_WATER));
                         break;
                     case "road":
-                        areaMod.add(SAMPLE_AREAMOD_ROAD);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_ROAD));
                         break;
                     case "grass":
-                        areaMod.add(SAMPLE_AREAMOD_GRASS);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_GRASS));
                         break;
                     case "door":
-                        areaMod.add(SAMPLE_AREAMOD_DOOR);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_DOOR));
                         break;
                     default:
-                        areaMod.add(SAMPLE_AREAMOD_GROUND);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_GROUND));
                 }
             }
         });
-
-        //Build merged mesh.
-        InputGeomProvider geomProvider = new GeometryProviderBuilder(
-                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
+        
+        //Clean up offMesh connections.
+        offMeshCon.detachAllChildren();
         
         RecastBuilderConfig bcfg = new RecastBuilderConfigBuilder(worldMap).withDetailMesh(true).
                 build(new RecastConfigBuilder()
@@ -714,28 +742,28 @@ public class NavState extends BaseAppState {
                         .withAgentMaxSlope(45f)         
                         .withEdgeMaxLen(2.4f)             // r*8
                         .withEdgeMaxError(1.3f)         // 1.1 - 1.5
-                        .withDetailSampleDistance(1.0f) // increase to 8 if exception on level model
+                        .withDetailSampleDistance(8.0f) // increase to 8 if exception on level model
                         .withDetailSampleMaxError(8.0f) // increase to 8 if exception on level model
                         .withVertsPerPoly(3).build());
         
         //Split up for testing.
-        RecastBuilderResult result = new RecastBuilder().build(geomProvider, bcfg, listTriLength, areaMod);
+        RecastBuilderResult result = new RecastBuilder().build(geomProvider, bcfg);
         
         NavMeshDataCreateParamsBuilder paramsBuilder = new NavMeshDataCreateParamsBuilder(result);
         PolyMesh m_pmesh = result.getMesh();
         
-        //Set Ability flags. Including offmesh connection flags.
+        //Set Ability flags. 
         for (int i = 0; i < m_pmesh.npolys; ++i) {
-            if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
-            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
-            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK);
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_SWIM);
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                paramsBuilder.withPolyFlags(m_pmesh.flags[i], SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR);
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
-                paramsBuilder.withPolyFlag(m_pmesh.flags[i], SAMPLE_POLYFLAGS_JUMP);
+            if (m_pmesh.areas[i] == POLYAREA_TYPE_GROUND
+            ||  m_pmesh.areas[i] == POLYAREA_TYPE_GRASS
+            ||  m_pmesh.areas[i] == POLYAREA_TYPE_ROAD) {
+                paramsBuilder.withPolyFlag(i, POLYFLAGS_WALK);
+            } else if (m_pmesh.areas[i] == POLYAREA_TYPE_WATER) {
+                paramsBuilder.withPolyFlag(i, POLYFLAGS_SWIM);
+            } else if (m_pmesh.areas[i] == POLYAREA_TYPE_DOOR) {
+                paramsBuilder.withPolyFlags(i, POLYFLAGS_WALK | POLYFLAGS_DOOR);
+            } else if (m_pmesh.areas[i] == POLYAREA_TYPE_JUMP) {
+                paramsBuilder.withPolyFlag(i, POLYFLAGS_JUMP);
             }
         }
         
@@ -775,61 +803,40 @@ public class NavState extends BaseAppState {
      * Implements area type and flag setting.
      */
     private void buildSoloRecast4j() {
+
+        //Build merged mesh.
+        JmeInputGeomProvider geomProvider = new GeometryProviderBuilder2(worldMap).build();
         
-        //Collect each geometry length of triangles to pass to buildTile.
-        List<Integer> listTriLength = new ArrayList<>();
-        //Collect area modifications based off geometry material or userData.
-        List<AreaModification> areaMod = new ArrayList<>();
-        
-        //Set area types and flags.
         worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
-            
             @Override
             public void visit(Geometry spat) {
-                //Load triangle lengths so we can pick them out from the 
-                //TriMesh later.
-                listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                /**
-                 * Set Area Type based off materials in this case. UserData
-                 * can be added as a optional way to do this. UserData would
-                 * require separating the geometry in blender which is not
-                 * any different really than using materials.
-                 *
-                 * Doors could work the same way, mark the path between the
-                 * two rooms with a material or separate the door path
-                 * geometry into a separate object so it can be picked out.
-                 *
-                 * Off mesh connections can use a similar format. We could
-                 * parse the geometry looking for two connection geometry
-                 * that are flagged as same connection and set the off mesh
-                 * connections programmatically. 
-                 */
-                String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
-
+                int geomLength = spat.getMesh().getTriangleCount() *3;
+                
+                String[] name = spat.getMaterial().getName().split("_");
+                
                 switch (name[0]) {
 
                     case "water":
-                        areaMod.add(SAMPLE_AREAMOD_WATER);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_WATER));
                         break;
                     case "road":
-                        areaMod.add(SAMPLE_AREAMOD_ROAD);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_ROAD));
                         break;
                     case "grass":
-                        areaMod.add(SAMPLE_AREAMOD_GRASS);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_GRASS));
                         break;
                     case "door":
-                        areaMod.add(SAMPLE_AREAMOD_DOOR);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_DOOR));
                         break;
                     default:
-                        areaMod.add(SAMPLE_AREAMOD_GROUND);
+                        geomProvider.addMod(new Modification(geomLength, AREAMOD_GROUND));
                 }
             }
         });
-
-        //Build merged mesh.
-        InputGeomProvider geomProvider = new GeometryProviderBuilder(
-                (Node)((SimpleApplication) getApplication()).getRootNode().getChild("worldmap")).build();
-
+        
+        //Clean up offMesh connections.
+        offMeshCon.detachAllChildren();
+        
         //Get min/max bounds.
         float[] bmin = geomProvider.getMeshBoundsMin();
         float[] bmax = geomProvider.getMeshBoundsMax();
@@ -849,12 +856,13 @@ public class NavState extends BaseAppState {
             .withEdgeMaxError(1.3f)             // 1.1 - 1.5
             .withDetailSampleDistance(8.0f)     // increase if exception
             .withDetailSampleMaxError(8.0f)     // increase if exception
-            .withWalkableAreaMod(SAMPLE_AREAMOD_GROUND)
+            .withWalkableAreaMod(AREAMOD_GROUND)
             .withVertsPerPoly(3).build();
         
         RecastBuilderConfig bcfg = new RecastBuilderConfig(cfg, bmin, bmax);
         
         Heightfield m_solid = new Heightfield(bcfg.width, bcfg.height, bcfg.bmin, bcfg.bmax, cfg.cs, cfg.ch);
+        
         for (TriMesh geom : geomProvider.meshes()) {
             float[] verts = geom.getVerts();
             int[] tris = geom.getTris();
@@ -863,22 +871,19 @@ public class NavState extends BaseAppState {
             //Separate individual triangles into a arrays so we can mark Area Type.
             List<int[]> listTris = new ArrayList<>();
             int fromIndex = 0;
-            for(int length: listTriLength) {
-                int[] triangles = new int[length];
-                System.arraycopy(tris, fromIndex, triangles, 0, length);
+            for(Modification mod: geomProvider.getListMods()) {
+                int[] triangles = new int[mod.getGeomLength()];
+                System.arraycopy(tris, fromIndex, triangles, 0, mod.getGeomLength());
                 listTris.add(triangles);
-                fromIndex += length;
+                fromIndex += mod.getGeomLength();
             }
             
-            /**
-             * Set the Area Type for each triangle.
-             */
             List<int[]> areas = new ArrayList<>();
-            for (int i = 0; i < areaMod.size(); i++) {
-                int[] m_triareas = Recast.markWalkableTriangles(
-                        m_ctx, cfg.walkableSlopeAngle, verts, listTris.get(i), listTris.get(i).length/3, areaMod.get(i));
+            
+            for (Modification mod: geomProvider.getListMods()) {
+                int[] m_triareas = Recast.markWalkableTriangles(m_ctx, cfg.walkableSlopeAngle, verts, listTris.get(geomProvider.getListMods().indexOf(mod)), listTris.get(geomProvider.getListMods().indexOf(mod)).length/3, mod.getMod());
                 areas.add(m_triareas);
-            }
+            }            
             
             //Prepare the new array for all areas.
             int[] m_triareasAll = new int[ntris];
@@ -900,7 +905,7 @@ public class NavState extends BaseAppState {
         RecastArea.erodeWalkableArea(m_ctx, cfg.walkableRadius, m_chf);
  
 //        // (Optional) Mark areas.
-//        List<ConvexVolume> vols = geomProvider.getConvexVolumes(); 
+//        List<ConvexVolume> vols = geom.getConvexVolumes(); 
 //        for (ConvexVolume convexVolume: vols) { 
 //            RecastArea.markConvexPolyArea(m_ctx, convexVolume.verts, convexVolume.hmin, convexVolume.hmax, convexVolume.areaMod, m_chf);
 //        }
@@ -928,16 +933,16 @@ public class NavState extends BaseAppState {
 
         //Set Ability flags.
         for (int i = 0; i < m_pmesh.npolys; ++i) {
-            if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
-            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
-            ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK;
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
-            } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_JUMP) {
-                m_pmesh.flags[i] = SAMPLE_POLYFLAGS_JUMP;
+            if (m_pmesh.areas[i] == POLYAREA_TYPE_GROUND
+            ||  m_pmesh.areas[i] == POLYAREA_TYPE_GRASS
+            ||  m_pmesh.areas[i] == POLYAREA_TYPE_ROAD) {
+                m_pmesh.flags[i] = POLYFLAGS_WALK;
+            } else if (m_pmesh.areas[i] == POLYAREA_TYPE_WATER) {
+                m_pmesh.flags[i] = POLYFLAGS_SWIM;
+            } else if (m_pmesh.areas[i] == POLYAREA_TYPE_DOOR) {
+                m_pmesh.flags[i] = POLYFLAGS_WALK | POLYFLAGS_DOOR;
+            } else if (m_pmesh.areas[i] == POLYAREA_TYPE_JUMP) {
+                m_pmesh.flags[i] = POLYFLAGS_JUMP;
             }          
         }
 
@@ -970,7 +975,6 @@ public class NavState extends BaseAppState {
                 
         MeshData meshData = NavMeshBuilder.createNavMeshData(params);
         navMesh = new NavMesh(meshData, params.nvp, 0);
-        
         query = new NavMeshQuery(navMesh);
         
         //Create offmesh connections here.
@@ -997,52 +1001,32 @@ public class NavState extends BaseAppState {
      */
     private void buildTiledRecast4j() {
         
-        //Collect each geometry length of triangles to pass to buildTile.
-        List<Integer> listTriLength = new ArrayList<>();
-        //Collect area modifications based off geometry material or userData.
-        List<AreaModification> areaMod = new ArrayList<>();
-
-        //Set area types and flags.
+        //Step 1. Gather our geometry.
+        JmeInputGeomProvider geom = new GeometryProviderBuilder2(worldMap).build();
+        
         worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
-            
             @Override
             public void visit(Geometry spat) {
-                //Load triangle lengths so we can pick them out from the 
-                //TriMesh later.
-                listTriLength.add(getTriangles(((Geometry) spat).getMesh()).length);
-                /**
-                 * Set Area Type based off materials in this case. UserData
-                 * can be added as a optional way to do this. UserData would
-                 * require separating the geometry in blender which is not
-                 * any different really than using materials.
-                 *
-                 * Doors could work the same way, mark the path between the
-                 * two rooms with a material or separate the door path
-                 * geometry into a separate object so it can be picked out.
-                 *
-                 * Off mesh connections can use a similar format. We could
-                 * parse the geometry looking for two connection geometry
-                 * that are flagged as same connection and set the off mesh
-                 * connections programmatically. 
-                 */
-                String[] name = ((Geometry) spat).getMaterial().getName().toLowerCase().split("_");
-
+                int geomLength = spat.getMesh().getTriangleCount() *3;
+                
+                String[] name = spat.getMaterial().getName().split("_");
+                
                 switch (name[0]) {
 
                     case "water":
-                        areaMod.add(SAMPLE_AREAMOD_WATER);
+                        geom.addMod(new Modification(geomLength, AREAMOD_WATER));
                         break;
                     case "road":
-                        areaMod.add(SAMPLE_AREAMOD_ROAD);
+                        geom.addMod(new Modification(geomLength, AREAMOD_ROAD));
                         break;
                     case "grass":
-                        areaMod.add(SAMPLE_AREAMOD_GRASS);
+                        geom.addMod(new Modification(geomLength, AREAMOD_GRASS));
                         break;
                     case "door":
-                        areaMod.add(SAMPLE_AREAMOD_DOOR);
+                        geom.addMod(new Modification(geomLength, AREAMOD_DOOR));
                         break;
                     default:
-                        areaMod.add(SAMPLE_AREAMOD_GROUND);
+                        geom.addMod(new Modification(geomLength, AREAMOD_GROUND));
                 }
             }
         });
@@ -1066,17 +1050,23 @@ public class NavState extends BaseAppState {
 
                     if (skelCont != null) {
                         /**
-                        * Offmesh connections require a start/end vector3f. 
-                        * To attain these vector3f, you can use bones from 
-                        * an armature. The bones must be paired and use a 
-                        * naming convention. In our case, we use:
+                        * Offmesh connections require two connections, a 
+                        * start/end vector3f and must connect to a surrounding 
+                        * tile. To complete a connection, start and end must be 
+                        * the same for each. You can supply the Vector3f manually 
+                        * or for example, use bones from an armature. When using 
+                        * bones, they should be paired and use a naming convention. 
+                        * 
+                        * In our case, we used bones and this naming convention:
                         * 
                         * arg[0](delimiter)arg[1](delimiter)arg[2]
                         * 
-                        * You set each bone origin to any vertices, in any 
-                        * mesh, as long as the same string for arg[0] and 
-                        * arg[1] are identical and they do not use the same 
-                        * vertices. 
+                        * We set each bone origin to any vertices, in any mesh, 
+                        * as long as the same string for arg[0] and arg[1] are 
+                        * identical and they do not use the same vertices. We 
+                        * duplicate two polygons (triangles) in the mesh or 
+                        * separate meshes and add an armature(s) using a naming
+                        * convention.
                         * 
                         * Naming convention for two bones: 
                         * 
@@ -1113,62 +1103,92 @@ public class NavState extends BaseAppState {
                             if (arg[0].equals("offmesh")) {
 
                                 //New connection.
-                                org.recast4j.detour.OffMeshConnection linkA = new org.recast4j.detour.OffMeshConnection();
+                                org.recast4j.detour.OffMeshConnection link1 = new org.recast4j.detour.OffMeshConnection();
 
                                 /**
-                                 * The bones worldTranslation will be the 
-                                 * start Vector3f of the OffMeshConnection 
+                                 * The bones worldTranslation will be the start
+                                 * or end Vector3f of each OffMeshConnection 
                                  * object.
                                  */
-                                float[] startPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
+                                float[] linkPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
 
                                 /**
-                                 * Prepare new position array. The endpoints 
-                                 * of the connection. 
+                                 * Prepare new position array. The endpoints of 
+                                 * the connection. 
+                                 * 
                                  *  startPos    endPos
                                  * [ax, ay, az, bx, by, bz]
                                  */
                                 float[] pos = new float[6];
 
-                                //Copy linkA current postition to A.startPos. 
-                                System.arraycopy(startPos, 0, pos, 0, 3);
+                                /**
+                                 * Copy link1 current position to pos array. If
+                                 * link1 is bone (a), it becomes the link start.
+                                 * If (b), the link end.
+                                 */
+                                System.arraycopy(linkPos, 0, pos, arg[2].equals("a") ? 0:3, 3);
 
-                                //Set linkA pos to new array.
-                                linkA.pos = pos;
+                                //Set link1 to new array.
+                                link1.pos = pos;
 
                                 //Player (r)adius. Links fire at (r) * 2.25.
-                                linkA.rad = radius;
+                                link1.rad = radius;
+                                
+                                /**
+                                 * Move through link1 both directions. Only 
+                                 * works if both links have identical in start/end.
+                                 * Set to 0 for one direction link.
+                                 */
+                                link1.flags = NavMesh.DT_OFFMESH_CON_BIDIR;
 
                                 /**
-                                 * We need to look for the bones mate. Based 
-                                 * off our naming convention, this will be 
+                                 * We need to look for the bones mate. Based off 
+                                 * our naming convention, this will be 
                                  * offmesh.anything."a" or "b" so we set the 
-                                 * search to whatever this bones arg[2] isn't.
+                                 * search to whatever link1 arg[2] isn't.
                                  */
-                                String linkB = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
+                                String link2 = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
 
                                 /**
-                                 * If the paired bone has already been added 
-                                 * to map, set endPos and give each an id.
+                                 * If the paired bone has already been added to 
+                                 * map, set start or end determined by link1 arg[2].
                                  */
-                                if (mapOffMeshCon.containsKey(linkB)) {
-                                    //Copy A.startPos to B.endPos.
-                                    System.arraycopy(linkA.pos, 0, mapOffMeshCon.get(linkB).pos, 3, 3);
-                                    //Copy B.startPos to A.endPos.
-                                    System.arraycopy(mapOffMeshCon.get(linkB).pos, 0, linkA.pos, 3, 3);
+                                if (mapOffMeshCon.containsKey(link2)) {
+                                    /**
+                                     * Copy link1 pos to link2 pos. If link1 is 
+                                     * start(a) of link, copy link1 start to 
+                                     * link2 start. If link1 is the end(b) of 
+                                     * link, copy link1 end to link2 end. 
+                                     */
+                                    System.arraycopy(link1.pos, arg[2].equals("a") ? 0:3, mapOffMeshCon.get(link2).pos, arg[2].equals("a") ? 0:3, 3);
+                                    
+                                    /**
+                                     * Copy link2 pos to link1 pos. If link1 is
+                                     * the start(a) of link, copy link2 end to
+                                     * link1 end. If link1 is end(b) of link, 
+                                     * copy link2 start to link1 start.
+                                     */
+                                    System.arraycopy(mapOffMeshCon.get(link2).pos, arg[2].equals("a") ? 3:0, link1.pos, arg[2].equals("a") ? 3:0, 3);
 
                                     /**
-                                     * OffMeshconnections with id of 0 don't 
-                                     * get processed later.
+                                     * OffMeshconnections with id of 0 don't get 
+                                     * processed later if not set here.
                                      */
-                                    linkA.userId = ++id;
-                                    LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), linkA.userId);
-                                    mapOffMeshCon.get(linkB).userId = ++id;
-                                    LOG.info("OffMeshConnection [{}] id [{}]", linkB, mapOffMeshCon.get(linkB).userId);
+                                    if (arg[2].equals("a")) {
+                                        link1.userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), link1.userId);
+                                        mapOffMeshCon.get(link2).userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id [{}]", link2, mapOffMeshCon.get(link2).userId);
+                                    } else {
+                                        mapOffMeshCon.get(link2).userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id [{}]", link2, mapOffMeshCon.get(link2).userId);
+                                        link1.userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), link1.userId);
+                                    }
 
                                 }
                                 //Add this bone to map.
-                                mapOffMeshCon.put(b.getName(), linkA);
+                                mapOffMeshCon.put(b.getName(), link1);
                             }
                         }
                     }
@@ -1179,8 +1199,6 @@ public class NavState extends BaseAppState {
         //Clean up offMesh connections.
         offMeshCon.detachAllChildren();
         
-        //Step 1. Gather our geometry.
-        InputGeomProvider geomProvider = new GeometryProviderBuilder(worldMap).build();
         //Step 2. Create a Recast configuration object.
         RecastConfigBuilder builder = new RecastConfigBuilder();
         //Instantiate the configuration parameters.
@@ -1200,13 +1218,13 @@ public class NavState extends BaseAppState {
                 .withTileSize(16).build(); 
         // Build all tiles
         RecastBuilder rb = new RecastBuilder(new ProgressListen());
-        RecastBuilderResult[][] rcResult = rb.buildTiles(geomProvider, cfg, 1, listTriLength, areaMod);
+        RecastBuilderResult[][] rcResult = rb.buildTiles(geom, cfg, 1);
         // Add tiles to nav mesh
         int tw = rcResult.length;
         int th = rcResult[0].length;
         // Create empty nav mesh
         NavMeshParams navMeshParams = new NavMeshParams();
-        copy(navMeshParams.orig, geomProvider.getMeshBoundsMin());
+        copy(navMeshParams.orig, geom.getMeshBoundsMin());
         navMeshParams.tileWidth = cfg.tileSize * cfg.cs;
         navMeshParams.tileHeight = cfg.tileSize * cfg.cs;
         navMeshParams.maxTiles = tw * th;
@@ -1222,14 +1240,14 @@ public class NavState extends BaseAppState {
                 
                 // Update obj flags from areas. Including offmesh connections.
                 for (int i = 0; i < m_pmesh.npolys; ++i) {
-                    if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GROUND
-                    ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_GRASS
-                    ||  m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_ROAD) {
-                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK;
-                    } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_WATER) {
-                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_SWIM;
-                    } else if (m_pmesh.areas[i] == SAMPLE_POLYAREA_TYPE_DOOR) {
-                        m_pmesh.flags[i] = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
+                    if (m_pmesh.areas[i] == POLYAREA_TYPE_GROUND
+                    ||  m_pmesh.areas[i] == POLYAREA_TYPE_GRASS
+                    ||  m_pmesh.areas[i] == POLYAREA_TYPE_ROAD) {
+                        m_pmesh.flags[i] = POLYFLAGS_WALK;
+                    } else if (m_pmesh.areas[i] == POLYAREA_TYPE_WATER) {
+                        m_pmesh.flags[i] = POLYFLAGS_SWIM;
+                    } else if (m_pmesh.areas[i] == POLYAREA_TYPE_DOOR) {
+                        m_pmesh.flags[i] = POLYFLAGS_WALK | POLYFLAGS_DOOR;
                     }                     
                 }
                 
@@ -1262,7 +1280,6 @@ public class NavState extends BaseAppState {
                 navMesh.addTile(NavMeshBuilder.createNavMeshData(params), 0, 0);
             }
         }
-        
         query = new NavMeshQuery(navMesh);
         
         /**
@@ -1286,7 +1303,7 @@ public class NavState extends BaseAppState {
                 DefaultQueryFilter filter = new DefaultQueryFilter();
 
                 //In our case, we only need swim or walk flags.
-                int include = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_SWIM;
+                int include = POLYFLAGS_WALK | POLYFLAGS_SWIM;
                 filter.setIncludeFlags(include);
 
                 //No excludes.
@@ -1386,8 +1403,8 @@ public class NavState extends BaseAppState {
                         startTile.header.offMeshConCount++;
 
                         //Set the polys area type and flags.
-                        startTile.polys[poly].flags = SAMPLE_POLYFLAGS_JUMP;
-                        startTile.polys[poly].setArea(SAMPLE_POLYAREA_TYPE_JUMP);
+                        startTile.polys[poly].flags = POLYFLAGS_JUMP;
+                        startTile.polys[poly].setArea(POLYAREA_TYPE_JUMP);
 
                         /**
                          * Removing and adding the tile will rebuild all the 
@@ -1408,6 +1425,7 @@ public class NavState extends BaseAppState {
             //Read in saved NavMesh.
             MeshSetReader msr = new MeshSetReader();
             navMesh = msr.read(new FileInputStream("test.nm"), cfg.maxVertsPerPoly);
+            query = new NavMeshQuery(navMesh);
             int maxTiles = navMesh.getMaxTiles();
 
             //Tile data can be null since maxTiles is not an exact science.
@@ -1422,6 +1440,317 @@ public class NavState extends BaseAppState {
         }
     }  
  
+    private void buildTileCache() {
+                
+        //Step 1. Gather our geometry.
+        JmeInputGeomProvider geom = new GeometryProviderBuilder2(worldMap).build();
+        
+        worldMap.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+            @Override
+            public void visit(Geometry spat) {
+                int geomLength = spat.getMesh().getTriangleCount() *3;
+                
+                String[] name = spat.getMaterial().getName().split("_");
+                
+                switch (name[0]) {
+
+                    case "water":
+                        geom.addMod(new Modification(geomLength, AREAMOD_WATER));
+                        break;
+                    case "road":
+                        geom.addMod(new Modification(geomLength, AREAMOD_ROAD));
+                        break;
+                    case "grass":
+                        geom.addMod(new Modification(geomLength, AREAMOD_GRASS));
+                        break;
+                    case "door":
+                        geom.addMod(new Modification(geomLength, AREAMOD_DOOR));
+                        break;
+                    default:
+                        geom.addMod(new Modification(geomLength, AREAMOD_GROUND));
+                }
+            }
+        });
+        
+        //Set offmesh connections.
+        offMeshCon.depthFirstTraversal(new SceneGraphVisitorAdapter() {
+            //Id will be used for OffMeshConnections.
+            int id = 0;
+            
+            @Override
+            public void visit(Node spat) { 
+                /**
+                 * offMeshCon has no skeleton and is instance of node so the 
+                 * search will include its children. This will return with a 
+                 * child SkeletonControl because of this. Add check to skip 
+                 * offMeshCon.
+                 */
+                if (!spat.getName().equals(offMeshCon.getName())) {
+
+                    SkeletonControl skelCont = getState(UtilState.class).findControl(spat, SkeletonControl.class);
+
+                    if (skelCont != null) {
+                        /**
+                        * Offmesh connections require a start/end vector3f. 
+                        * To attain these vector3f, you can use bones from 
+                        * an armature. The bones must be paired and use a 
+                        * naming convention. In our case, we use:
+                        * 
+                        * arg[0](delimiter)arg[1](delimiter)arg[2]
+                        * 
+                        * You set each bone origin to any vertices, in any 
+                        * mesh, as long as the same string for arg[0] and 
+                        * arg[1] are identical and they do not use the same 
+                        * vertices. 
+                        * 
+                        * Naming convention for two bones: 
+                        * 
+                        * Bone 1 naming: offmesh.anything.a
+                        * Bone 2 naming: offmesh.anything.b
+                        * 
+                        * arg[0]: offmesh   = same value all bones
+                        * arg[1]: anything  = same value paired bones
+                        * arg[2]: a or b    = one paired bone
+                        * 
+                        * The value of arg[0] applies to ALL bones and 
+                        * dictates these are link bones.
+                        * 
+                        * The value of arg[1] dictates these pair of bones 
+                        * belong together. 
+                        * 
+                        * The value of arg[2] distinguishes the paired bones 
+                        * from each other.
+                        * 
+                        * Examples: 
+                        * 
+                        * offmesh.pond.a
+                        * offmesh.pond.b
+                        * offmesh.1.a
+                        * offmesh.1.b
+                        */
+                        Bone[] roots = skelCont.getSkeleton().getRoots();
+                        for (Bone b: roots) {
+                            /**
+                             * Split the name up using delimiter. 
+                             */
+                            String[] arg = b.getName().split("\\.");
+
+                            if (arg[0].equals("offmesh")) {
+
+                                //New connection.
+                                org.recast4j.detour.OffMeshConnection linkA = new org.recast4j.detour.OffMeshConnection();
+
+                                /**
+                                 * The bones worldTranslation will be the start 
+                                 * Vector3f of the OffMeshConnection object.
+                                 */
+                                float[] startPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
+
+                                /**
+                                 * Prepare new position array. The endpoints of 
+                                 * the connection. 
+                                 *  startPos    endPos
+                                 * [ax, ay, az, bx, by, bz]
+                                 */
+                                float[] pos = new float[6];
+
+                                //Copy linkA current postition to A.startPos. 
+                                System.arraycopy(startPos, 0, pos, 0, 3);
+
+                                //Set linkA pos to new array.
+                                linkA.pos = pos;
+
+                                //Player (r)adius. Links fire at (r) * 2.25.
+                                linkA.rad = radius;
+                                
+                                //Move through link both directions.
+                                linkA.flags = NavMesh.DT_OFFMESH_CON_BIDIR;
+
+                                /**
+                                 * We need to look for the bones mate. Based off 
+                                 * our naming convention, this will be 
+                                 * offmesh.anything."a" or "b" so we set the 
+                                 * search to whatever this bones arg[2] isn't.
+                                 */
+                                String linkB = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
+
+                                /**
+                                 * If the paired bone has already been added to 
+                                 * map, set endPos and give each an id.
+                                 */
+                                if (mapOffMeshCon.containsKey(linkB)) {
+                                    //Copy A.startPos to B.endPos.
+                                    System.arraycopy(linkA.pos, 0, mapOffMeshCon.get(linkB).pos, 3, 3);
+                                    //Copy B.startPos to A.endPos.
+                                    System.arraycopy(mapOffMeshCon.get(linkB).pos, 0, linkA.pos, 3, 3);
+
+                                    /**
+                                     * OffMeshconnections with id of 0 don't get 
+                                     * processed later.
+                                     */
+                                    linkA.userId = ++id;
+                                    LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), linkA.userId);
+                                    mapOffMeshCon.get(linkB).userId = ++id;
+                                    LOG.info("OffMeshConnection [{}] id [{}]", linkB, mapOffMeshCon.get(linkB).userId);
+
+                                }
+                                //Add this bone to map.
+                                mapOffMeshCon.put(b.getName(), linkA);
+                            }
+                        }
+                    }
+                }
+            }
+        }); 
+        
+        //Clean up offMesh connections.
+        offMeshCon.detachAllChildren();
+                
+        //Step 2. Create a Recast configuration object.
+        RecastConfigBuilder builder = new RecastConfigBuilder();
+        //Instantiate the configuration parameters.
+        RecastConfig rcConfig = builder
+                .withAgentRadius(radius)            // r
+                .withAgentHeight(height)            // h
+                //cs and ch should be .1 at min.
+                .withCellSize(0.1f)                 // cs=r/2
+                .withCellHeight(0.1f)               // ch=cs/2 but not < .1f
+                .withAgentMaxClimb(maxClimb)        // > 2*ch
+                .withAgentMaxSlope(45f)
+                .withEdgeMaxLen(3.2f)               // r*8
+                .withEdgeMaxError(1.3f)             // 1.1 - 1.5
+                .withDetailSampleDistance(6.0f)     // increase if exception
+                .withDetailSampleMaxError(6.0f)     // increase if exception
+                .withVertsPerPoly(3)
+                .withTileSize(16).build();
+
+
+        TileCache tc = getTileCache(geom, rcConfig);
+        
+        TileLayerBuilder layerBuilder = new TileLayerBuilder(geom, rcConfig);
+
+        List<byte[]> layers = layerBuilder.build(ByteOrder.BIG_ENDIAN, false, 1);
+        
+        for (byte[] data : layers) {
+            try {
+                long ref = tc.addTile(data, 0);
+                tc.buildNavMeshTile(ref);
+            } catch (IOException ex) {
+                LOG.error("{} {}" + NavState.class.getName(), ex);
+            }
+        }                
+
+        TileCacheWriter writer = new TileCacheWriter(); 
+        TileCacheReader reader = new TileCacheReader();  
+
+        try {
+            writer.write(new FileOutputStream(new File("test.tc")), tc, ByteOrder.BIG_ENDIAN, false);
+            tc = reader.read(new FileInputStream("test.tc"), 3, new JmeTileCacheMeshProcess(geom));
+            
+            navMesh = tc.getNavMesh();
+            query = new NavMeshQuery(navMesh);
+            
+            int maxTiles = tc.getTileCount();
+
+            //Tile data can be null since maxTiles is not an exact science.
+            for (int i = 0; i < maxTiles; i++) {
+                MeshData meshData = navMesh.getTile(i).data;
+                if (meshData != null ) {
+                    showDebugByArea(meshData, true);
+                }
+            }
+        } catch (IOException ex) {
+            LOG.error("{} {}", NavState.class.getName(), ex);
+        }
+        
+    }
+    
+    protected class JmeTileCacheMeshProcess implements TileCacheMeshProcess {
+
+        private final JmeInputGeomProvider m_geom;
+
+        public JmeTileCacheMeshProcess(InputGeomProvider geom) {
+            this.m_geom = (JmeInputGeomProvider) geom;
+        }
+
+        @Override
+        public void process(NavMeshDataCreateParams params) {
+            
+            // Update poly flags from areas.
+            for (int i = 0; i < params.polyCount; ++i) {
+                if (params.polyAreas[i] == DT_TILECACHE_WALKABLE_AREA) {
+                    params.polyAreas[i] = POLYAREA_TYPE_GROUND;
+                }
+
+                if (params.polyAreas[i] == POLYAREA_TYPE_GROUND 
+                ||  params.polyAreas[i] == POLYAREA_TYPE_GRASS 
+                ||  params.polyAreas[i] == POLYAREA_TYPE_ROAD) {
+                    params.polyFlags[i] = POLYFLAGS_WALK;
+                } else if (params.polyAreas[i] == POLYAREA_TYPE_WATER) {
+                    params.polyFlags[i] = POLYFLAGS_SWIM;
+                } else if (params.polyAreas[i] == POLYAREA_TYPE_DOOR) {
+                    params.polyFlags[i] = POLYFLAGS_WALK | POLYFLAGS_DOOR;
+                }
+            }
+                
+//            // Pass in off-mesh connections.
+//            if (m_geom != null) {
+//                LOG.info("params.offMeshConVerts {}", Arrays.toString(params.offMeshConVerts));
+//                LOG.info("params.offMeshConRad {}", Arrays.toString(params.offMeshConRad));
+//                LOG.info("params.offMeshConDir {}", Arrays.toString(params.offMeshConDir));
+//                LOG.info("params.offMeshConAreas {}", Arrays.toString(params.offMeshConAreas));
+//                LOG.info("params.offMeshConFlags {}", Arrays.toString(params.offMeshConFlags));
+//                LOG.info("params.offMeshConUserID {}", Arrays.toString(params.offMeshConUserID));
+//                LOG.info("params.offMeshConCount [{}]", params.offMeshConCount);
+//                System.out.println(params.tileX + "x " + params.tileY + "y");
+//                params.offMeshConVerts = m_geom.getOffMeshConVerts();
+//                params.offMeshConRad = m_geom.getOffMeshConRads();
+//                params.offMeshConDir = m_geom.getOffMeshConDirs();
+//                params.offMeshConAreas = m_geom.getOffMeshConAreas();
+//                params.offMeshConFlags = m_geom.getOffMeshConFlags();
+//                params.offMeshConUserID = m_geom.getOffMeshConId();
+//                params.offMeshConCount = m_geom.getOffMeshConCount();	
+//                LOG.info("params.offMeshConVerts {}", Arrays.toString(params.offMeshConVerts));
+//                LOG.info("params.offMeshConRad {}", Arrays.toString(params.offMeshConRad));
+//                LOG.info("params.offMeshConDir {}", Arrays.toString(params.offMeshConDir));
+//                LOG.info("params.offMeshConAreas {}", Arrays.toString(params.offMeshConAreas));
+//                LOG.info("params.offMeshConFlags {}", Arrays.toString(params.offMeshConFlags));
+//                LOG.info("params.offMeshConUserID {}", Arrays.toString(params.offMeshConUserID));
+//                LOG.info("params.offMeshConCount [{}]", params.offMeshConCount);
+//            }
+        }
+
+    }
+
+    private TileCache getTileCache(InputGeomProvider geom, RecastConfig rcfg) {
+        final int EXPECTED_LAYERS_PER_TILE = 4;
+        
+        TileCacheParams params = new TileCacheParams();
+        
+        int[] twh = Recast.calcTileCount(geom.getMeshBoundsMin(), geom.getMeshBoundsMax(), rcfg.cs, rcfg.tileSize);
+
+        params.ch = rcfg.ch;
+        params.cs = rcfg.cs;
+        vCopy(params.orig, geom.getMeshBoundsMin());
+        params.height = rcfg.tileSize;
+        params.width = rcfg.tileSize;
+        params.walkableHeight = height;
+        params.walkableRadius = radius;
+        params.walkableClimb = maxClimb;
+        params.maxSimplificationError = rcfg.maxSimplificationError;
+        params.maxTiles = twh[0] * twh[1] * EXPECTED_LAYERS_PER_TILE;
+        params.maxObstacles = 128;
+        NavMeshParams navMeshParams = new NavMeshParams();
+        copy(navMeshParams.orig, geom.getMeshBoundsMin());
+        navMeshParams.tileWidth = rcfg.tileSize * rcfg.cs;
+        navMeshParams.tileHeight = rcfg.tileSize * rcfg.cs;
+        navMeshParams.maxTiles = params.maxTiles;
+        navMeshParams.maxPolys = 16384;
+        navMesh = new NavMesh(navMeshParams, 3);
+
+        return new TileCache(params, new TileCacheStorageParams(ByteOrder.BIG_ENDIAN, false), navMesh, TileCacheCompressorFactory.get(false), new JmeTileCacheMeshProcess(geom));
+    }
+    
     /**
      * Displays a debug mesh based off the area type of the poly.
      * 
@@ -1429,12 +1758,12 @@ public class NavState extends BaseAppState {
      * @param wireFrame display as solid or wire frame. 
      */
     private void showDebugByArea(MeshData meshData, boolean wireFrame) {
-        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_GROUND, wireFrame);
-        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_WATER, wireFrame);
-        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_ROAD, wireFrame);        
-        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_DOOR, wireFrame);       
-        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_GRASS, wireFrame);       
-        sortVertsByArea(meshData, SAMPLE_POLYAREA_TYPE_JUMP, wireFrame);        
+        sortVertsByArea(meshData, POLYAREA_TYPE_GROUND, wireFrame);
+        sortVertsByArea(meshData, POLYAREA_TYPE_WATER, wireFrame);
+        sortVertsByArea(meshData, POLYAREA_TYPE_ROAD, wireFrame);        
+        sortVertsByArea(meshData, POLYAREA_TYPE_DOOR, wireFrame);       
+        sortVertsByArea(meshData, POLYAREA_TYPE_GRASS, wireFrame);       
+        sortVertsByArea(meshData, POLYAREA_TYPE_JUMP, wireFrame);        
     }
     
     /**
@@ -1543,54 +1872,34 @@ public class NavState extends BaseAppState {
     private ColorRGBA areaToCol(int area) {
         
         //Ground (1): light blue
-        if (area == SAMPLE_POLYAREA_TYPE_GROUND) {
+        if (area == POLYAREA_TYPE_GROUND) {
             return new ColorRGBA(0.0f, 0.75f, 1.0f, 1.0f);
         }
         //Water (2): blue
-        else if (area == SAMPLE_POLYAREA_TYPE_WATER) {
+        else if (area == POLYAREA_TYPE_WATER) {
             return ColorRGBA.Blue;
         }
         //Road (3): brown
-        else if (area == SAMPLE_POLYAREA_TYPE_ROAD) {
+        else if (area == POLYAREA_TYPE_ROAD) {
             return new ColorRGBA(0.2f, 0.08f, 0.05f, 1);
         }
         //Door (4): cyan
-        else if (area == SAMPLE_POLYAREA_TYPE_DOOR) {
+        else if (area == POLYAREA_TYPE_DOOR) {
             return ColorRGBA.Magenta;
         }
         //Grass (5): green
-        else if (area == SAMPLE_POLYAREA_TYPE_GRASS) {
+        else if (area == POLYAREA_TYPE_GRASS) {
             return ColorRGBA.Green;
         }
         //Jump (6): yellow
-        else if (area == SAMPLE_POLYAREA_TYPE_JUMP) {
+        else if (area == POLYAREA_TYPE_JUMP) {
             return ColorRGBA.Yellow;
         }
         //Unexpected : red
         else {
             return ColorRGBA.Red;
         }
-    }
-
-    /**
-     * Get all triangles from a mesh. Should open up jme3-recast4j existing 
-     * GeometryProviderBuilder method.
-     *
-     * @param mesh Mesh to get triangles from.
-     * @return Returns array of triangles.
-     */
-    private int[] getTriangles(Mesh mesh) {
-        int[] indices = new int[3];
-        int[] triangles = new int[mesh.getTriangleCount() * 3];
-
-        for (int i = 0; i < triangles.length; i += 3) {
-            mesh.getTriangle(i / 3, indices);
-            triangles[i] = indices[0];
-            triangles[i + 1] = indices[1];
-            triangles[i + 2] = indices[2];
-        }
-        return triangles;
-    }  
+    } 
         
     /**
      * Prints any polygons found flags to the log.
@@ -1598,24 +1907,55 @@ public class NavState extends BaseAppState {
      * @param poly The polygon id to look for flags.
      */
     private void printFlags (long poly) {
-        if (isBitSet(SAMPLE_POLYFLAGS_DOOR, navMesh.getPolyFlags(poly).result)) {
-            LOG.info("SAMPLE_POLYFLAGS_DOOR [{}]", SAMPLE_POLYFLAGS_DOOR);
+        if (isBitSet(POLYFLAGS_DOOR, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("POLYFLAGS_DOOR [{}]", POLYFLAGS_DOOR);
         }
 
-        if (isBitSet(SAMPLE_POLYFLAGS_WALK, navMesh.getPolyFlags(poly).result)) {
-            LOG.info("SAMPLE_POLYFLAGS_WALK [{}]", SAMPLE_POLYFLAGS_WALK);
+        if (isBitSet(POLYFLAGS_WALK, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("POLYFLAGS_WALK [{}]", POLYFLAGS_WALK);
         }
 
-        if (isBitSet(SAMPLE_POLYFLAGS_SWIM, navMesh.getPolyFlags(poly).result)) {
-            LOG.info("SAMPLE_POLYFLAGS_SWIM [{}]" , SAMPLE_POLYFLAGS_SWIM);
+        if (isBitSet(POLYFLAGS_SWIM, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("POLYFLAGS_SWIM [{}]" , POLYFLAGS_SWIM);
         }
 
-        if (isBitSet(SAMPLE_POLYFLAGS_JUMP, navMesh.getPolyFlags(poly).result)) {
-            LOG.info("SAMPLE_POLYFLAGS_JUMP [{}]", SAMPLE_POLYFLAGS_JUMP);
+        if (isBitSet(POLYFLAGS_JUMP, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("POLYFLAGS_JUMP [{}]", POLYFLAGS_JUMP);
         }
 
-        if (isBitSet(SAMPLE_POLYFLAGS_DISABLED, navMesh.getPolyFlags(poly).result)) {
-            LOG.info("SAMPLE_POLYFLAGS_DISABLED [{}]", SAMPLE_POLYFLAGS_DISABLED);
+        if (isBitSet(POLYFLAGS_DISABLED, navMesh.getPolyFlags(poly).result)) {
+            LOG.info("POLYFLAGS_DISABLED [{}]", POLYFLAGS_DISABLED);
+        }
+        
+    }
+    
+    /**
+     * Prints any flag found in the supplied flags.
+     * @param flags The flags to print.
+     */
+    private void printFlags (int flags) {
+        if (flags == 0) {
+            LOG.info("No flag found.");
+        }
+        
+        if (isBitSet(POLYFLAGS_DOOR, flags)) {
+            LOG.info("POLYFLAGS_DOOR         [{}]", POLYFLAGS_DOOR);
+        }
+
+        if (isBitSet(POLYFLAGS_WALK, flags)) {
+            LOG.info("POLYFLAGS_WALK         [{}]", POLYFLAGS_WALK);
+        }
+
+        if (isBitSet(POLYFLAGS_SWIM, flags)) {
+            LOG.info("POLYFLAGS_SWIM         [{}]" , POLYFLAGS_SWIM);
+        }
+
+        if (isBitSet(POLYFLAGS_JUMP, flags)) {
+            LOG.info("POLYFLAGS_JUMP         [{}]", POLYFLAGS_JUMP);
+        }
+
+        if (isBitSet(POLYFLAGS_DISABLED, flags)) {
+            LOG.info("POLYFLAGS_DISABLED     [{}]", POLYFLAGS_DISABLED);
         }
         
     }
@@ -1627,60 +1967,8 @@ public class NavState extends BaseAppState {
      * @param flags The flags to check for the supplied flag.
      * @return True if the supplied flag is set for the given flags.
      */
-    private boolean isBitSet(int flag, int flags) {
+    private static boolean isBitSet(int flag, int flags) {
         return (flags & flag) == flag;
-    }
-    
-    /**
-     * Listener for build process of tiled builds.
-     */
-    private class ProgressListen implements RecastBuilderProgressListener {
-
-        private long time = System.nanoTime();
-        private long elapsedTime;
-        private long avBuildTime;
-        private long estTotalTime;
-        private long estTimeRemain;
-        private long buildTimeNano;
-        private long elapsedTimeHr;
-        private long elapsedTimeMin;
-        private long elapsedTimeSec;
-        private long totalTimeHr;
-        private long totalTimeMin;
-        private long totalTimeSec;
-        private long timeRemainHr;
-        private long timeRemainMin;
-        private long timeRemainSec;
-
-        @Override
-        public void onProgress(int completed, int total) {
-            elapsedTime += System.nanoTime() - time;
-            avBuildTime = elapsedTime/(long)completed;
-            estTotalTime = avBuildTime * (long)total;
-            estTimeRemain = estTotalTime - elapsedTime;
-
-            buildTimeNano = TimeUnit.MILLISECONDS.convert(avBuildTime, TimeUnit.NANOSECONDS);
-            System.out.printf("Completed %d[%d] Average [%dms] ", completed, total, buildTimeNano);
-
-            elapsedTimeHr = TimeUnit.HOURS.convert(elapsedTime, TimeUnit.NANOSECONDS) % 24;
-            elapsedTimeMin = TimeUnit.MINUTES.convert(elapsedTime, TimeUnit.NANOSECONDS) % 60;
-            elapsedTimeSec = TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS) % 60;
-            System.out.printf("Elapsed Time [%02d:%02d:%02d] ", elapsedTimeHr, elapsedTimeMin, elapsedTimeSec);
-
-            totalTimeHr = TimeUnit.HOURS.convert(estTotalTime, TimeUnit.NANOSECONDS) % 24;
-            totalTimeMin = TimeUnit.MINUTES.convert(estTotalTime, TimeUnit.NANOSECONDS) % 60;
-            totalTimeSec = TimeUnit.SECONDS.convert(estTotalTime, TimeUnit.NANOSECONDS) % 60;
-            System.out.printf("Estimated Total [%02d:%02d:%02d] ", totalTimeHr, totalTimeMin, totalTimeSec);
-
-            timeRemainHr = TimeUnit.HOURS.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 24;
-            timeRemainMin = TimeUnit.MINUTES.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 60;
-            timeRemainSec = TimeUnit.SECONDS.convert(estTimeRemain, TimeUnit.NANOSECONDS) % 60;
-            System.out.printf("Remaining Time [%02d:%02d:%02d]%n", timeRemainHr, timeRemainMin, timeRemainSec);
-
-            //reset time
-            time = System.nanoTime();
-        }
-        
     }
     
     /**

@@ -31,9 +31,7 @@ import com.jme3.app.Application;
 import com.jme3.app.state.BaseAppState;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.DetourUtils;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DISABLED;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_DOOR;
-import static com.jme3.recast4j.Recast.SampleAreaModifications.SAMPLE_POLYFLAGS_WALK;
+import static com.jme3.recast4j.demo.AreaModifications.*;
 import com.jme3.scene.Spatial;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,10 +78,10 @@ public class PathState extends BaseAppState {
         //Use the DefaultQueryFilter so can set flags.        
         DefaultQueryFilter filter = new DefaultQueryFilter();
         
-        int includeFlags = SAMPLE_POLYFLAGS_WALK | SAMPLE_POLYFLAGS_DOOR;
+        int includeFlags = POLYFLAGS_WALK | POLYFLAGS_DOOR;
         filter.setIncludeFlags(includeFlags);
         
-        int excludeFlags = SAMPLE_POLYFLAGS_DISABLED;
+        int excludeFlags = POLYFLAGS_DISABLED;
         filter.setExcludeFlags(excludeFlags);
         
         //The target.
