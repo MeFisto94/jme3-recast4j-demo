@@ -56,7 +56,6 @@ import org.recast4j.detour.io.MeshDataWriter;
 import org.recast4j.detour.io.MeshSetReader;
 import org.recast4j.detour.io.MeshSetWriter;
 import org.recast4j.recast.RecastConstants.PartitionType;
-import org.recast4j.recast.geom.InputGeomProvider;
 import org.recast4j.recast.geom.TriMesh;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,12 +110,6 @@ import org.recast4j.recast.RecastMesh;
 import org.recast4j.recast.RecastMeshDetail;
 import org.recast4j.recast.RecastRasterization;
 import org.recast4j.recast.RecastRegion;
-import static org.recast4j.detour.DetourCommon.vCopy;
-import static org.recast4j.recast.RecastVectors.copy;
-import static org.recast4j.detour.DetourCommon.vCopy;
-import static org.recast4j.recast.RecastVectors.copy;
-import static org.recast4j.detour.DetourCommon.vCopy;
-import static org.recast4j.recast.RecastVectors.copy;
 import static org.recast4j.detour.DetourCommon.vCopy;
 import static org.recast4j.recast.RecastVectors.copy;
 
@@ -1237,7 +1230,7 @@ public class NavState extends BaseAppState {
                 if (m_pmesh.npolys == 0) {
                         continue;
                 }
-                
+
                 // Update obj flags from areas. Including offmesh connections.
                 for (int i = 0; i < m_pmesh.npolys; ++i) {
                     if (m_pmesh.areas[i] == POLYAREA_TYPE_GROUND
@@ -1280,6 +1273,7 @@ public class NavState extends BaseAppState {
                 navMesh.addTile(NavMeshBuilder.createNavMeshData(params), 0, 0);
             }
         }
+        
         query = new NavMeshQuery(navMesh);
         
         /**
@@ -1318,8 +1312,8 @@ public class NavState extends BaseAppState {
                 System.arraycopy(next.getValue().pos, 3, endPos, 0, 3);
 
                 //Find the nearest polys to start/end.
-                Result<FindNearestPolyResult> startPoly = query.findNearestPoly(startPos, new float[] {1,1,1}, filter);
-                Result<FindNearestPolyResult> endPoly = query.findNearestPoly(endPos, new float[] {1,1,1}, filter);
+                Result<FindNearestPolyResult> startPoly = query.findNearestPoly(startPos, new float[] {radius,radius,radius}, filter);
+                Result<FindNearestPolyResult> endPoly = query.findNearestPoly(endPos, new float[] {radius,radius,radius}, filter);
 
                 /**
                  * Note: not isFailure() here, because isSuccess guarantees us, 
@@ -1491,17 +1485,23 @@ public class NavState extends BaseAppState {
 
                     if (skelCont != null) {
                         /**
-                        * Offmesh connections require a start/end vector3f. 
-                        * To attain these vector3f, you can use bones from 
-                        * an armature. The bones must be paired and use a 
-                        * naming convention. In our case, we use:
+                        * Offmesh connections require two connections, a 
+                        * start/end vector3f and must connect to a surrounding 
+                        * tile. To complete a connection, start and end must be 
+                        * the same for each. You can supply the Vector3f manually 
+                        * or for example, use bones from an armature. When using 
+                        * bones, they should be paired and use a naming convention. 
+                        * 
+                        * In our case, we used bones and this naming convention:
                         * 
                         * arg[0](delimiter)arg[1](delimiter)arg[2]
                         * 
-                        * You set each bone origin to any vertices, in any 
-                        * mesh, as long as the same string for arg[0] and 
-                        * arg[1] are identical and they do not use the same 
-                        * vertices. 
+                        * We set each bone origin to any vertices, in any mesh, 
+                        * as long as the same string for arg[0] and arg[1] are 
+                        * identical and they do not use the same vertices. We 
+                        * duplicate two polygons (triangles) in the mesh or 
+                        * separate meshes and add an armature(s) using a naming
+                        * convention.
                         * 
                         * Naming convention for two bones: 
                         * 
@@ -1538,64 +1538,95 @@ public class NavState extends BaseAppState {
                             if (arg[0].equals("offmesh")) {
 
                                 //New connection.
-                                org.recast4j.detour.OffMeshConnection linkA = new org.recast4j.detour.OffMeshConnection();
+                                org.recast4j.detour.OffMeshConnection link1 = new org.recast4j.detour.OffMeshConnection();
 
                                 /**
-                                 * The bones worldTranslation will be the start 
-                                 * Vector3f of the OffMeshConnection object.
+                                 * The bones worldTranslation will be the start
+                                 * or end Vector3f of each OffMeshConnection 
+                                 * object.
                                  */
-                                float[] startPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
+                                float[] linkPos = DetourUtils.toFloatArray(spat.localToWorld(b.getModelSpacePosition(), null));
 
                                 /**
                                  * Prepare new position array. The endpoints of 
                                  * the connection. 
+                                 * 
                                  *  startPos    endPos
                                  * [ax, ay, az, bx, by, bz]
                                  */
                                 float[] pos = new float[6];
 
-                                //Copy linkA current postition to A.startPos. 
-                                System.arraycopy(startPos, 0, pos, 0, 3);
+                                /**
+                                 * Copy link1 current position to pos array. If
+                                 * link1 is bone (a), it becomes the link start.
+                                 * If (b), the link end.
+                                 */
+                                System.arraycopy(linkPos, 0, pos, arg[2].equals("a") ? 0:3, 3);
 
-                                //Set linkA pos to new array.
-                                linkA.pos = pos;
+                                //Set link1 to new array.
+                                link1.pos = pos;
 
                                 //Player (r)adius. Links fire at (r) * 2.25.
-                                linkA.rad = radius;
+                                link1.rad = radius;
                                 
-                                //Move through link both directions.
-                                linkA.flags = NavMesh.DT_OFFMESH_CON_BIDIR;
+                                /**
+                                 * Move through link1 both directions. Only 
+                                 * works if both links have identical in start/end.
+                                 * Set to 0 for one direction link.
+                                 */
+                                link1.flags = NavMesh.DT_OFFMESH_CON_BIDIR;
 
                                 /**
                                  * We need to look for the bones mate. Based off 
                                  * our naming convention, this will be 
                                  * offmesh.anything."a" or "b" so we set the 
-                                 * search to whatever this bones arg[2] isn't.
+                                 * search to whatever link1 arg[2] isn't.
                                  */
-                                String linkB = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
+                                String link2 = String.join(".", arg[0], arg[1], arg[2].equals("a") ? "b": "a");
 
                                 /**
                                  * If the paired bone has already been added to 
-                                 * map, set endPos and give each an id.
+                                 * map, set start or end determined by link1 arg[2].
                                  */
-                                if (mapOffMeshCon.containsKey(linkB)) {
-                                    //Copy A.startPos to B.endPos.
-                                    System.arraycopy(linkA.pos, 0, mapOffMeshCon.get(linkB).pos, 3, 3);
-                                    //Copy B.startPos to A.endPos.
-                                    System.arraycopy(mapOffMeshCon.get(linkB).pos, 0, linkA.pos, 3, 3);
+                                if (mapOffMeshCon.containsKey(link2)) {
+                                    /**
+                                     * Copy link1 pos to link2 pos. If link1 is 
+                                     * start(a) of link, copy link1 start to 
+                                     * link2 start. If link1 is the end(b) of 
+                                     * link, copy link1 end to link2 end. 
+                                     */
+                                    System.arraycopy(link1.pos, arg[2].equals("a") ? 0:3, mapOffMeshCon.get(link2).pos, arg[2].equals("a") ? 0:3, 3);
+                                    
+                                    /**
+                                     * Copy link2 pos to link1 pos. If link1 is
+                                     * the start(a) of link, copy link2 end to
+                                     * link1 end. If link1 is end(b) of link, 
+                                     * copy link2 start to link1 start.
+                                     */
+                                    System.arraycopy(mapOffMeshCon.get(link2).pos, arg[2].equals("a") ? 3:0, link1.pos, arg[2].equals("a") ? 3:0, 3);
 
                                     /**
                                      * OffMeshconnections with id of 0 don't get 
-                                     * processed later.
+                                     * processed later if not set here.
                                      */
-                                    linkA.userId = ++id;
-                                    LOG.info("OffMeshConnection [{}] id [{}]", b.getName(), linkA.userId);
-                                    mapOffMeshCon.get(linkB).userId = ++id;
-                                    LOG.info("OffMeshConnection [{}] id [{}]", linkB, mapOffMeshCon.get(linkB).userId);
-
+                                    if (arg[2].equals("a")) {
+                                        link1.userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id  [{}]", b.getName(), link1.userId);
+                                        LOG.info("OffMeshConnection [{}] pos {}", b.getName(), link1.pos);
+                                        mapOffMeshCon.get(link2).userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id  [{}]", link2, mapOffMeshCon.get(link2).userId);
+                                        LOG.info("OffMeshConnection [{}] pos {}", link2, mapOffMeshCon.get(link2).pos);
+                                    } else {
+                                        mapOffMeshCon.get(link2).userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id  [{}]", link2, mapOffMeshCon.get(link2).userId);
+                                        LOG.info("OffMeshConnection [{}] pos {}", link2, mapOffMeshCon.get(link2).pos);
+                                        link1.userId = ++id;
+                                        LOG.info("OffMeshConnection [{}] id  [{}]", b.getName(), link1.userId);
+                                        LOG.info("OffMeshConnection [{}] pos {}", b.getName(), link1.pos);
+                                    }
                                 }
                                 //Add this bone to map.
-                                mapOffMeshCon.put(b.getName(), linkA);
+                                mapOffMeshCon.put(b.getName(), link1);
                             }
                         }
                     }
@@ -1625,8 +1656,8 @@ public class NavState extends BaseAppState {
                 .withTileSize(16).build();
 
 
-        TileCache tc = getTileCache(geom, rcConfig);
-        
+        TileCache tc = getTileCache(geom, rcConfig);    
+                
         TileLayerBuilder layerBuilder = new TileLayerBuilder(geom, rcConfig);
 
         List<byte[]> layers = layerBuilder.build(ByteOrder.BIG_ENDIAN, false, 1);
@@ -1638,23 +1669,160 @@ public class NavState extends BaseAppState {
             } catch (IOException ex) {
                 LOG.error("{} {}" + NavState.class.getName(), ex);
             }
-        }                
-
+        }  
+                          
         TileCacheWriter writer = new TileCacheWriter(); 
         TileCacheReader reader = new TileCacheReader();  
 
         try {
             writer.write(new FileOutputStream(new File("test.tc")), tc, ByteOrder.BIG_ENDIAN, false);
-            tc = reader.read(new FileInputStream("test.tc"), 3, new JmeTileCacheMeshProcess(geom));
-            
+            tc = reader.read(new FileInputStream("test.tc"), 3, new JmeTileCacheMeshProcess());
+
             navMesh = tc.getNavMesh();
-            query = new NavMeshQuery(navMesh);
+            query = new NavMeshQuery(navMesh); 
+
+            /**
+             * Process OffMeshConnections. 
+             * Basic flow: 
+             * Check each mapOffMeshConnection for an index > 0. 
+             * findNearestPoly() for the start/end positions of the link.
+             * getTileAndPolyByRef() using the returned poly reference.
+             * If both start and end are good values, set the connection properties.
+             */
+            Iterator<Map.Entry<String, org.recast4j.detour.OffMeshConnection>> itOffMesh = mapOffMeshCon.entrySet().iterator();
+            while (itOffMesh.hasNext()) {
+                Map.Entry<String, org.recast4j.detour.OffMeshConnection> next = itOffMesh.next();
+
+                /**
+                 * If the OffMeshConnection id is 0, there is no paired bone for the
+                 * link so skip.
+                 */            
+                if (next.getValue().userId > 0) {
+                    //Create a new filter for findNearestPoly
+                    DefaultQueryFilter filter = new DefaultQueryFilter();
+
+                    //In our case, we only need swim or walk flags.
+                    int include = POLYFLAGS_WALK | POLYFLAGS_SWIM;
+                    filter.setIncludeFlags(include);
+
+                    //No excludes.
+                    int exclude = 0;
+                    filter.setExcludeFlags(exclude);
+
+                    //Get the start position for the link.
+                    float[] startPos = new float[3];
+                    System.arraycopy(next.getValue().pos, 0, startPos, 0, 3);
+                    //Get the end position for the link.
+                    float[] endPos = new float[3];
+                    System.arraycopy(next.getValue().pos, 3, endPos, 0, 3);
+
+                    //Find the nearest polys to start/end.
+                    Result<FindNearestPolyResult> startPoly = query.findNearestPoly(startPos, new float[] {radius,radius,radius}, filter);
+                    Result<FindNearestPolyResult> endPoly = query.findNearestPoly(endPos, new float[] {radius,radius,radius}, filter);
+
+                    /**
+                     * Note: not isFailure() here, because isSuccess guarantees us, 
+                     * that the result isn't "RUNNING", which it could be if we only 
+                     * check it's not failure.
+                     */
+                    if (!startPoly.status.isSuccess() 
+                    ||  !endPoly.status.isSuccess() 
+                    ||   startPoly.result.getNearestRef() == 0 
+                    ||   endPoly.result.getNearestRef() == 0) {
+                        LOG.error("offmeshCon findNearestPoly unsuccessful or getNearestRef is not > 0.");
+                        LOG.error("Link [{}] pos {} id [{}]", next.getKey(), Arrays.toString(next.getValue().pos), next.getValue().userId);
+                        LOG.error("findNearestPoly startPoly [{}] getNearestRef [{}]", startPoly.status.isSuccess(), startPoly.result.getNearestRef());
+                        LOG.error("findNearestPoly endPoly [{}] getNearestRef [{}].", endPoly.status.isSuccess(), endPoly.result.getNearestRef());
+                    } else {
+                        //Get the tile and poly from reference.
+                        Result<Tupple2<MeshTile, Poly>> startTileByRef = navMesh.getTileAndPolyByRef(startPoly.result.getNearestRef());
+                        Result<Tupple2<MeshTile, Poly>> endTileByRef = navMesh.getTileAndPolyByRef(endPoly.result.getNearestRef());
+
+                        //Mesh data for the start/end tile.
+                        MeshData startTile = startTileByRef.result.first.data;
+                        MeshData endTile = endTileByRef.result.first.data;
+
+                        //Both start and end poly must be vailid.
+                        if (startTileByRef.result.second != null && endTileByRef.result.second != null) {
+                            //We will add a new poly that will become our "link" 
+                            //between start and end points so make room for it.
+                            startTile.polys = Arrays.copyOf(startTile.polys, startTile.polys.length + 1);
+                            //We shifted everything but haven't incremented polyCount 
+                            //yet so this will become our new poly's index.
+                            int poly = startTile.header.polyCount;
+                            /**
+                             * Off-mesh connections are stored in the navigation 
+                             * mesh as special 2-vertex polygons with a single edge. 
+                             * At least one of the vertices is expected to be inside 
+                             * a normal polygon. So an off-mesh connection is 
+                             * "entered" from a normal polygon at one of its 
+                             * endpoints. Jme requires 3 vertices per poly to 
+                             * compile so we have to create a 3-vertex polygon. The 
+                             * extra vertex position will be connected automatically 
+                             * when we add the tile back to the navmesh.
+                             * 
+                             * See: https://github.com/ppiastucki/recast4j/blob/3c532068d79fe0306fedf035e50216008c306cdf/detour/src/main/java/org/recast4j/detour/NavMesh.java#L406
+                             */
+                            startTile.polys[poly] = new Poly(poly, 3);
+                            /**
+                             * Must add/create our new indices for start and end.
+                             * When we add the tile, the third vert will be 
+                             * generated for us. 
+                             */
+                            startTile.polys[poly].verts[0] = startTile.header.vertCount;
+                            startTile.polys[poly].verts[1] = startTile.header.vertCount + 1;
+                            //Set the poly's type to DT_POLYTYPE_OFFMESH_CONNECTION
+                            //so it is not seen as a regular poly when linking.
+                            startTile.polys[poly].setType(Poly.DT_POLYTYPE_OFFMESH_CONNECTION);
+                            //Make room for our start/end verts.
+                            startTile.verts = Arrays.copyOf(startTile.verts, startTile.verts.length + 6);
+                            //Increment our poly and vert counts.
+                            startTile.header.polyCount++;
+                            startTile.header.vertCount += 2;
+                            //Set our OffMeshLinks poly to this new poly.
+                            next.getValue().poly = poly;
+                            //Shorten names and make readable. Could just call directly.
+                            float[] start = startPoly.result.getNearestPos();
+                            float[] end = endPoly.result.getNearestPos();
+                            //Set the links position array values to nearest.
+                            next.getValue().pos = new float[] { start[0], start[1], start[2], end[0], end[1], end[2] };
+                            //Determine what side of the tile the vertx is on.
+                            next.getValue().side = startTile == endTile ? 0xFF
+                                    : NavMeshBuilder.classifyOffMeshPoint(new VectorPtr(next.getValue().pos, 3),
+                                            startTile.header.bmin, startTile.header.bmax);
+                            //Create new OffMeshConnection array.
+                            if (startTile.offMeshCons == null) {
+                                    startTile.offMeshCons = new org.recast4j.detour.OffMeshConnection[1];
+                            } else {
+                                    startTile.offMeshCons = Arrays.copyOf(startTile.offMeshCons, startTile.offMeshCons.length + 1);
+                            }
+
+                            //Add this connection.
+                            startTile.offMeshCons[startTile.offMeshCons.length - 1] = next.getValue();
+                            startTile.header.offMeshConCount++;
+
+                            //Set the polys area type and flags.
+                            startTile.polys[poly].flags = POLYFLAGS_JUMP;
+                            startTile.polys[poly].setArea(POLYAREA_TYPE_JUMP);
+
+                            /**
+                             * Removing and adding the tile will rebuild all the 
+                             * links for the tile automatically. The number of links 
+                             * is : edges + portals * 2 + off-mesh con * 2.
+                             */
+                            MeshData removeTile = navMesh.removeTile(navMesh.getTileRef(startTileByRef.result.first));
+                            navMesh.addTile(removeTile, 0, navMesh.getTileRef(startTileByRef.result.first));                      
+                        }
+                    }       
+                }
+            }
             
             int maxTiles = tc.getTileCount();
 
             //Tile data can be null since maxTiles is not an exact science.
             for (int i = 0; i < maxTiles; i++) {
-                MeshData meshData = navMesh.getTile(i).data;
+                MeshTile tile = tc.getNavMesh().getTile(i);
+                MeshData meshData = tile.data;
                 if (meshData != null ) {
                     showDebugByArea(meshData, true);
                 }
@@ -1667,17 +1835,12 @@ public class NavState extends BaseAppState {
     
     protected class JmeTileCacheMeshProcess implements TileCacheMeshProcess {
 
-        private final JmeInputGeomProvider m_geom;
-
-        public JmeTileCacheMeshProcess(InputGeomProvider geom) {
-            this.m_geom = (JmeInputGeomProvider) geom;
-        }
-
         @Override
-        public void process(NavMeshDataCreateParams params) {
-            
+        public void process(NavMeshDataCreateParams params) {            
             // Update poly flags from areas.
             for (int i = 0; i < params.polyCount; ++i) {
+                Poly p = new Poly(i, 6);
+                
                 if (params.polyAreas[i] == DT_TILECACHE_WALKABLE_AREA) {
                     params.polyAreas[i] = POLYAREA_TYPE_GROUND;
                 }
@@ -1710,19 +1873,20 @@ public class NavState extends BaseAppState {
 //                params.offMeshConFlags = m_geom.getOffMeshConFlags();
 //                params.offMeshConUserID = m_geom.getOffMeshConId();
 //                params.offMeshConCount = m_geom.getOffMeshConCount();	
-//                LOG.info("params.offMeshConVerts {}", Arrays.toString(params.offMeshConVerts));
-//                LOG.info("params.offMeshConRad {}", Arrays.toString(params.offMeshConRad));
-//                LOG.info("params.offMeshConDir {}", Arrays.toString(params.offMeshConDir));
-//                LOG.info("params.offMeshConAreas {}", Arrays.toString(params.offMeshConAreas));
-//                LOG.info("params.offMeshConFlags {}", Arrays.toString(params.offMeshConFlags));
-//                LOG.info("params.offMeshConUserID {}", Arrays.toString(params.offMeshConUserID));
-//                LOG.info("params.offMeshConCount [{}]", params.offMeshConCount);
+//                System.out.println("params.offMeshConVerts " + Arrays.toString(params.offMeshConVerts));
+//                System.out.println("params.offMeshConRad " + Arrays.toString(params.offMeshConRad));
+//                System.out.println("params.offMeshConDir " + Arrays.toString(params.offMeshConDir));
+//                System.out.println("params.offMeshConAreas " + Arrays.toString(params.offMeshConAreas));
+//                System.out.println("params.offMeshConFlags " + Arrays.toString(params.offMeshConFlags));
+//                System.out.println("params.offMeshConUserID " + Arrays.toString(params.offMeshConUserID));
+//                System.out.println("params.offMeshConCount " + params.offMeshConCount);
+//                System.out.println("params.userId " + params.userId);
 //            }
         }
 
     }
 
-    private TileCache getTileCache(InputGeomProvider geom, RecastConfig rcfg) {
+    private TileCache getTileCache(JmeInputGeomProvider geom, RecastConfig rcfg) {
         final int EXPECTED_LAYERS_PER_TILE = 4;
         
         TileCacheParams params = new TileCacheParams();
@@ -1746,9 +1910,9 @@ public class NavState extends BaseAppState {
         navMeshParams.tileHeight = rcfg.tileSize * rcfg.cs;
         navMeshParams.maxTiles = params.maxTiles;
         navMeshParams.maxPolys = 16384;
-        navMesh = new NavMesh(navMeshParams, 3);
+        NavMesh navMesh = new NavMesh(navMeshParams, 3);
 
-        return new TileCache(params, new TileCacheStorageParams(ByteOrder.BIG_ENDIAN, false), navMesh, TileCacheCompressorFactory.get(false), new JmeTileCacheMeshProcess(geom));
+        return new TileCache(params, new TileCacheStorageParams(ByteOrder.BIG_ENDIAN, false), navMesh, TileCacheCompressorFactory.get(false), new JmeTileCacheMeshProcess());
     }
     
     /**
