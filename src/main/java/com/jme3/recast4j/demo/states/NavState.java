@@ -1656,33 +1656,50 @@ public class NavState extends BaseAppState {
                 .withTileSize(16).build();
 
 
+        //Build the tile cache which also builds the navMesh.
         TileCache tc = getTileCache(geom, rcConfig);    
-                
+            
+        /**
+         * Layers represent heights for the tile cache. For example, a bridge
+         * with an underpass would have a layer for travel under the bridge and 
+         * another for traveling over the bridge.
+         */
         TileLayerBuilder layerBuilder = new TileLayerBuilder(geom, rcConfig);
 
         List<byte[]> layers = layerBuilder.build(ByteOrder.BIG_ENDIAN, false, 1);
         
         for (byte[] data : layers) {
             try {
+                /**
+                 * The way tile cache works is you have two tiles, one is for 
+                 * the cache and is added here with addTile. The other is for 
+                 * the NavMesh and is added with buildNavMeshTile.
+                 */
                 long ref = tc.addTile(data, 0);
                 tc.buildNavMeshTile(ref);
             } catch (IOException ex) {
                 LOG.error("{} {}" + NavState.class.getName(), ex);
             }
         }  
-                          
+                    
+        //Save and read back for testing.
         TileCacheWriter writer = new TileCacheWriter(); 
         TileCacheReader reader = new TileCacheReader();  
 
         try {
+            //Write our file.
             writer.write(new FileOutputStream(new File("test.tc")), tc, ByteOrder.BIG_ENDIAN, false);
+            //Create new tile cache.
             tc = reader.read(new FileInputStream("test.tc"), 3, new JmeTileCacheMeshProcess());
 
+            //Get the navMesh and build a querry object.
             navMesh = tc.getNavMesh();
             query = new NavMeshQuery(navMesh); 
 
             /**
-             * Process OffMeshConnections. 
+             * Process OffMeshConnections. Since we are reading this in we do it 
+             * here. If we were just running with the tile cache we first 
+             * created we would just place this after building the tiles.
              * Basic flow: 
              * Check each mapOffMeshConnection for an index > 0. 
              * findNearestPoly() for the start/end positions of the link.
@@ -1833,6 +1850,10 @@ public class NavState extends BaseAppState {
         
     }
     
+    /**
+     * This is a mandatory class otherwise the tile cache build will not set
+     * the areas. This gets call from the tc.buildNavMeshTile(ref) method.
+     */
     protected class JmeTileCacheMeshProcess implements TileCacheMeshProcess {
 
         @Override
@@ -1855,37 +1876,11 @@ public class NavState extends BaseAppState {
                     params.polyFlags[i] = POLYFLAGS_WALK | POLYFLAGS_DOOR;
                 }
             }
-                
-//            // Pass in off-mesh connections.
-//            if (m_geom != null) {
-//                LOG.info("params.offMeshConVerts {}", Arrays.toString(params.offMeshConVerts));
-//                LOG.info("params.offMeshConRad {}", Arrays.toString(params.offMeshConRad));
-//                LOG.info("params.offMeshConDir {}", Arrays.toString(params.offMeshConDir));
-//                LOG.info("params.offMeshConAreas {}", Arrays.toString(params.offMeshConAreas));
-//                LOG.info("params.offMeshConFlags {}", Arrays.toString(params.offMeshConFlags));
-//                LOG.info("params.offMeshConUserID {}", Arrays.toString(params.offMeshConUserID));
-//                LOG.info("params.offMeshConCount [{}]", params.offMeshConCount);
-//                System.out.println(params.tileX + "x " + params.tileY + "y");
-//                params.offMeshConVerts = m_geom.getOffMeshConVerts();
-//                params.offMeshConRad = m_geom.getOffMeshConRads();
-//                params.offMeshConDir = m_geom.getOffMeshConDirs();
-//                params.offMeshConAreas = m_geom.getOffMeshConAreas();
-//                params.offMeshConFlags = m_geom.getOffMeshConFlags();
-//                params.offMeshConUserID = m_geom.getOffMeshConId();
-//                params.offMeshConCount = m_geom.getOffMeshConCount();	
-//                System.out.println("params.offMeshConVerts " + Arrays.toString(params.offMeshConVerts));
-//                System.out.println("params.offMeshConRad " + Arrays.toString(params.offMeshConRad));
-//                System.out.println("params.offMeshConDir " + Arrays.toString(params.offMeshConDir));
-//                System.out.println("params.offMeshConAreas " + Arrays.toString(params.offMeshConAreas));
-//                System.out.println("params.offMeshConFlags " + Arrays.toString(params.offMeshConFlags));
-//                System.out.println("params.offMeshConUserID " + Arrays.toString(params.offMeshConUserID));
-//                System.out.println("params.offMeshConCount " + params.offMeshConCount);
-//                System.out.println("params.userId " + params.userId);
-//            }
         }
 
     }
 
+    //Build the tile cache.
     private TileCache getTileCache(JmeInputGeomProvider geom, RecastConfig rcfg) {
         final int EXPECTED_LAYERS_PER_TILE = 4;
         
