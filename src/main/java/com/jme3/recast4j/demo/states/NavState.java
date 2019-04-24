@@ -1208,7 +1208,9 @@ public class NavState extends BaseAppState {
                 .withDetailSampleDistance(6.0f)     // increase if exception
                 .withDetailSampleMaxError(6.0f)     // increase if exception
                 .withVertsPerPoly(3)
-                .withTileSize(16).build(); 
+                .withTileSize(16)
+                .withPartitionType(PartitionType.MONOTONE)
+                .build(); 
         // Build all tiles
         RecastBuilder rb = new RecastBuilder(new ProgressListen());
         RecastBuilderResult[][] rcResult = rb.buildTiles(geom, cfg, 1);
@@ -1352,9 +1354,11 @@ public class NavState extends BaseAppState {
                          * a normal polygon. So an off-mesh connection is 
                          * "entered" from a normal polygon at one of its 
                          * endpoints. Jme requires 3 vertices per poly to 
-                         * compile so we have to create a 3-vertex polygon. The 
-                         * extra vertex position will be connected automatically 
-                         * when we add the tile back to the navmesh.
+                         * build a debug mesh so we have to create a 
+                         * 3-vertex polygon here if using debug. The extra 
+                         * vertex position will be connected automatically 
+                         * when we add the tile back to the navmesh. For 
+                         * games, this would be a two vert poly.
                          * 
                          * See: https://github.com/ppiastucki/recast4j/blob/3c532068d79fe0306fedf035e50216008c306cdf/detour/src/main/java/org/recast4j/detour/NavMesh.java#L406
                          */
@@ -1774,9 +1778,11 @@ public class NavState extends BaseAppState {
                              * a normal polygon. So an off-mesh connection is 
                              * "entered" from a normal polygon at one of its 
                              * endpoints. Jme requires 3 vertices per poly to 
-                             * compile so we have to create a 3-vertex polygon. The 
-                             * extra vertex position will be connected automatically 
-                             * when we add the tile back to the navmesh.
+                             * build a debug mesh so we have to create a 
+                             * 3-vertex polygon here if using debug. The extra 
+                             * vertex position will be connected automatically 
+                             * when we add the tile back to the navmesh. For 
+                             * games, this would be a two vert poly.
                              * 
                              * See: https://github.com/ppiastucki/recast4j/blob/3c532068d79fe0306fedf035e50216008c306cdf/detour/src/main/java/org/recast4j/detour/NavMesh.java#L406
                              */
