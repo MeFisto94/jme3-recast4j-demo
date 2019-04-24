@@ -131,20 +131,13 @@ public class NavState extends BaseAppState {
     private float maxClimb = .3f; //Should add getter for this.
     private float radius = 0.4f; //Should add getter for this.
     private float height = 1.7f; //Should add getter for this.
-    private int DT_TILECACHE_WALKABLE_AREA;
+    //This is unused in recast4j so setting it here rather than using reflection.
+    private static final int DT_TILECACHE_WALKABLE_AREA = 63;
     
     public NavState() {
         pathGeometries = new ArrayList<>(64);
         characters = new ArrayList<>(64);  
         mapOffMeshCon = new HashMap<>();
-        TileCacheBuilder builder = new TileCacheBuilder();
-        try {
-            Field tcWalkableArea = builder.getClass().getDeclaredField("DT_TILECACHE_WALKABLE_AREA");
-            tcWalkableArea.setAccessible(true);
-            DT_TILECACHE_WALKABLE_AREA = tcWalkableArea.getInt(builder);
-        } catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException ex) {
-            LOG.error("{} {}", NavState.class.getName(),ex);
-        }
     }
     
     @Override
