@@ -77,7 +77,6 @@ import com.jme3.recast4j.demo.RecastBuilder;
 import com.jme3.recast4j.demo.TileLayerBuilder;
 import com.jme3.recast4j.demo.controls.DoorSwingControl;
 import com.jme3.util.BufferUtils;
-import java.lang.reflect.Field;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.Arrays;
@@ -85,7 +84,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.recast4j.detour.tilecache.TileCache;
-import org.recast4j.detour.tilecache.TileCacheBuilder;
 import org.recast4j.detour.tilecache.TileCacheMeshProcess;
 import org.recast4j.detour.tilecache.TileCacheParams;
 import org.recast4j.detour.tilecache.TileCacheStorageParams;
@@ -1202,7 +1200,6 @@ public class NavState extends BaseAppState {
                 .withDetailSampleMaxError(6.0f)     // increase if exception
                 .withVertsPerPoly(3)
                 .withTileSize(16)
-                .withPartitionType(PartitionType.MONOTONE)
                 .build(); 
         // Build all tiles
         RecastBuilder rb = new RecastBuilder(new ProgressListen());
@@ -1650,8 +1647,8 @@ public class NavState extends BaseAppState {
                 .withDetailSampleDistance(6.0f)     // increase if exception
                 .withDetailSampleMaxError(6.0f)     // increase if exception
                 .withVertsPerPoly(3)
+                .withPartitionType(PartitionType.MONOTONE)
                 .withTileSize(16).build();
-
 
         //Build the tile cache which also builds the navMesh.
         TileCache tc = getTileCache(geom, rcConfig);    
