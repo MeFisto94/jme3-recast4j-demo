@@ -33,6 +33,7 @@ import com.jme3.app.state.BaseAppState;
 import com.jme3.input.event.MouseButtonEvent;
 import com.jme3.math.Vector3f;
 import com.jme3.recast4j.Detour.BetterDefaultQueryFilter;
+import com.jme3.recast4j.Detour.Crowd.CircleFormationHandler;
 import com.jme3.recast4j.Detour.Crowd.Crowd;
 import com.jme3.recast4j.Detour.Crowd.CrowdManager;
 import com.jme3.recast4j.Detour.Crowd.Impl.CrowdManagerAppstate;
@@ -1019,7 +1020,7 @@ public class CrowdBuilderState extends BaseAppState {
                 updateFiltersList();
             }
 
-            crowd.setFormationHandler(null);
+            crowd.setFormationHandler(new CircleFormationHandler(maxAgents, crowd, 2f));
             
             //Add to CrowdManager, mapCrowds, and listBoxActiveCrowds.
             getState(CrowdManagerAppstate.class).getCrowdManager().addCrowd(crowd);
@@ -1443,7 +1444,7 @@ public class CrowdBuilderState extends BaseAppState {
      * selected, re-populates by creating all new BetterDefaultQueryFilter.
      * 
      * If checkEditActive is unchecked: Updates by clearing the list then 
-     * re-populating using all new BetterDeafaultQueryFilter.
+     * re-populating using all new BetterDefaultQueryFilter.
      */
     private void updateFiltersList() {
         listBoxFilters.getModel().clear();
