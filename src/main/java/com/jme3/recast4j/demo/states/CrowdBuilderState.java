@@ -1062,7 +1062,7 @@ public class CrowdBuilderState extends BaseAppState {
             velBias = new Float(fieldVelocityBias.getText());
             //Stop negative input.
             if (velBias < 0.0f || velBias > 1) {
-                displayMessage("[ fieldVelocityBias ] requires a float value between 0 and 1 inclusive.", 0);
+                displayMessage("[ velocityBias ] requires a float value between 0 and 1 inclusive.", 0);
                 return;
             }
         }
@@ -1084,13 +1084,13 @@ public class CrowdBuilderState extends BaseAppState {
         //The weighted current velocity settings.
         if (!getState(UtilState.class).isNumeric(fieldWeightCurVel.getText()) 
         ||  fieldWeightCurVel.getText().isEmpty()) {
-            displayMessage("[ fieldWeightCurVel ] requires a valid float value.", 0);
+            displayMessage("[ weightCurVel ] requires a valid float value.", 0);
             return;
         } else {
             weightCurVel = new Float(fieldWeightCurVel.getText());
             //Stop negative input.
             if (weightCurVel < 0.0f) {
-                displayMessage("[ fieldWeightCurVel ] requires a float value >= 0.", 0);
+                displayMessage("[ weightCurVel ] requires a float value >= 0.", 0);
                 return;
             }
         }
@@ -1098,13 +1098,13 @@ public class CrowdBuilderState extends BaseAppState {
         //The weighted side settings.
         if (!getState(UtilState.class).isNumeric(fieldWeightSide.getText()) 
         ||  fieldWeightSide.getText().isEmpty()) {
-            displayMessage("[ fieldWeightSide ] requires a valid float value.", 0);
+            displayMessage("[ weightSide ] requires a valid float value.", 0);
             return;
         } else {
             weightSide = new Float(fieldWeightSide.getText());
             //Stop negative input.
             if (weightSide < 0.0f) {
-                displayMessage("[ fieldWeightSide ] requires a float value >= 0.", 0);
+                displayMessage("[ weightSide ] requires a float value >= 0.", 0);
                 return;
             }
         }
@@ -1112,13 +1112,13 @@ public class CrowdBuilderState extends BaseAppState {
         //The weight to impact settings.
         if (!getState(UtilState.class).isNumeric(fieldWeightToi.getText()) 
         ||  fieldWeightToi.getText().isEmpty()) {
-            displayMessage("[ fieldWeightToi ] requires a valid float value.", 0);
+            displayMessage("[ weightToi ] requires a valid float value.", 0);
             return;
         } else {
             weightToi = new Float(fieldWeightToi.getText());
             //Stop negative input.
             if (weightToi < 0.0f) {
-                displayMessage("[ fieldWeightToi ] requires a float value >= 0.", 0);
+                displayMessage("[ weightToi ] requires a float value >= 0.", 0);
                 return;
             }
         }        
@@ -1126,26 +1126,26 @@ public class CrowdBuilderState extends BaseAppState {
         //The horizon settings.
         if (!getState(UtilState.class).isNumeric(fieldHorizTime.getText()) 
         ||  fieldHorizTime.getText().isEmpty()) {
-            displayMessage("[ fieldHorizTime ] requires a valid float value.", 0);
+            displayMessage("[ horizTime ] requires a valid float value.", 0);
             return;
         } else {
             horizTime = new Float(fieldHorizTime.getText());
             //Stop negative input.
             if (weightToi < 0.0f) {
-                displayMessage("[ fieldHorizTime ] requires a float value >= 0.", 0);
+                displayMessage("[ horizTime ] requires a float value >= 0.", 0);
                 return;
             }
         }       
         
         //The grid size settings. Uses numeric doc filter to prevent bad data.
         if (fieldGridSize.getText().isEmpty()) {
-            displayMessage("[ fieldGridSize ] requires a valid int value.", 0);
+            displayMessage("[ gridSize ] requires a valid int value.", 0);
             return;
         } else {
             gridSize = new Integer(fieldGridSize.getText());
             //Stop useless input.
             if (gridSize < 1) {
-                displayMessage("[ fieldGridSize ] requires a int value >= 1.", 0);
+                displayMessage("[ gridSize ] requires a int value >= 1.", 0);
                 return;
             }
         }
